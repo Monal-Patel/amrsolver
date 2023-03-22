@@ -49,3 +49,7 @@ EB_CNS/Exec/Sod/tmp_build_dir
 /lib/boost/project-config.jam
 /lib/boost/tools
 /lib/boost/b2
+
+/tst/AMReX_regtests/output/AMReX-benchmarks/*
+/tst/AMReX_regtests/output/AMReX-tests/*
+/tst/AMReX_regtests/output/web/*
