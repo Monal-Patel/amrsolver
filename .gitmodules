@@ -4,3 +4,6 @@
 [submodule "lib/cgal"]
 	path = lib/cgal
 	url = https://github.com/CGAL/cgal.git
+[submodule "tst/regression_testing"]
+	path = tst/regression_testing
+	url = https://github.com/AMReX-Codes/regression_testing.git
