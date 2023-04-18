@@ -5,7 +5,9 @@
 
 #include <CNS.H>
 
+#ifdef AMREX_USE_GPIBM
 #include <IBM.H>
+#endif
 
 using namespace amrex;
 
@@ -33,7 +35,7 @@ int main (int argc, char* argv[]) {
         pp.query("max_step",max_step);
         pp.query("strt_time",strt_time);
         pp.query("time_step",CNS::dt_glob);
-        pp.get("ib.filename",IBfilename);
+        // pp.get("ib.filename",IBfilename);
         stop_time = max_step*CNS::dt_glob;
     }
 
@@ -46,10 +48,12 @@ int main (int argc, char* argv[]) {
     // Read input and setup ----------------------------------------------------
     {
         double timer_init = amrex::second();
+        Amr amr(getLevelBld());
+#ifdef AMREX_USE_GPIBM
         IBM::ib.setMaxLevel(max_level);
         IBM::ib.readGeom(IBfilename);
-        Amr amr(getLevelBld());
         IBM::ib.initialise(&amr,2,CNS::NUM_GROW);
+#endif
         amr.init(strt_time,stop_time);
         timer_init = amrex::second() - timer_init;
     // -------------------------------------------------------------------------

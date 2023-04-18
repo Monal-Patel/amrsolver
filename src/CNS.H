@@ -140,9 +140,11 @@ public:
 
     static amrex::Real gravity;
 
-    static Parm* parm;
+public:
+public:
+    static Parm* h_parm;
     static Parm* d_parm;
-    static ProbParm* prob_parm;
+    static ProbParm* h_prob_parm;
     static ProbParm* d_prob_parm;
 };
 

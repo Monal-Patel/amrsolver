@@ -1,7 +1,8 @@
 amrex.fpe_trap_invalid=1
 
-max_step  = 100000
+max_step  = 100
 stop_time = 0.2
+time_step = 0.2e-2
 
 geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical

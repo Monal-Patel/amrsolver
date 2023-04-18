@@ -34,9 +34,12 @@ include $(TOP)/src/cls/Make.package
 INCLUDE_LOCATIONS += $(TOP)/src/cls/
 VPATH_LOCATIONS   += $(TOP)/src/cls/
 
-include $(TOP)/src/ibm/Make.package
-INCLUDE_LOCATIONS += $(TOP)/src/ibm/
-VPATH_LOCATIONS   += $(TOP)/src/ibm/
+ifeq ($(USE_IBM),TRUE)
+  include $(TOP)/src/ibm/Make.package
+  INCLUDE_LOCATIONS += $(TOP)/src/ibm/
+  VPATH_LOCATIONS   += $(TOP)/src/ibm/
+  DEFINES += -DAMREX_USE_GPIBM
+endif
 
 include $(AMREX_HOME)/Src/Base/Make.package
 include $(AMREX_HOME)/Src/Boundary/Make.package

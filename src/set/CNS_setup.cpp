@@ -5,9 +5,9 @@
 using namespace amrex;
 
 int CNS::num_state_data_types = 0;
-Parm* CNS::parm = nullptr;
+Parm* CNS::h_parm = nullptr;
 Parm* CNS::d_parm = nullptr;
-ProbParm* CNS::prob_parm = nullptr;
+ProbParm* CNS::h_prob_parm = nullptr;
 ProbParm* CNS::d_prob_parm = nullptr;
 
 static Box the_same_box (const Box& b) { return b; }
@@ -100,13 +100,15 @@ set_z_vel_bc(BCRec& bc, const BCRec& phys_bc)
 void
 CNS::variableSetUp ()
 {
-    parm = new Parm{}; // This is deleted in CNS::variableCleanUp().
-    prob_parm = new ProbParm{};
+    // parm = new Parm{}; // This is deleted in CNS::variableCleanUp().
+    // prob_parm = new ProbParm{};
     // parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
     // prob_parm = (ProbParm*)The_Arena()->alloc(sizeof(ProbParm));
 
-    // amrex::Print() << prob_parm->p_l << parm->eos_gamma;
-    // exit(0);
+    h_parm = new Parm{}; // This is deleted in CNS::variableCleanUp().
+    h_prob_parm = new ProbParm{};
+    d_parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
+    d_prob_parm = (ProbParm*)The_Arena()->alloc(sizeof(ProbParm));
 
     read_params();
 
@@ -174,14 +176,14 @@ CNS::variableSetUp ()
 void
 CNS::variableCleanUp ()
 {
-    // delete parm;
-    // delete prob_parm;
-    // The_Arena()->free(parm);
-    // The_Arena()->free(prob_parm);
+    delete h_parm;
+    delete h_prob_parm;
+    The_Arena()->free(d_parm);
+    The_Arena()->free(d_prob_parm);
     desc_lst.clear();
     derive_lst.clear();
 
-#ifdef AMREX_USE_GPU
-    The_Arena()->free(dp_refine_boxes);
-#endif
+// #ifdef AMREX_USE_GPU
+//     The_Arena()->free(dp_refine_boxes);
+// #endif
 }

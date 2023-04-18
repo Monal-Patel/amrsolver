@@ -6,6 +6,7 @@ USE_OMP = FALSE
 
 include ./Make.package
 include ../src/Make.CNS
+
 INCLUDE_LOCATIONS += ../lib/install/boost/include
 LIBRARY_LOCATIONS += ../lib/install/boost/lib
 #LIBRARIES += -lboost

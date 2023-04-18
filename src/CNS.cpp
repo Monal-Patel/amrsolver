@@ -4,7 +4,10 @@
 #include <CNS_K.H>
 #include <cns_prob.H>
 #include <CNS_parm.H>
+
+#ifdef AMREX_USE_GPIBM
 #include <IBM.H>
+#endif
 
 using namespace amrex;
 
@@ -75,9 +78,10 @@ void CNS::read_params () {
 
     pp.query("gravity", gravity);
 
-    // pp.query("eos_gamma", h_parm->eos_gamma);
+    pp.query("eos_gamma", h_parm->eos_gamma);
 
-    parm->Initialize();
+    h_parm->Initialize();
+    amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
 }
 
 void CNS::init (AmrLevel& old) {
@@ -111,14 +115,14 @@ void CNS::initData ()
     const auto geomdata = geom.data();
     MultiFab& S_new = get_new_data(State_Type);
 
-    // Parm const* lparm = d_parm;
-    // ProbParm const* lprobparm = d_prob_parm;
+    Parm const* lparm = d_parm;
+    ProbParm const* lprobparm = d_prob_parm;
 
     auto const& sma = S_new.arrays();
     amrex::ParallelFor(S_new,
     [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
     {
-        cns_initdata(i, j, k, sma[box_no], geomdata, *parm, *prob_parm);
+        cns_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
     });
 
     // Compute the initial temperature (will override what was set in initdata)
@@ -156,7 +160,7 @@ void CNS::computeTemp (MultiFab& State, int ng)
 {
     BL_PROFILE("CNS::computeTemp()");
 
-    Parm const* lparm = parm;
+    Parm const* lparm = d_parm;
 
     // This will reset Eint and compute Temperature
 #ifdef AMREX_USE_OMP
@@ -275,16 +279,20 @@ void CNS::post_timestep (int /*iteration*/) {
 // Gridding -------------------------------------------------------------------
 void CNS::post_regrid (int lbase, int new_finest) { 
 
+#ifdef AMREX_USE_GPIBM
       IBM::ib.destroyIBMultiFab(level);
       IBM::ib.buildIBMultiFab(this->boxArray(),this->DistributionMap(),level,2,2);
       IBM::ib.computeMarkers(level);
       IBM::ib.initialiseGPs(level);
+#endif
 }
 
 
 void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
   Real time, int /*n_error_buf*/, int /*ngrow*/) {
 
+
+#ifdef AMREX_USE_GPIBM
   // MF without ghost points filled (why?)
   MultiFab sdata( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
 
@@ -295,6 +303,7 @@ void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
   // call function from cns_prob
   IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
   tagging(tags, sdata, level, ibdata);
+#endif
 
 
   // -------------------------------- Monal 03/03/23
@@ -394,7 +403,9 @@ void CNS::writePlotFile (const std::string& dir,
     int n_data_items = plot_var_map.size() + num_derive;
 
 //----------------------------------------------------------------------modified
+#ifdef AMREX_USE_GPIBM
     n_data_items += 2;
+#endif
 //------------------------------------------------------------------------------
 
     // get the time from the first State_Type
@@ -432,8 +443,10 @@ void CNS::writePlotFile (const std::string& dir,
         }
 
 //----------------------------------------------------------------------modified
+#ifdef AMREX_USE_GPIBM
         os << "sld\n";
         os << "ghs\n";
+#endif
 //------------------------------------------------------------------------------
 
         os << AMREX_SPACEDIM << '\n';
@@ -560,8 +573,10 @@ void CNS::writePlotFile (const std::string& dir,
     }
 
 //----------------------------------------------------------------------modified
+#ifdef AMREX_USE_GPIBM
     plotMF.setVal(0.0, cnt, 2, nGrow);
     IBM::ib.mfa.at(level)->copytoRealMF(plotMF,0,cnt);
+#endif
 //------------------------------------------------------------------------------
 
     //

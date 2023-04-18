@@ -1,8 +1,9 @@
 #include <CNS.H>
 #include <AMReX_FluxRegister.H>
 #include <CNS_hydro_K.H>
+#ifdef AMREX_USE_GPIBM
 #include <IBM.H>
-
+#endif
 using namespace amrex;
 
 
@@ -42,8 +43,10 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, NUM_STATE);
     // fillpatch copies data from leveldata to sborder
 
+#ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(level,Sborder);
     // exit(0);
+#endif
 
     compute_dSdt(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // U^* = U^n + dt*dUdt^n
@@ -54,7 +57,9 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     // After fillpatch Sborder = U^n+dt*dUdt^n
     FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, NUM_STATE);
 
+#ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(level,Sborder);
+#endif
 
     compute_dSdt(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
@@ -86,7 +91,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
                             S.DistributionMap(), ncomp, 0);
     }
 
-    Parm const* lparm = parm;
+    Parm const* lparm = d_parm;
 
     FArrayBox qtmp, slopetmp;
     for (MFIter mfi(S); mfi.isValid(); ++mfi)
