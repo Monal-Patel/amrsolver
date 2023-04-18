@@ -43,7 +43,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     // fillpatch copies data from leveldata to sborder
 
     IBM::ib.computeGPs(level,Sborder);
-    exit(0);
+    // exit(0);
 
     compute_dSdt(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // U^* = U^n + dt*dUdt^n

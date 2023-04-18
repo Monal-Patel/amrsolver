@@ -34,11 +34,12 @@ EB_CNS/Exec/Sod/tmp_build_dir
 .vscode/settings.json
 .vscode/targets.log
 
-/wrk/plt*
-/wrk/tmp_build_dir
-/wrk/*.ex
-/wrk/*.off
-/wrk/Backtrace.*
+#/wrk/plt*
+#/wrk/tmp_build_dir
+#/wrk/*.ex
+#/wrk/*.off
+#/wrk/Backtrace.*
+/wrk/
 
 /lib/cgal/build
 /lib/install
