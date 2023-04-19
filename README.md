@@ -24,4 +24,4 @@ Time integration method
 1. Install CUDA and ensure relevant environment variables are set in your shell, as per the standard CUDA installation guide.
 2. Set `AMREX_HOME` variable in your shell environment to the amrex submodule(`./lib/amrex`) path.
 3. `make` an executable in the `wrk` folder. For example, copy files in `/exm/Sods` folder to `wrk`.
-4. Run with `./executable inputs` in `wrk` folder.
+4. Run with `./"executable_name" inputs` in `wrk` folder.
