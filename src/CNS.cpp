@@ -12,583 +12,611 @@
 using namespace amrex;
 
 constexpr int CNS::NUM_GROW;
-BCRec     CNS::phys_bc;
+BCRec CNS::phys_bc;
 
-int       CNS::verbose = 0;
-IntVect   CNS::hydro_tile_size {AMREX_D_DECL(1024,16,16)};
-Real      CNS::cfl       = 0.3;
-Real      CNS::dt_glob = 0.0;
-int       CNS::do_reflux = 1;
-int       CNS::refine_max_dengrad_lev   = -1;
-Real      CNS::refine_dengrad           = 1.0e10;
+bool CNS::verbose = true;
+int  CNS::nstep_screen_output=10;
+bool CNS::dt_dynamic=false;
+Real CNS::cfl = 0.3;
+Real CNS::dt_constant = 0.0;
+int  CNS::do_reflux = 1;
+int  CNS::refine_max_dengrad_lev = -1;
+Real CNS::refine_dengrad = 1.0e10;
 
-Real      CNS::gravity = 0.0;
+Real CNS::gravity = 0.0;
 
-// needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented) 
+// needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented)
 
-CNS::CNS () {}
+CNS::CNS() {}
 
-CNS::CNS (Amr&            papa,
-          int             lev,
-          const Geometry& level_geom,
-          const BoxArray& bl,
-          const DistributionMapping& dm,
-          Real            time)
-    : AmrLevel(papa,lev,level_geom,bl,dm,time)
+CNS::CNS(Amr &papa,
+         int lev,
+         const Geometry &level_geom,
+         const BoxArray &bl,
+         const DistributionMapping &dm,
+         Real time)
+    : AmrLevel(papa, lev, level_geom, bl, dm, time)
 {
-    if (do_reflux && level > 0) {
-        flux_reg.reset(new FluxRegister(grids,dmap,crse_ratio,level,NUM_STATE));
-    }
+  if (do_reflux && level > 0)
+  {
+    flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level, NUM_STATE));
+  }
 
-    buildMetrics();
+  buildMetrics();
 }
 
-CNS::~CNS () {}
+CNS::~CNS() {}
 // -----------------------------------------------------------------------------
 
 // init ------------------------------------------------------------------------
 
-void CNS::read_params () {
-    ParmParse pp("cns");
+void CNS::read_params()
+{
+  ParmParse pp("cns");
 
-    // pp.query("v", verbose);
+  pp.query("verbose", verbose);
 
-    Vector<int> tilesize(AMREX_SPACEDIM);
-    if (pp.queryarr("hydro_tile_size", tilesize, 0, AMREX_SPACEDIM))
-    {
-        for (int i=0; i<AMREX_SPACEDIM; i++) hydro_tile_size[i] = tilesize[i];
-    }
+  Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
+  pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
+  pp.getarr("hi_bc", hi_bc, 0, AMREX_SPACEDIM);
+  for (int i = 0; i < AMREX_SPACEDIM; ++i)
+  {
+    phys_bc.setLo(i, lo_bc[i]);
+    phys_bc.setHi(i, hi_bc[i]);
+  }
 
-    pp.query("cfl", cfl);
-    pp.query("time_step",dt_glob);
-    // pp.query("n_cycle",n_cycle);
+  pp.query("do_reflux", do_reflux);
 
-    Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
-    pp.getarr("lo_bc", lo_bc, 0, AMREX_SPACEDIM);
-    pp.getarr("hi_bc", hi_bc, 0, AMREX_SPACEDIM);
-    for (int i = 0; i < AMREX_SPACEDIM; ++i) {
-        phys_bc.setLo(i,lo_bc[i]);
-        phys_bc.setHi(i,hi_bc[i]);
-    }
+  pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
+  pp.query("refine_dengrad", refine_dengrad);
 
-    pp.query("do_reflux", do_reflux);
+  pp.query("gravity", gravity);
 
-    pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
-    pp.query("refine_dengrad", refine_dengrad);
-
-    pp.query("gravity", gravity);
-
-    pp.query("eos_gamma", h_parm->eos_gamma);
-
-    h_parm->Initialize();
-    amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
+  h_parm->Initialize();
+#if AMREX_USE_GPU
+  amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
+#endif
 }
 
-void CNS::init (AmrLevel& old) {
-    auto& oldlev = dynamic_cast<CNS&>(old);
+void CNS::init(AmrLevel &old)
+{
+  auto &oldlev = dynamic_cast<CNS &>(old);
 
-    Real dt_new    = parent->dtLevel(level);
-    Real cur_time  = oldlev.state[State_Type].curTime();
-    Real prev_time = oldlev.state[State_Type].prevTime();
-    Real dt_old    = cur_time - prev_time;
-    setTimeLevel(cur_time,dt_old,dt_new);
+  Real dt_new = parent->dtLevel(level);
+  Real cur_time = oldlev.state[State_Type].curTime();
+  Real prev_time = oldlev.state[State_Type].prevTime();
+  Real dt_old = cur_time - prev_time;
+  setTimeLevel(cur_time, dt_old, dt_new);
 
-    MultiFab& S_new = get_new_data(State_Type);
-    FillPatch(old,S_new,0,cur_time,State_Type,0,NUM_STATE);
+  MultiFab &S_new = get_new_data(State_Type);
+  FillPatch(old, S_new, 0, cur_time, State_Type, 0, NUM_STATE);
 }
 
-void CNS::init() {
-    Real dt        = parent->dtLevel(level);
-    Real cur_time  = getLevel(level-1).state[State_Type].curTime();
-    Real prev_time = getLevel(level-1).state[State_Type].prevTime();
-    Real dt_old = (cur_time - prev_time)/static_cast<Real>(parent->MaxRefRatio(level-1));
-    setTimeLevel(cur_time,dt_old,dt);
+void CNS::init()
+{
+  Real dt = parent->dtLevel(level);
+  Real cur_time = getLevel(level - 1).state[State_Type].curTime();
+  Real prev_time = getLevel(level - 1).state[State_Type].prevTime();
+  Real dt_old = (cur_time - prev_time) / static_cast<Real>(parent->MaxRefRatio(level - 1));
+  setTimeLevel(cur_time, dt_old, dt);
 
-    MultiFab& S_new = get_new_data(State_Type);
-    FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, NUM_STATE);
+  MultiFab &S_new = get_new_data(State_Type);
+  FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, NUM_STATE);
 };
 
-void CNS::initData ()
+void CNS::initData()
 {
-    BL_PROFILE("CNS::initData()");
+  BL_PROFILE("CNS::initData()");
 
-    const auto geomdata = geom.data();
-    MultiFab& S_new = get_new_data(State_Type);
+  const auto geomdata = geom.data();
+  MultiFab &S_new = get_new_data(State_Type);
 
-    Parm const* lparm = d_parm;
-    ProbParm const* lprobparm = d_prob_parm;
+  Parm const *lparm = d_parm;
+  ProbParm const *lprobparm = d_prob_parm;
 
-    auto const& sma = S_new.arrays();
-    amrex::ParallelFor(S_new,
-    [=] AMREX_GPU_DEVICE (int box_no, int i, int j, int k) noexcept
-    {
-        cns_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
-    });
+  auto const &sma = S_new.arrays();
+  amrex::ParallelFor(S_new,
+                     [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
+                     {
+                       cns_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
+                     });
 
-    // Compute the initial temperature (will override what was set in initdata)
-    computeTemp(S_new,0);
+  // Compute the initial temperature (will override what was set in initdata)
+  computeTemp(S_new, 0);
 
-    // MultiFab& C_new = get_new_data(Cost_Type);
-    // C_new.setVal(1.0);
+  // MultiFab& C_new = get_new_data(Cost_Type);
+  // C_new.setVal(1.0);
 }
 
-void CNS::buildMetrics ()
+void CNS::buildMetrics()
 {
-    // print mesh sizes
-    const Real* dx = geom.CellSize();
-    amrex::Print() << "Mesh size (dx,dy,dz) = ";
-    amrex::Print() << dx[0] << "  "
-                   << dx[1] << "  "
-                   << dx[2] << "  \n";
+  // print mesh sizes
+  const Real *dx = geom.CellSize();
+  amrex::Print() << "Mesh size (dx,dy,dz) = ";
+  amrex::Print() << dx[0] << "  "
+                 << dx[1] << "  "
+                 << dx[2] << "  \n";
 }
 
-void CNS::post_init (Real) {
-    if (level > 0) return;
-    for (int k = parent->finestLevel()-1; k >= 0; --k) {
-        getLevel(k).avgDown();
-    }
+void CNS::post_init(Real)
+{
+  if (level > 0) {return;};
 
-    // if (verbose >= 2) {
-        printTotal();
-    // }
+  for (int k = parent->finestLevel() - 1; k >= 0; --k)
+  {
+    getLevel(k).avgDown();
+  }
+
+  if (verbose) {
+  printTotal();
+  }
 }
 // -----------------------------------------------------------------------------
 
-
 // Time-stepping ---------------------------------------------------------------
-void CNS::computeTemp (MultiFab& State, int ng)
+void CNS::computeTemp(MultiFab &State, int ng)
 {
-    BL_PROFILE("CNS::computeTemp()");
+  BL_PROFILE("CNS::computeTemp()");
 
-    Parm const* lparm = d_parm;
+  Parm const *lparm = d_parm;
 
-    // This will reset Eint and compute Temperature
+  // This will reset Eint and compute Temperature
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-    for (MFIter mfi(State,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+  for (MFIter mfi(State, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+  {
+    const Box &bx = mfi.growntilebox(ng);
+    auto const &sfab = State.array(mfi);
+
+    amrex::ParallelFor(bx,
+                       [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
+                       {
+                         cns_compute_temperature(i, j, k, sfab, *lparm);
+                       });
+  }
+}
+// Called on level 0 only, after field data is initialised but before first step. 
+void CNS::computeInitialDt(int finest_level,
+                           int sub_cycle,
+                           Vector<int> &n_cycle, // no. of subcycling steps
+                           const Vector<IntVect> &ref_ratio,
+                           Vector<Real> &dt_level,
+                           Real stop_time)
+{
+  Real dt0=std::numeric_limits<Real>::max();
+  int nfactor = 1;
+
+  // dt at base level
+  if (!dt_dynamic) {dt0 = dt_constant;}
+  else {
+    // estimate dt per level
+    for (int i = 0; i <= finest_level; i++) {
+      dt_level[i] = getLevel(i).estTimeStep(); }
+    // find min dt across all levels
+    nfactor=1;
+    for (int i = 0; i <= finest_level; i++) {
+        nfactor *= n_cycle[i];
+        dt0 = std::min(dt0,nfactor*dt_level[i]); }
+  }
+
+  // dt at all levels
+  nfactor = 1;
+  for (int i = 0; i <= finest_level; i++)
     {
-        const Box& bx = mfi.growntilebox(ng);
-        auto const& sfab = State.array(mfi);
-
-        amrex::ParallelFor(bx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_compute_temperature(i,j,k,sfab,*lparm);
-        });
+        nfactor *= n_cycle[i];
+        dt_level[i] = dt0/nfactor;
     }
+
 }
 
-Real CNS::initialTimeStep () {
-    return CNS::dt_glob;
-}
 
-void CNS::computeInitialDt (int                finest_level,
-                       int                    /*sub_cycle*/,
-                       Vector<int>&           n_cycle,
-                       const Vector<IntVect>& /*ref_ratio*/,
-                       Vector<Real>&          dt_level,
-                       Real                   stop_time) {
-    //
-    // Grids have been constructed, compute dt for all levels.
-    //
-    // if (level > 0) {
-    //     return;
-    // }
+// Called at the end of a coarse grid timecycle or after regrid, to compute the dt (time step) for all levels, for the next step.
+void CNS::computeNewDt(int finest_level,
+                       int /*sub_cycle*/,
+                       Vector<int> &n_cycle,
+                       const Vector<IntVect> & /*ref_ratio*/,
+                       Vector<Real> &dt_min,
+                       Vector<Real> &dt_level,
+                       Real stop_time,
+                       int post_regrid_flag)
+{
+  // dt is constant, dt at level 0 is from inputs and dt at higher levels is computed from the number of subcycles ////////////////////////////////////////
+  if(!dt_dynamic)   {
+    int nfactor = 1;
+    for (int i = 0; i <= finest_level; i++) {
+      nfactor *= n_cycle[i];
+      dt_level[i] = dt_constant / nfactor;}
+    return;
+  }
 
-    // Real dt_0 = std::numeric_limits<Real>::max();
-    // int n_factor = 1;
-    // for (int i = 0; i <= finest_level; i++)
-    // {
-    //     dt_level[i] = getLevel(i).initialTimeStep();
-    //     n_factor   *= n_cycle[i];
-    //     dt_0 = std::min(dt_0,n_factor*dt_level[i]);
-    // }
-    int n_factor = 1;
-    dt_level[0] = getLevel(0).initialTimeStep();
+  // if dt is dynamic //////////////////////////////////////////////////////////
+  for (int i = 0; i <= finest_level; i++) {
+    dt_min[i] = getLevel(i).estTimeStep();
+  }
+
+  // Limit dt
+  if (post_regrid_flag == 1) {
+    // Limit dt's by pre-regrid dt
+    for (int i = 0; i <= finest_level; i++) {
+      dt_min[i] = std::min(dt_min[i],dt_level[i]);}
+  }
+  // Limit dt's by change_max * old dt
+  else {
+    static Real change_max = 1.1;
     for (int i = 0; i <= finest_level; i++)
-    {
-        n_factor *= n_cycle[i];
-        dt_level[i] = dt_level[0]/n_factor;
-        // amrex::Print() << "level i="<< i << ", dt ="<< dt_level[i] << "\n";
-    }
+    { dt_min[i] = std::min(dt_min[i],change_max*dt_level[i]);}
+  }
 
-    //
-    // Limit dt's by the value of stop_time.
-    //
-    // const Real eps = 0.001*dt_0;
-    // Real cur_time  = state[State_Type].curTime();
-    // if (stop_time >= 0.0) {
-    //     if ((cur_time + dt_0) > (stop_time - eps))
-    //         dt_0 = stop_time - cur_time;
-    // }
+  // Find the minimum over all levels
+  Real dt_0 = std::numeric_limits<Real>::max();
+  int nfactor = 1;
+  for (int i = 0; i <= finest_level; i++) {
+    nfactor *= n_cycle[i];
+    dt_0 = std::min(dt_0,nfactor*dt_min[i]);}
 
+  // Limit dt's by the value of stop_time.
+  const Real eps = 0.001*dt_0;
+  Real cur_time  = state[State_Type].curTime();
+  if (stop_time >= 0.0) {
+    if ((cur_time + dt_0) > (stop_time - eps)) {
+        dt_0 = stop_time - cur_time;}
+  }
 
+  nfactor = 1;
+  for (int i = 0; i <= finest_level; i++) {
+    nfactor *= n_cycle[i];
+    dt_level[i] = dt_0/nfactor;}
 }
 
-/////////////////// SAME AS computeInitialDt for now ///////////////////////////
-void CNS::computeNewDt (int                    finest_level,
-                   int                    /*sub_cycle*/,
-                   Vector<int>&           n_cycle,
-                   const Vector<IntVect>& /*ref_ratio*/,
-                   Vector<Real>&          dt_min,
-                   Vector<Real>&          dt_level,
-                   Real                   stop_time,
-                   int                    post_regrid_flag) {
-    //
-    // Grids have been constructed, compute dt for all levels.
-    //
-    // if (level > 0) {
-    //     return;
-    // }
 
-    // Real dt_0 = std::numeric_limits<Real>::max();
-    // int n_factor = 1;
-    // for (int i = 0; i <= finest_level; i++)
-    // {
-    //     dt_level[i] = getLevel(i).initialTimeStep();
-    //     n_factor   *= n_cycle[i];
-    //     dt_0 = std::min(dt_0,n_factor*dt_level[i]);
-    // }
-    int n_factor = 1;
-    dt_level[0] = getLevel(0).initialTimeStep();
-    for (int i = 0; i <= finest_level; i++)
-    {
-        n_factor *= n_cycle[i];
-        dt_level[i] = dt_level[0]/n_factor;
-        // amrex::Print() << "level i="<< i << ", dt ="<< dt_level[i] << "\n";
-    }
+Real CNS::estTimeStep () {
+  BL_PROFILE("CNS::estTimeStep()");
 
+  const auto dx = geom.CellSizeArray();
+  const MultiFab& S = get_new_data(State_Type);
+  Parm const* lparm = d_parm;
+
+  Real estdt = amrex::ReduceMin(S, 0,
+  [=] AMREX_GPU_HOST_DEVICE (Box const& bx, Array4<Real const> const& fab) -> Real { 
+    return cns_estdt(bx, fab, dx, *lparm); });
+
+  estdt *= cfl;
+  ParallelDescriptor::ReduceRealMin(estdt);
+
+  return estdt;
 }
 
-void CNS::post_timestep (int /*iteration*/) {
-    BL_PROFILE("post_timestep");
 
-    if (do_reflux && level < parent->finestLevel()) {
-        MultiFab& S = get_new_data(State_Type);
-        CNS& fine_level = getLevel(level+1);
-        fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, NUM_STATE, geom);
-    }
+void CNS::post_timestep(int /* iteration*/)
+{
+  BL_PROFILE("post_timestep");
 
-    if (level < parent->finestLevel()) {
-        avgDown();
-    }
+  if (do_reflux && level < parent->finestLevel()){
+    MultiFab &S = get_new_data(State_Type);
+    CNS &fine_level = getLevel(level + 1);
+    fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, NUM_STATE, geom);
+  }
+
+  if (level < parent->finestLevel()) { avgDown();}
+
+  if (verbose && this->nStep()%nstep_screen_output == 0) {
+    printTotal();}
 }
 // -----------------------------------------------------------------------------
 
 // Gridding -------------------------------------------------------------------
-void CNS::post_regrid (int lbase, int new_finest) { 
+void CNS::post_regrid(int lbase, int new_finest)
+{
 
 #ifdef AMREX_USE_GPIBM
-      IBM::ib.destroyIBMultiFab(level);
-      IBM::ib.buildIBMultiFab(this->boxArray(),this->DistributionMap(),level,2,2);
-      IBM::ib.computeMarkers(level);
-      IBM::ib.initialiseGPs(level);
+  IBM::ib.destroyIBMultiFab(level);
+  IBM::ib.buildIBMultiFab(this->boxArray(), this->DistributionMap(), level, 2, 2);
+  IBM::ib.computeMarkers(level);
+  IBM::ib.initialiseGPs(level);
 #endif
 }
 
-
-void CNS::errorEst (TagBoxArray& tags, int /*clearval*/, int /*tagval*/,
-  Real time, int /*n_error_buf*/, int /*ngrow*/) {
-
-
-#ifdef AMREX_USE_GPIBM
+void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
+                   Real time, int /*n_error_buf*/, int /*ngrow*/)
+{
   // MF without ghost points filled (why?)
-  MultiFab sdata( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
+  MultiFab sdata(get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
 
   // filling ghost points (copied from PeleC)
   const Real cur_time = state[State_Type].curTime();
   FillPatch(*this, sdata, sdata.nGrow(), cur_time, State_Type, 0, NUM_STATE, 0);
 
+#ifdef AMREX_USE_GPIBM
   // call function from cns_prob
   IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
   tagging(tags, sdata, level, ibdata);
+#else
+  tagging(tags, sdata, level);
 #endif
 
-
-  // -------------------------------- Monal 03/03/23
-  // amrex::Print() << state[0].descriptor()->name(0) << std::endl;
-  //
-  // In tagging(...) retrieving data MultiFabs seem to have ghost points not filled - atleast straight after initialisation.
-  // I have tried the following:
-  // MultiFab &data=get_new_data(0); 
-  // MultiFab& data = state.at(0).newData();
-  // both give erroneous computation error.
-  //
-  // PeleC creates a local copy of the MultiFab rather than passing through the master data with:
-  // MultiFab data( get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
-  // However, this is not necessary.
-  //---------------------------------
 }
 // -----------------------------------------------------------------------------
 
 // misc ------------------------------------------------------------------------
 
-void CNS::avgDown () {
-    BL_PROFILE("CNS::avgDown()");
+void CNS::avgDown()
+{
+  BL_PROFILE("CNS::avgDown()");
 
-    if (level == parent->finestLevel()) return;
+  if (level == parent->finestLevel())
+    return;
 
-    auto& fine_lev = getLevel(level+1);
+  auto &fine_lev = getLevel(level + 1);
 
-    MultiFab& S_crse =          get_new_data(State_Type);
-    MultiFab& S_fine = fine_lev.get_new_data(State_Type);
+  MultiFab &S_crse = get_new_data(State_Type);
+  MultiFab &S_fine = fine_lev.get_new_data(State_Type);
 
-    amrex::average_down(S_fine, S_crse, fine_lev.geom, geom,
-                        0, S_fine.nComp(), parent->refRatio(level));
+  amrex::average_down(S_fine, S_crse, fine_lev.geom, geom,
+                      0, S_fine.nComp(), parent->refRatio(level));
 
-    const int nghost = 0;
-    computeTemp(S_crse, nghost);
+  const int nghost = 0;
+  computeTemp(S_crse, nghost);
 }
 
-void CNS::printTotal () const {
-    const MultiFab& S_new = get_new_data(State_Type);
-    std::array<Real,5> tot;
-    for (int comp = 0; comp < 5; ++comp) {
-        tot[comp] = S_new.sum(comp,true) * geom.ProbSize();
-    }
+void CNS::printTotal() const
+{
+  const MultiFab &S_new = get_new_data(State_Type);
+  std::array<Real, 5> tot;
+  for (int comp = 0; comp < 5; ++comp)
+  {
+    tot[comp] = S_new.sum(comp, true) * geom.ProbSize();
+  }
 #ifdef BL_LAZY
-    Lazy::QueueReduction( [=] () mutable {
+  Lazy::QueueReduction([=]() mutable
+                       {
 #endif
-            ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
-            amrex::Print().SetPrecision(17) << "\n[CNS] Total mass       is " << tot[0] << "\n"
-                                            <<   "      Total x-momentum is " << tot[1] << "\n"
-                                            <<   "      Total y-momentum is " << tot[2] << "\n"
-                                            <<   "      Total z-momentum is " << tot[3] << "\n"
-                                            <<   "      Total energy     is " << tot[4] << "\n";
+                         ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
+
+                         amrex::Print().SetPrecision(17) << "\n[CNS] Total mass       is " << tot[0] << "\n"
+                                                         << "      Total x-momentum is " << tot[1] << "\n"
+                                                         << "      Total y-momentum is " << tot[2] << "\n"
+                                                         << "      Total z-momentum is " << tot[3] << "\n"
+                                                         << "      Total energy     is " << tot[4] << "\n";
+
 #ifdef BL_LAZY
-        });
+                       });
 #endif
 }
 
 // Plotting
 //------------------------------------------------------------------------------
-void CNS::writePlotFile (const std::string& dir,
-                         std::ostream&      os,
-                         VisMF::How         how)
+void CNS::writePlotFile(const std::string &dir,
+                        std::ostream &os,
+                        VisMF::How how)
 {
-    // amrex::Print() << "custom plot " << " (level" << level << ") "<< dir << std::endl;
-    // amrex::Print() << parent->levelSteps(level) << std::endl;
-    int i, n;
-    //
-    // The list of indices of State to write to plotfile.
-    // first component of pair is state_type,
-    // second component of pair is component # within the state_type
-    //
-    std::vector<std::pair<int,int> > plot_var_map;
-    for (int typ = 0; typ < desc_lst.size(); typ++)
+  int i, n;
+  //
+  // The list of indices of State to write to plotfile.
+  // first component of pair is state_type,
+  // second component of pair is component # within the state_type
+  //
+  std::vector<std::pair<int, int>> plot_var_map;
+  for (int typ = 0; typ < desc_lst.size(); typ++)
+  {
+    for (int comp = 0; comp < desc_lst[typ].nComp(); comp++)
     {
-        for (int comp = 0; comp < desc_lst[typ].nComp();comp++)
-        {
-            if (parent->isStatePlotVar(desc_lst[typ].name(comp)) &&
-                desc_lst[typ].getType() == IndexType::TheCellType())
-            {
-                plot_var_map.push_back(std::pair<int,int>(typ,comp));
-            }
-        }
+      if (parent->isStatePlotVar(desc_lst[typ].name(comp)) &&
+          desc_lst[typ].getType() == IndexType::TheCellType())
+      {
+        plot_var_map.push_back(std::pair<int, int>(typ, comp));
+      }
     }
+  }
 
-    int num_derive = 0;
-    std::vector<std::string> derive_names;
-    const std::list<DeriveRec>& dlist = derive_lst.dlist();
-    for (auto const& d : dlist)
+  int num_derive = 0;
+  std::vector<std::string> derive_names;
+  const std::list<DeriveRec> &dlist = derive_lst.dlist();
+  for (auto const &d : dlist)
+  {
+    if (parent->isDerivePlotVar(d.name()))
     {
-        if (parent->isDerivePlotVar(d.name()))
-        {
-            derive_names.push_back(d.name());
-            num_derive += d.numDerive();
-        }
+      derive_names.push_back(d.name());
+      num_derive += d.numDerive();
     }
+  }
 
-    int n_data_items = plot_var_map.size() + num_derive;
+  int n_data_items = plot_var_map.size() + num_derive;
 
 //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
-    n_data_items += 2;
+  n_data_items += 2;
 #endif
-//------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------
 
-    // get the time from the first State_Type
-    // if the State_Type is ::Interval, this will get t^{n+1/2} instead of t^n
-    Real cur_time = state[0].curTime();
+  // get the time from the first State_Type
+  // if the State_Type is ::Interval, this will get t^{n+1/2} instead of t^n
+  Real cur_time = state[0].curTime();
 
-    if (level == 0 && ParallelDescriptor::IOProcessor())
-    {
-        //
-        // The first thing we write out is the plotfile type.
-        //
-        os << thePlotFileType() << '\n';
-
-        if (n_data_items == 0)
-            amrex::Error("Must specify at least one valid data item to plot");
-
-        os << n_data_items << '\n';
-
-        //
-        // Names of variables
-        //
-        for (i =0; i < static_cast<int>(plot_var_map.size()); i++)
-        {
-            int typ = plot_var_map[i].first;
-            int comp = plot_var_map[i].second;
-            os << desc_lst[typ].name(comp) << '\n';
-        }
-
-        // derived
-        for (auto const& dname : derive_names) {
-            const DeriveRec* rec = derive_lst.get(dname);
-            for (i = 0; i < rec->numDerive(); ++i) {
-                os << rec->variableName(i) << '\n';
-            }
-        }
-
-//----------------------------------------------------------------------modified
-#ifdef AMREX_USE_GPIBM
-        os << "sld\n";
-        os << "ghs\n";
-#endif
-//------------------------------------------------------------------------------
-
-        os << AMREX_SPACEDIM << '\n';
-        os << parent->cumTime() << '\n';
-        int f_lev = parent->finestLevel();
-        os << f_lev << '\n';
-        for (i = 0; i < AMREX_SPACEDIM; i++)
-            os << Geom().ProbLo(i) << ' ';
-        os << '\n';
-        for (i = 0; i < AMREX_SPACEDIM; i++)
-            os << Geom().ProbHi(i) << ' ';
-        os << '\n';
-        for (i = 0; i < f_lev; i++)
-            os << parent->refRatio(i)[0] << ' ';
-        os << '\n';
-        for (i = 0; i <= f_lev; i++)
-            os << parent->Geom(i).Domain() << ' ';
-        os << '\n';
-        for (i = 0; i <= f_lev; i++)
-            os << parent->levelSteps(i) << ' ';
-        os << '\n';
-        for (i = 0; i <= f_lev; i++)
-        {
-            for (int k = 0; k < AMREX_SPACEDIM; k++)
-                os << parent->Geom(i).CellSize()[k] << ' ';
-            os << '\n';
-        }
-        os << (int) Geom().Coord() << '\n';
-        os << "0\n"; // Write bndry data.
-
-    }
-    // Build the directory to hold the MultiFab at this level.
-    // The name is relative to the directory containing the Header file.
+  if (level == 0 && ParallelDescriptor::IOProcessor())
+  {
     //
-    static const std::string BaseName = "/Cell";
-    char buf[64];
-    snprintf(buf, sizeof buf, "Level_%d", level);
-    std::string sLevel = buf;
+    // The first thing we write out is the plotfile type.
     //
-    // Now for the full pathname of that directory.
-    //
-    std::string FullPath = dir;
-    if ( ! FullPath.empty() && FullPath[FullPath.size()-1] != '/')
-    {
-        FullPath += '/';
-    }
-    FullPath += sLevel;
-    //
-    // Only the I/O processor makes the directory if it doesn't already exist.
-    //
-    if ( ! levelDirectoryCreated) {
-        if (ParallelDescriptor::IOProcessor()) {
-            if ( ! amrex::UtilCreateDirectory(FullPath, 0755)) {
-                amrex::CreateDirectoryFailed(FullPath);
-            }
-        }
-        // Force other processors to wait until directory is built.
-        ParallelDescriptor::Barrier();
-    }
+    os << thePlotFileType() << '\n';
 
-    if (ParallelDescriptor::IOProcessor())
-    {
-        os << level << ' ' << grids.size() << ' ' << cur_time << '\n';
-        os << parent->levelSteps(level) << '\n';
+    if (n_data_items == 0)
+      amrex::Error("Must specify at least one valid data item to plot");
 
-        for (i = 0; i < grids.size(); ++i)
-        {
-            RealBox gridloc = RealBox(grids[i],geom.CellSize(),geom.ProbLo());
-            for (n = 0; n < AMREX_SPACEDIM; n++)
-                os << gridloc.lo(n) << ' ' << gridloc.hi(n) << '\n';
-        }
-        //
-        // The full relative pathname of the MultiFabs at this level.
-        // The name is relative to the Header file containing this name.
-        // It's the name that gets written into the Header.
-        //
-        if (n_data_items > 0)
-        {
-            std::string PathNameInHeader = sLevel;
-            PathNameInHeader += BaseName;
-            os << PathNameInHeader << '\n';
-        }
+    os << n_data_items << '\n';
 
-//----------------------------------------------------------------------modified
-// #ifdef AMREX_USE_EB
-        // if (EB2::TopIndexSpaceIfPresent()) {
-        //     volfrac threshold for amrvis
-        //     if (level == parent->finestLevel()) {
-        //         for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
-        //             os << "1.0e-6\n";
-        //         }
-        //     }
-        // }
-// #endif
-//------------------------------------------------------------------------------
-    }
     //
-    // We combine all of the multifabs -- state, derived, etc -- into one
-    // multifab -- plotMF.
-    int       cnt   = 0;
-    const int nGrow = 0;
-    MultiFab  plotMF(grids,dmap,n_data_items,nGrow,MFInfo(),Factory());
-    MultiFab* this_dat = 0;
-    //
-    // Cull data from state variables -- use no ghost cells.
+    // Names of variables
     //
     for (i = 0; i < static_cast<int>(plot_var_map.size()); i++)
     {
-        int typ  = plot_var_map[i].first;
-        int comp = plot_var_map[i].second;
-        this_dat = &state[typ].newData();
-        MultiFab::Copy(plotMF,*this_dat,comp,cnt,1,nGrow);
-        cnt++;
+      int typ = plot_var_map[i].first;
+      int comp = plot_var_map[i].second;
+      os << desc_lst[typ].name(comp) << '\n';
     }
 
     // derived
-    if (derive_names.size() > 0)
+    for (auto const &dname : derive_names)
     {
-        for (auto const& dname : derive_names)
-        {
-            derive(dname, cur_time, plotMF, cnt);
-            cnt += derive_lst.get(dname)->numDerive();
-        }
+      const DeriveRec *rec = derive_lst.get(dname);
+      for (i = 0; i < rec->numDerive(); ++i)
+      {
+        os << rec->variableName(i) << '\n';
+      }
     }
 
 //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
-    plotMF.setVal(0.0, cnt, 2, nGrow);
-    IBM::ib.mfa.at(level)->copytoRealMF(plotMF,0,cnt);
+    os << "sld\n";
+    os << "ghs\n";
 #endif
-//------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------
 
+    os << AMREX_SPACEDIM << '\n';
+    os << parent->cumTime() << '\n';
+    int f_lev = parent->finestLevel();
+    os << f_lev << '\n';
+    for (i = 0; i < AMREX_SPACEDIM; i++)
+      os << Geom().ProbLo(i) << ' ';
+    os << '\n';
+    for (i = 0; i < AMREX_SPACEDIM; i++)
+      os << Geom().ProbHi(i) << ' ';
+    os << '\n';
+    for (i = 0; i < f_lev; i++)
+      os << parent->refRatio(i)[0] << ' ';
+    os << '\n';
+    for (i = 0; i <= f_lev; i++)
+      os << parent->Geom(i).Domain() << ' ';
+    os << '\n';
+    for (i = 0; i <= f_lev; i++)
+      os << parent->levelSteps(i) << ' ';
+    os << '\n';
+    for (i = 0; i <= f_lev; i++)
+    {
+      for (int k = 0; k < AMREX_SPACEDIM; k++)
+        os << parent->Geom(i).CellSize()[k] << ' ';
+      os << '\n';
+    }
+    os << (int)Geom().Coord() << '\n';
+    os << "0\n"; // Write bndry data.
+  }
+  // Build the directory to hold the MultiFab at this level.
+  // The name is relative to the directory containing the Header file.
+  //
+  static const std::string BaseName = "/Cell";
+  char buf[64];
+  snprintf(buf, sizeof buf, "Level_%d", level);
+  std::string sLevel = buf;
+  //
+  // Now for the full pathname of that directory.
+  //
+  std::string FullPath = dir;
+  if (!FullPath.empty() && FullPath[FullPath.size() - 1] != '/')
+  {
+    FullPath += '/';
+  }
+  FullPath += sLevel;
+  //
+  // Only the I/O processor makes the directory if it doesn't already exist.
+  //
+  if (!levelDirectoryCreated)
+  {
+    if (ParallelDescriptor::IOProcessor())
+    {
+      if (!amrex::UtilCreateDirectory(FullPath, 0755))
+      {
+        amrex::CreateDirectoryFailed(FullPath);
+      }
+    }
+    // Force other processors to wait until directory is built.
+    ParallelDescriptor::Barrier();
+  }
+
+  if (ParallelDescriptor::IOProcessor())
+  {
+    os << level << ' ' << grids.size() << ' ' << cur_time << '\n';
+    os << parent->levelSteps(level) << '\n';
+
+    for (i = 0; i < grids.size(); ++i)
+    {
+      RealBox gridloc = RealBox(grids[i], geom.CellSize(), geom.ProbLo());
+      for (n = 0; n < AMREX_SPACEDIM; n++)
+        os << gridloc.lo(n) << ' ' << gridloc.hi(n) << '\n';
+    }
     //
-    // Use the Full pathname when naming the MultiFab.
+    // The full relative pathname of the MultiFabs at this level.
+    // The name is relative to the Header file containing this name.
+    // It's the name that gets written into the Header.
     //
-    std::string TheFullPath = FullPath;
-    TheFullPath += BaseName;
-    if (AsyncOut::UseAsyncOut()) {
-        VisMF::AsyncWrite(plotMF,TheFullPath);
-    } else {
-        VisMF::Write(plotMF,TheFullPath,how,true);
+    if (n_data_items > 0)
+    {
+      std::string PathNameInHeader = sLevel;
+      PathNameInHeader += BaseName;
+      os << PathNameInHeader << '\n';
     }
 
-    levelDirectoryCreated = false;  // ---- now that the plotfile is finished
+    //----------------------------------------------------------------------modified
+    // #ifdef AMREX_USE_EB
+    // if (EB2::TopIndexSpaceIfPresent()) {
+    //     volfrac threshold for amrvis
+    //     if (level == parent->finestLevel()) {
+    //         for (int lev = 0; lev <= parent->finestLevel(); ++lev) {
+    //             os << "1.0e-6\n";
+    //         }
+    //     }
+    // }
+    // #endif
+    //------------------------------------------------------------------------------
+  }
+  //
+  // We combine all of the multifabs -- state, derived, etc -- into one
+  // multifab -- plotMF.
+  int cnt = 0;
+  const int nGrow = 0;
+  MultiFab plotMF(grids, dmap, n_data_items, nGrow, MFInfo(), Factory());
+  MultiFab *this_dat = 0;
+  //
+  // Cull data from state variables -- use no ghost cells.
+  //
+  for (i = 0; i < static_cast<int>(plot_var_map.size()); i++)
+  {
+    int typ = plot_var_map[i].first;
+    int comp = plot_var_map[i].second;
+    this_dat = &state[typ].newData();
+    MultiFab::Copy(plotMF, *this_dat, comp, cnt, 1, nGrow);
+    cnt++;
+  }
+
+  // derived
+  if (derive_names.size() > 0)
+  {
+    for (auto const &dname : derive_names)
+    {
+      derive(dname, cur_time, plotMF, cnt);
+      cnt += derive_lst.get(dname)->numDerive();
+    }
+  }
+
+//----------------------------------------------------------------------modified
+#ifdef AMREX_USE_GPIBM
+  plotMF.setVal(0.0, cnt, 2, nGrow);
+  IBM::ib.mfa.at(level)->copytoRealMF(plotMF, 0, cnt);
+#endif
+  //------------------------------------------------------------------------------
+
+  //
+  // Use the Full pathname when naming the MultiFab.
+  //
+  std::string TheFullPath = FullPath;
+  TheFullPath += BaseName;
+  if (AsyncOut::UseAsyncOut())
+  {
+    VisMF::AsyncWrite(plotMF, TheFullPath);
+  }
+  else
+  {
+    VisMF::Write(plotMF, TheFullPath, how, true);
+  }
+
+  levelDirectoryCreated = false; // ---- now that the plotfile is finished
 }

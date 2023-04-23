@@ -14,8 +14,8 @@ void derpres (const Box& bx, FArrayBox& pfab, int dcomp, int /*ncomp*/,
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
-        // p(i,j,k,dcomp) = (parm->eos_gamma-1.);//*rhoe(i,j,k);
-        p(i,j,k,dcomp) = (1.4-1.)*rhoe(i,j,k);
+        p(i,j,k,dcomp) = (parm->eos_gamma-1.);//*rhoe(i,j,k);
+        // p(i,j,k,dcomp) = (1.4-1.)*rhoe(i,j,k);
     });
 }
 

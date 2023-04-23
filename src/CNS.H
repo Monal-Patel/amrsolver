@@ -129,18 +129,19 @@ public:
     static int do_reflux;
 
     static amrex::BCRec phys_bc;
-    static int verbose;
-    static amrex::IntVect hydro_tile_size;
+    static bool verbose;
+    // static amrex::IntVect hydro_tile_size;
     static amrex::Real cfl;
-    static amrex::Real dt_glob;
 
     static int refine_max_dengrad_lev;
     static amrex::Real refine_dengrad;
 
-
     static amrex::Real gravity;
 
-public:
+    static amrex::Real dt_constant;
+    static bool dt_dynamic;
+    static int nstep_screen_output;
+
 public:
     static Parm* h_parm;
     static Parm* d_parm;

@@ -109,6 +109,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
         Elixir qeli = qtmp.elixir();
         auto const& q = qtmp.array();
 
+        // conservative to primitive variable change
         amrex::ParallelFor(bxg2,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
@@ -120,6 +121,7 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
         Elixir slopeeli = slopetmp.elixir();
         auto const& slope = slopetmp.array();
 
+        // Euler terms ///////////////////////////////////////////////////////
         // x-direction
         int cdir = 0;
         const Box& xslpbx = amrex::grow(bx, cdir, 1);
@@ -172,12 +174,16 @@ CNS::compute_dSdt (const MultiFab& S, MultiFab& dSdt, Real dt,
         qeli.clear(); // don't need them anymore
         slopeeli.clear();
 
+        // add to rhs
         amrex::ParallelFor(bx, ncons,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
         {
             cns_flux_to_dudt(i, j, k, n, dsdtfab, AMREX_D_DECL(fxfab,fyfab,fzfab), dxinv);
         });
 
+        // Viscous terms ///////////////////////////////////////////////////////
+
+        // Source terms ////////////////////////////////////////////////////////
         if (gravity != Real(0.0)) {
             const Real g = gravity;
             const int irho = Density;
