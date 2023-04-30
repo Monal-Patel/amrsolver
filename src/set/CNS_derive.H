@@ -4,15 +4,16 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_Geometry.H>
 
-void derpres (const amrex::Box& bx, amrex::FArrayBox& derfab, 
-                  int dcomp, int ncomp, const amrex::FArrayBox& datafab, const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec, int level);
+using namespace amrex;
 
-void dervelx (const amrex::Box& bx, amrex::FArrayBox& derfab, 
-              int dcomp, int ncomp, const amrex::FArrayBox& datafab, const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec, int level);
+void derpres (const Box& bx, FArrayBox& derfab, 
+                  int dcomp, int ncomp, const FArrayBox& datafab, const Geometry& geomdata, Real time, const int* bcrec, int level);
 
-void dervely (const amrex::Box& bx, amrex::FArrayBox& derfab, 
-              int dcomp, int ncomp, const amrex::FArrayBox& datafab, const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec, int level);
+void dertemp (const Box& bx, FArrayBox& derfab, int dcomp, int ncomp,
+                  const FArrayBox& datafab, const Geometry& geomdata,
+                  Real time, const int* bcrec, int level);
 
-void dervelz (const amrex::Box& bx, amrex::FArrayBox& derfab, 
-              int dcomp, int ncomp, const amrex::FArrayBox& datafab, const amrex::Geometry& geomdata, amrex::Real time, const int* bcrec, int level);
+void dervel (const Box& bx, FArrayBox& derfab, 
+              int dcomp, int ncomp, const FArrayBox& datafab, const Geometry& geomdata, Real time, const int* bcrec, int level);
+
 #endif

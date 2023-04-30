@@ -5,7 +5,7 @@
 #define UMX   1
 #define UMY   2
 #define UMZ   3
-#define UET 4
+#define UET   4
 #define NCONS 5
 
 #define QRHO   0

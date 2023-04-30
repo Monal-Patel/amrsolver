@@ -48,7 +48,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     // exit(0);
 #endif
 
-    compute_dSdt(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
+    compute_rhs(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // U^* = U^n + dt*dUdt^n
     MultiFab::LinComb(S_new, Real(1.0), Sborder, 0, dt, dSdt, 0, 0, NCONS, 0);
     // computeTemp(S_new,0);
@@ -61,7 +61,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     IBM::ib.computeGPs(level,Sborder);
 #endif
 
-    compute_dSdt(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
+    compute_rhs(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
     MultiFab::LinComb(S_new, Real(0.5), Sborder, 0, Real(0.5), S_old, 0, 0, NCONS, 0);
     // S_new += 0.5*dt*dSdt
@@ -73,10 +73,10 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 }
 
 
-void CNS::compute_dSdt (const MultiFab& statemf, MultiFab& dSdt, Real dt,
+void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
                    FluxRegister* fr_as_crse, FluxRegister* fr_as_fine)
 {
-    BL_PROFILE("CNS::compute_dSdt()");
+    BL_PROFILE("CNS::compute_rhs()");
 
     const auto dx = geom.CellSizeArray();
     const auto dxinv = geom.InvCellSizeArray();
@@ -140,9 +140,8 @@ void CNS::compute_dSdt (const MultiFab& statemf, MultiFab& dSdt, Real dt,
             cons2eulerflux(i, j, k, statefab, pfabfx, pfabfy, pfabfz, pparm);
         });
 
-
         ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-              numericalflux(i, j, k, n, pfabfx, pfabfy, pfabfz ,nfabfx, nfabfy, nfabfz); // Storage of numerical fluxes (in nfabfx, nfabfy, nfabfz) - index i contains i-1/2 interface flux.
+              numericalflux(i, j, k, n, pfabfx, pfabfy, pfabfz ,nfabfx, nfabfy, nfabfz); // Storage of numerical fluxes in nfabfx, nfabfy, nfabfz - index i contains i-1/2 interface flux.
               // printf("i,j,k,n  -  %i %i %i %i %f \n",i,j,k,n, nfabfx(i,j,k,n) );
         });
 

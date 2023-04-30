@@ -138,7 +138,7 @@ CNS::variableSetUp ()
     bndryfunc.setRunOnGPU(true);
 
     desc_lst.setComponent(State_Type,
-                          0,//URHO,
+                          URHO,
                           name,
                           bcs,
                           bndryfunc);
@@ -156,19 +156,27 @@ CNS::variableSetUp ()
     // Pressure
     derive_lst.add("pressure",IndexType::TheCellType(),1,
                    derpres,the_same_box);
-    derive_lst.addComponent("pressure",desc_lst,State_Type,Density,4);
+    derive_lst.addComponent("pressure",desc_lst,State_Type,URHO,NCONS);
+
+    // Temperature
+    derive_lst.add("temperature", IndexType::TheCellType(), 1,
+                 derpres,the_same_box);
+    derive_lst.addComponent("temperature", desc_lst, State_Type, URHO,NCONS);
 
     // Velocities
-//     derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervelx, the_same_box);
-//     derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,4);
+    derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervel, the_same_box);
+    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Xmom,1);
 
-//     derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, dervely, the_same_box);
-//     derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,4);
+    derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, dervel, the_same_box);
+    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Ymom,1);
 
-// #if (AMREX_SPACEDIM == 3)
-//     derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervelz, the_same_box);
-//     derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,4);
-// #endif
+#if (AMREX_SPACEDIM == 3)
+    derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervel, the_same_box);
+    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,1);
+    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Zmom,1);
+#endif
 
     ////////////////////////////////////////////////////////////////////////////
 }
