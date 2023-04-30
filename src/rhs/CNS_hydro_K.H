@@ -21,7 +21,7 @@ AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const 
     Real uy = u(i,j,k,UMY)*rhoinv;
     Real uz = u(i,j,k,UMZ)*rhoinv;
     Real ke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-    Real ei = (u(i,j,k,UEDEN) - ke)*rhoinv;
+    Real ei = (u(i,j,k,UET) - ke)*rhoinv;
     Real p = (parm.eos_gamma-Real(1.0))*ei;
 
     q(i,j,k,QRHO)  = rho;
@@ -42,7 +42,7 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
   Real momx   = cons(i,j,k,UMX);
   Real momy   = cons(i,j,k,UMY);
   Real momz   = cons(i,j,k,UMZ);
-  Real rhoet  = cons(i,j,k,UEDEN);
+  Real rhoet  = cons(i,j,k,UET);
   Real ux     = momx*rhoinv;
   Real uy     = momy*rhoinv;
   Real uz     = momz*rhoinv;
@@ -55,19 +55,19 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
   fx(i,j,k,UMX)   = momx*ux + P;
   fx(i,j,k,UMY)   = momy*ux;
   fx(i,j,k,UMZ)   = momz*ux;
-  fx(i,j,k,UEDEN) = rhoet*ux + P*ux;
+  fx(i,j,k,UET) = rhoet*ux + P*ux;
 
   fy(i,j,k,URHO)  = momy;
   fy(i,j,k,UMX)   = momx*uy;
   fy(i,j,k,UMY)   = momy*uy + P;
   fy(i,j,k,UMZ)   = momz*uy;
-  fy(i,j,k,UEDEN) = rhoet*uy + P*uy;
+  fy(i,j,k,UET) = rhoet*uy + P*uy;
 
   fz(i,j,k,URHO)  = momz;
   fz(i,j,k,UMX)   = momx*uz;
   fz(i,j,k,UMY)   = momy*uz;
   fz(i,j,k,UMZ)   = momz*uz + P;
-  fz(i,j,k,UEDEN) = rhoet*uz + P*uz;
+  fz(i,j,k,UET) = rhoet*uz + P*uz;
 
   // for (int n=0;n<5;n++){
     // printf("%i %i %i %i \n",i,j,k,n);
@@ -473,7 +473,7 @@ nfz(i,j,k,n) = weno5js(sten);
 
 //     riemann(parm.eos_gamma, parm.smallp, parm.smallr,
 //             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
-//             fx(i,j,k,URHO), fx(i,j,k,UMX), fx(i,j,k,UMY), fx(i,j,k,UMZ), fx(i,j,k,UEDEN));
+//             fx(i,j,k,URHO), fx(i,j,k,UMX), fx(i,j,k,UMY), fx(i,j,k,UMZ), fx(i,j,k,UET));
 // }
 
 // AMREX_GPU_DEVICE
@@ -507,7 +507,7 @@ nfz(i,j,k,n) = weno5js(sten);
 
 //     riemann(parm.eos_gamma, parm.smallp, parm.smallr,
 //             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
-//             fy(i,j,k,URHO), fy(i,j,k,UMY), fy(i,j,k,UMX), fy(i,j,k,UMZ), fy(i,j,k,UEDEN));
+//             fy(i,j,k,URHO), fy(i,j,k,UMY), fy(i,j,k,UMX), fy(i,j,k,UMZ), fy(i,j,k,UET));
 // }
 
 // AMREX_GPU_DEVICE
@@ -541,7 +541,7 @@ nfz(i,j,k,n) = weno5js(sten);
 
 //     riemann(parm.eos_gamma, parm.smallp, parm.smallr,
 //             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
-//             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UEDEN));
+//             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UET));
 // }
 
 #endif

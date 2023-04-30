@@ -5,19 +5,15 @@
 #define UMX   1
 #define UMY   2
 #define UMZ   3
-#define UEDEN 4
-// #define UEINT 5
-// #define UTEMP 6
+#define UET 4
 #define NCONS 5
 
 #define QRHO   0
 #define QU     1
 #define QV     2
 #define QW     3
-// #define QEINT  4
 #define QPRES  4
 #define QTEMP  5
 #define NPRIM  6
-// #define QCS    5
 
 #endif

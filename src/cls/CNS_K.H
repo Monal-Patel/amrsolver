@@ -34,7 +34,7 @@ inline amrex::Real cns_estdt (amrex::Box const& bx, amrex::Array4<Real const>   
                 Real vy = my*rhoinv;
                 Real vz = mz*rhoinv;
                 Real ke = Real(0.5)*rho*(vx*vx + vy*vy + vz*vz);
-                Real rhoei = (state(i,j,k,UEDEN) - ke);
+                Real rhoei = (state(i,j,k,UET) - ke);
                 Real p  = (parm.eos_gamma-Real(1.0))*rhoei;
                 Real cs = std::sqrt(parm.eos_gamma*p*rhoinv);
                 Real dtx = dx[0]/(amrex::Math::abs(vx)+cs);
@@ -61,7 +61,7 @@ cns_compute_temperature (int i, int j, int k, amrex::Array4<amrex::Real> const& 
     Real mx = u(i,j,k,UMX);
     Real my = u(i,j,k,UMY);
     Real mz = u(i,j,k,UMZ);
-    Real rhoeint = u(i,j,k,UEDEN) - Real(0.5) * rhoinv * (mx*mx+my*my+mz*mz);
+    Real rhoeint = u(i,j,k,UET) - Real(0.5) * rhoinv * (mx*mx+my*my+mz*mz);
     // u(i,j,k,UTEMP) = rhoinv * rhoeint * (Real(1.0)/parm.cv);
 }
 
