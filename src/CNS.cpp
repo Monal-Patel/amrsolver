@@ -17,6 +17,7 @@ BCRec CNS::phys_bc;
 bool CNS::verbose = true;
 int  CNS::nstep_screen_output=10;
 bool CNS::dt_dynamic=false;
+int  CNS::euler_flux_type=0;
 Real CNS::cfl = 0.3;
 Real CNS::dt_constant = 0.0;
 int  CNS::do_reflux = 1;
@@ -39,7 +40,7 @@ CNS::CNS(Amr &papa,
 {
   if (do_reflux && level > 0)
   {
-    flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level, NUM_STATE));
+    flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level, NCONS));
   }
 
   buildMetrics();
@@ -67,6 +68,9 @@ void CNS::read_params()
 
   pp.query("do_reflux", do_reflux);
 
+  if (!pp.query("euler_flux_type",euler_flux_type)) {
+    amrex::Abort("Need to specify euler_flux_type.");}
+
   pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
   pp.query("refine_dengrad", refine_dengrad);
 
@@ -89,7 +93,7 @@ void CNS::init(AmrLevel &old)
   setTimeLevel(cur_time, dt_old, dt_new);
 
   MultiFab &S_new = get_new_data(State_Type);
-  FillPatch(old, S_new, 0, cur_time, State_Type, 0, NUM_STATE);
+  FillPatch(old, S_new, 0, cur_time, State_Type, 0, NCONS);
 }
 
 void CNS::init()
@@ -101,7 +105,7 @@ void CNS::init()
   setTimeLevel(cur_time, dt_old, dt);
 
   MultiFab &S_new = get_new_data(State_Type);
-  FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, NUM_STATE);
+  FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, NCONS);
 };
 
 void CNS::initData()
@@ -122,7 +126,7 @@ void CNS::initData()
                      });
 
   // Compute the initial temperature (will override what was set in initdata)
-  computeTemp(S_new, 0);
+  // computeTemp(S_new, 0);
 
   // MultiFab& C_new = get_new_data(Cost_Type);
   // C_new.setVal(1.0);
@@ -168,6 +172,8 @@ void CNS::computeTemp(MultiFab &State, int ng)
   {
     const Box &bx = mfi.growntilebox(ng);
     auto const &sfab = State.array(mfi);
+
+    amrex::Abort("ComputeTemp function not written");
 
     amrex::ParallelFor(bx,
                        [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
@@ -295,7 +301,7 @@ void CNS::post_timestep(int /* iteration*/)
   if (do_reflux && level < parent->finestLevel()){
     MultiFab &S = get_new_data(State_Type);
     CNS &fine_level = getLevel(level + 1);
-    fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, NUM_STATE, geom);
+    fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, NCONS, geom);
   }
 
   if (level < parent->finestLevel()) { avgDown();}
@@ -321,11 +327,11 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
                    Real time, int /*n_error_buf*/, int /*ngrow*/)
 {
   // MF without ghost points filled (why?)
-  MultiFab sdata(get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NUM_STATE, 1, MFInfo(), Factory());
+  MultiFab sdata(get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NCONS, 1, MFInfo(), Factory());
 
   // filling ghost points (copied from PeleC)
   const Real cur_time = state[State_Type].curTime();
-  FillPatch(*this, sdata, sdata.nGrow(), cur_time, State_Type, 0, NUM_STATE, 0);
+  FillPatch(*this, sdata, sdata.nGrow(), cur_time, State_Type, 0, NCONS, 0);
 
 #ifdef AMREX_USE_GPIBM
   // call function from cns_prob
@@ -356,7 +362,7 @@ void CNS::avgDown()
                       0, S_fine.nComp(), parent->refRatio(level));
 
   const int nghost = 0;
-  computeTemp(S_crse, nghost);
+  // computeTemp(S_crse, nghost);
 }
 
 void CNS::printTotal() const
@@ -368,16 +374,17 @@ void CNS::printTotal() const
     tot[comp] = S_new.sum(comp, true) * geom.ProbSize();
   }
 #ifdef BL_LAZY
-  Lazy::QueueReduction([=]() mutable
-                       {
+  Lazy::QueueReduction([=]() mutable {
 #endif
-                         ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
+  ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
 
-                         amrex::Print().SetPrecision(17) << "\n[CNS] Total mass       is " << tot[0] << "\n"
-                                                         << "      Total x-momentum is " << tot[1] << "\n"
-                                                         << "      Total y-momentum is " << tot[2] << "\n"
-                                                         << "      Total z-momentum is " << tot[3] << "\n"
-                                                         << "      Total energy     is " << tot[4] << "\n";
+  amrex::Print().SetPrecision(17) 
+  <<"\n[CNS level "<< level << "]\n" 
+  <<"   Total mass   = " << tot[0] << "\n"
+  <<"   Total x-mom  = " << tot[1] << "\n"
+  <<"   Total y-mom  = " << tot[2] << "\n"
+  <<"   Total z-mom  = " << tot[3] << "\n"
+  <<"   Total energy = " << tot[4] << "\n";
 
 #ifdef BL_LAZY
                        });
@@ -386,10 +393,7 @@ void CNS::printTotal() const
 
 // Plotting
 //------------------------------------------------------------------------------
-void CNS::writePlotFile(const std::string &dir,
-                        std::ostream &os,
-                        VisMF::How how)
-{
+void CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how) {
   int i, n;
   //
   // The list of indices of State to write to plotfile.

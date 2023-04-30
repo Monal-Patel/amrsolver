@@ -29,12 +29,13 @@ inline amrex::Real cns_estdt (amrex::Box const& bx, amrex::Array4<Real const>   
                 Real mx  = state(i,j,k,UMX);
                 Real my  = state(i,j,k,UMY);
                 Real mz  = state(i,j,k,UMY);
-                Real ei  = state(i,j,k,UEINT);
                 Real rhoinv = Real(1.0)/amrex::max(rho,parm.smallr);
                 Real vx = mx*rhoinv;
                 Real vy = my*rhoinv;
                 Real vz = mz*rhoinv;
-                Real p = amrex::max((parm.eos_gamma-Real(1.0))*ei, parm.smallp);
+                Real ke = Real(0.5)*rho*(vx*vx + vy*vy + vz*vz);
+                Real rhoei = (state(i,j,k,UEDEN) - ke);
+                Real p  = (parm.eos_gamma-Real(1.0))*rhoei;
                 Real cs = std::sqrt(parm.eos_gamma*p*rhoinv);
                 Real dtx = dx[0]/(amrex::Math::abs(vx)+cs);
                 Real dty = dx[1]/(amrex::Math::abs(vy)+cs);
@@ -60,8 +61,8 @@ cns_compute_temperature (int i, int j, int k, amrex::Array4<amrex::Real> const& 
     Real mx = u(i,j,k,UMX);
     Real my = u(i,j,k,UMY);
     Real mz = u(i,j,k,UMZ);
-    u(i,j,k,UEINT) = u(i,j,k,UEDEN) - Real(0.5) * rhoinv * (mx*mx+my*my+mz*mz);
-    u(i,j,k,UTEMP) = rhoinv * u(i,j,k,UEINT) * (Real(1.0)/parm.cv);
+    Real rhoeint = u(i,j,k,UEDEN) - Real(0.5) * rhoinv * (mx*mx+my*my+mz*mz);
+    // u(i,j,k,UTEMP) = rhoinv * rhoeint * (Real(1.0)/parm.cv);
 }
 
 #endif

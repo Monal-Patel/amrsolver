@@ -115,11 +115,11 @@ CNS::variableSetUp ()
     bool state_data_extrap = false;
     bool store_in_checkpoint = true;
     desc_lst.addDescriptor(State_Type,IndexType::TheCellType(),
-                           StateDescriptor::Point,NUM_GROW,NUM_STATE,
+                           StateDescriptor::Point,NUM_GROW,NCONS,
                            &cell_cons_interp,state_data_extrap,store_in_checkpoint);
 
-    Vector<BCRec>       bcs(NUM_STATE);
-    Vector<std::string> name(NUM_STATE);
+    Vector<BCRec>       bcs(NCONS);
+    Vector<std::string> name(NCONS);
 
     // Physical boundary conditions ////////////////////////////////////////////
     BCRec bc;
@@ -130,9 +130,9 @@ CNS::variableSetUp ()
 #if (AMREX_SPACEDIM == 3)
     cnt++; set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";
 #endif
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_eint";
+    // cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_eint";
     cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_et";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";
+    // cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";
 
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
     bndryfunc.setRunOnGPU(true);

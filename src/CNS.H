@@ -103,8 +103,7 @@ public:
     CNS& getLevel (int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
     enum StateVariable {
-        Density = 0, Xmom, Ymom, Zmom, Eden, Eint, Temp,
-        NUM_STATE
+        Density = 0, Xmom, Ymom, Zmom, Eden
     };
 
     enum StateDataType {
@@ -124,7 +123,7 @@ public:
 
     // Parameters
     static int num_state_data_types;
-    static constexpr int NUM_GROW = 2;
+    static constexpr int NUM_GROW = 3;
     std::unique_ptr<amrex::FluxRegister> flux_reg;
     static int do_reflux;
 
@@ -141,6 +140,7 @@ public:
     static amrex::Real dt_constant;
     static bool dt_dynamic;
     static int nstep_screen_output;
+    static int euler_flux_type;
 
 public:
     static Parm* h_parm;

@@ -6,414 +6,542 @@
 #include <AMReX_FArrayBox.H>
 #include <cmath>
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_ctoprim (int i, int j, int k,
-             amrex::Array4<amrex::Real const> const& u,
-             amrex::Array4<amrex::Real> const& q,
-             Parm const& parm) noexcept
-{
-    using amrex::Real;
+using namespace amrex;
 
-    Real rho = amrex::max(u(i,j,k,URHO),parm.smallr);
+// prim = primitive variables
+// cons = conserved variables
+// char = characteristic variables
+// flux = flux variables
+
+AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const Real>& u, Array4<Real> const& q, Parm const& parm) noexcept
+{
+    Real rho = u(i,j,k,URHO);
     Real rhoinv = Real(1.0)/rho;
     Real ux = u(i,j,k,UMX)*rhoinv;
     Real uy = u(i,j,k,UMY)*rhoinv;
     Real uz = u(i,j,k,UMZ)*rhoinv;
-    Real kineng = Real(0.5)*rho*(ux*ux+uy*uy+uz*uz);
-    Real ei = u(i,j,k,UEDEN) - kineng;
-    if (ei <= Real(0.0)) ei = u(i,j,k,UEINT);
-    Real p = amrex::max((parm.eos_gamma-Real(1.0))*ei,parm.smallp);
-    ei *= rhoinv;
+    Real ke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
+    Real ei = (u(i,j,k,UEDEN) - ke)*rhoinv;
+    Real p = (parm.eos_gamma-Real(1.0))*ei;
 
-    q(i,j,k,QRHO) = rho;
-    q(i,j,k,QU) = ux;
-    q(i,j,k,QV) = uy;
-    q(i,j,k,QW) = uz;
-    q(i,j,k,QEINT) = ei;
+    q(i,j,k,QRHO)  = rho;
+    q(i,j,k,QU)    = ux;
+    q(i,j,k,QV)    = uy;
+    q(i,j,k,QW)    = uz;
+    // q(i,j,k,QEINT) = ei;
     q(i,j,k,QPRES) = p;
-    q(i,j,k,QCS) = std::sqrt(parm.eos_gamma*p*rhoinv);
+    // q(i,j,k,QCS)   = std::sqrt(parm.eos_gamma*p*rhoinv);
     q(i,j,k,QTEMP) = Real(0.0);
 }
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_flux_to_dudt (int i, int j, int k, int n,
-                  amrex::Array4<amrex::Real> const& dudt,
-                  amrex::Array4<amrex::Real const> const& fx,
-                  amrex::Array4<amrex::Real const> const& fy,
-                  amrex::Array4<amrex::Real const> const& fz,
-                  amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxinv) noexcept
+// computes Euler fluxes from conserved variable vector 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, Parm const* parm) {
+
+  Real rhoinv = Real(1.0)/cons(i,j,k,URHO);
+  Real momx   = cons(i,j,k,UMX);
+  Real momy   = cons(i,j,k,UMY);
+  Real momz   = cons(i,j,k,UMZ);
+  Real rhoet  = cons(i,j,k,UEDEN);
+  Real ux     = momx*rhoinv;
+  Real uy     = momy*rhoinv;
+  Real uz     = momz*rhoinv;
+
+  Real rhoekin = rhoinv*(momx*momx + momy*momy + momz*momz);
+  Real rhoeint = rhoet - rhoekin;
+  Real P       = (parm->eos_gamma - 1.0)*rhoeint;
+
+  fx(i,j,k,URHO)  = momx;
+  fx(i,j,k,UMX)   = momx*ux + P;
+  fx(i,j,k,UMY)   = momy*ux;
+  fx(i,j,k,UMZ)   = momz*ux;
+  fx(i,j,k,UEDEN) = rhoet*ux + P*ux;
+
+  fy(i,j,k,URHO)  = momy;
+  fy(i,j,k,UMX)   = momx*uy;
+  fy(i,j,k,UMY)   = momy*uy + P;
+  fy(i,j,k,UMZ)   = momz*uy;
+  fy(i,j,k,UEDEN) = rhoet*uy + P*uy;
+
+  fz(i,j,k,URHO)  = momz;
+  fz(i,j,k,UMX)   = momx*uz;
+  fz(i,j,k,UMY)   = momy*uz;
+  fz(i,j,k,UMZ)   = momz*uz + P;
+  fz(i,j,k,UEDEN) = rhoet*uz + P*uz;
+
+  // for (int n=0;n<5;n++){
+    // printf("%i %i %i %i \n",i,j,k,n);
+    // printf("%i %f %f %f \n",n,fx(i,j,k,n),fy(i,j,k,n),fz(i,j,k,n));
+    // }
+    // printf("cons %f %f %f %f %f\n",cons(i,j,k,0), cons(i,j,k,1), cons(i,j,k,2), cons(i,j,k,3),cons(i,j,k,4));
+    // printf("fx %f %f %f %f %f\n",fx(i,j,k,0), fx(i,j,k,1), fx(i,j,k,2), fx(i,j,k,3),fx(i,j,k,4));
+}
+
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+// void cons2char (int i, int j, int k, int dir, Array4<const Real> const& q, const Array4<const Real>& w, const int sys)
+// {
+//     int QUN, QUT, QUTT;
+//     if      (dir == 0) { QUN = QU;  QUT = QV;  QUTT = QW; } 
+//     else if (dir == 1) { QUN = QV;  QUT = QU;  QUTT = QW; } 
+//     else               { QUN = QW;  QUT = QU;  QUTT = QV; }
+    
+//     if (sys == 0) { // speed of sound system
+//         // Real rmpoc2 = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
+//         w(i,j,k,WRHO) = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
+//         w(i,j,k,WACO)   = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) + q(i,j,k,QRHO)*q(i,j,k,QUN));
+//         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) - q(i,j,k,QRHO)*q(i,j,k,QUN));
+
+//     } else { // gamma system
+//         w(i,j,k,WRHO) = q(i,j,k,QRHO) * (1.0 - 1.0 / q(i,j,k,QG));
+//         w(i,j,k,WACO) = 0.5 * (q(i,j,k,QPRES) + std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
+//         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES) - std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
+//     }
+
+//     // Passive scalars are the same for both systems
+//     for (int n = 0; n < NUM_SPECIES; ++n) {
+//         w(i,j,k,WY+n) = q(i,j,k,QFS+n);
+//     }
+//     w(i,j,k,WC) = q(i,j,k,QC);
+//     AMREX_D_TERM(,
+//         w(i,j,k,WUT)   = q(i,j,k,QUT);,
+//         w(i,j,k,WUT+1) = q(i,j,k,QUTT););
+// }
+
+AMREX_GPU_DEVICE inline
+void cns_flux_to_dudt (int i, int j, int k, int n,
+                  Array4<Real> const& dudt,
+                  Array4<Real const> const& fx,
+                  Array4<Real const> const& fy,
+                  Array4<Real const> const& fz,
+                  GpuArray<Real,AMREX_SPACEDIM> const& dxinv) noexcept
 {
     dudt(i,j,k,n) = dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n))
         +           dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n))
         +           dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n));
 }
 
-namespace {
-
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-amrex::Real limiter (amrex::Real dlft, amrex::Real drgt) noexcept
-{
-    using amrex::Real;
+Real weno5js(const GpuArray<Real,5>& s)
+{ 
+  constexpr Real eps = 1e-6;
 
-    Real dcen = Real(0.5)*(dlft+drgt);
-    Real dsgn = amrex::Math::copysign(Real(1.0), dcen);
-    Real slop = Real(2.0) * amrex::min(amrex::Math::abs(dlft),amrex::Math::abs(drgt));
-    Real dlim = (dlft*drgt >= Real(0.0)) ? slop : Real(0.0);
-    return dsgn * amrex::min(dlim,amrex::Math::abs(dcen));
+  Real vl[3];
+  Real beta[3];
+  Real alpha[3];
+
+  beta[2] = (13.0 / 12.0) * pow(s[0] - 2.0 * s[1] + s[2], 2) +
+            0.25 * pow(s[0] - 4.0 * s[1] + 3.0 * s[2], 2);
+  beta[1] = (13.0 / 12.0) * pow(s[1] - 2.0 * s[2] + s[3], 2) +
+            0.25 * (s[1] - s[3]) * (s[1] - s[3]);
+  beta[0] = (13.0 / 12.0) * pow(s[2] - 2.0 * s[3] + s[4], 2) +
+            0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], 2);
+
+  beta[2] = 1.0 / ((eps + beta[2]) * (eps + beta[2]));
+  beta[1] = 1.0 / ((eps + beta[1]) * (eps + beta[1]));
+  beta[0] = 1.0 / ((eps + beta[0]) * (eps + beta[0]));
+
+  alpha[2] = beta[2];
+  alpha[1] = 6.0 * beta[1];
+  alpha[0] = 3.0 * beta[0];
+  Real alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
+
+  vl[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
+  vl[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
+  vl[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
+
+  return (1.0 / 6.0) * alpha1 * (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
 }
 
+// Fluxes
+//------------------------------------------------------------------------------
+// Computes Euler fluxes at i-1/2,j-1/2,k-1/2
+AMREX_GPU_DEVICE inline 
+void numericalflux (int i, int j, int k, int n, const auto& pfx, const auto& pfy, const auto& pfz, const auto& nfx, const auto& nfy, const auto& nfz) {
+
+GpuArray<Real,5> sten;
+
+// i-1/2
+sten[0] = pfx(i-3,j,k,n);
+sten[1] = pfx(i-2,j,k,n);
+sten[2] = pfx(i-1,j,k,n);
+sten[3] = pfx(i  ,j,k,n);
+sten[4] = pfx(i+1,j,k,n);
+nfx(i,j,k,n) = weno5js(sten);
+
+// j-1/2
+sten[0] = pfx(i,j-3,k,n);
+sten[1] = pfx(i,j-2,k,n);
+sten[2] = pfx(i,j-1,k,n);
+sten[3] = pfx(i,j  ,k,n);
+sten[4] = pfx(i,j+1,k,n);
+nfy(i,j,k,n) = weno5js(sten);
+
+// k-1/2
+sten[0] = pfx(i,j,k-3,n);
+sten[1] = pfx(i,j,k-2,n);
+sten[2] = pfx(i,j,k-1,n);
+sten[3] = pfx(i,j,k  ,n);
+sten[4] = pfx(i,j,k+1,n);
+nfz(i,j,k,n) = weno5js(sten);
 }
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_slope_x (int i, int j, int k,
-             amrex::Array4<amrex::Real> const& dq,
-             amrex::Array4<amrex::Real const> const& q) noexcept
-{
-    using amrex::Real;
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+// Real limiter (Real dlft, Real drgt) noexcept
+// {
+//     Real dcen = Real(0.5)*(dlft+drgt);
+//     Real dsgn = Math::copysign(Real(1.0), dcen);
+//     Real slop = Real(2.0) * min(Math::abs(dlft),Math::abs(drgt));
+//     Real dlim = (dlft*drgt >= Real(0.0)) ? slop : Real(0.0);
+//     return dsgn * min(dlim,Math::abs(dcen));
+// }
+// }
 
-    Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
-    Real drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
-    Real d0 = limiter(dlft, drgt);
+// AMREX_GPU_DEVICE
+// inline
+// void
+// cns_slope_x (int i, int j, int k,
+//              Array4<Real> const& dq,
+//              Array4<Real const> const& q) noexcept
+// {
+    
 
-    Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
-    dlft = (q(i,j,k,QRHO)-q(i-1,j,k,QRHO)) - (q(i,j,k,QPRES) - q(i-1,j,k,QPRES))/cs2;
-    drgt = (q(i+1,j,k,QRHO)-q(i,j,k,QRHO)) - (q(i+1,j,k,QPRES) - q(i,j,k,QPRES))/cs2;
-    Real d1 = limiter(dlft, drgt);
+//     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
+//     Real drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
+//     Real d0 = limiter(dlft, drgt);
 
-    dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
-    drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
-    Real d2 = limiter(dlft, drgt);
+//     Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
+//     dlft = (q(i,j,k,QRHO)-q(i-1,j,k,QRHO)) - (q(i,j,k,QPRES) - q(i-1,j,k,QPRES))/cs2;
+//     drgt = (q(i+1,j,k,QRHO)-q(i,j,k,QRHO)) - (q(i+1,j,k,QPRES) - q(i,j,k,QPRES))/cs2;
+//     Real d1 = limiter(dlft, drgt);
 
-    dlft = q(i,j,k,QV) - q(i-1,j,k,QV);
-    drgt = q(i+1,j,k,QV) - q(i,j,k,QV);
-    Real d3 = limiter(dlft, drgt);
+//     dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
+//     drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
+//     Real d2 = limiter(dlft, drgt);
 
-    dlft = q(i,j,k,QW) - q(i-1,j,k,QW);
-    drgt = q(i+1,j,k,QW) - q(i,j,k,QW);
-    Real d4 = limiter(dlft, drgt);
+//     dlft = q(i,j,k,QV) - q(i-1,j,k,QV);
+//     drgt = q(i+1,j,k,QV) - q(i,j,k,QV);
+//     Real d3 = limiter(dlft, drgt);
 
-    dq(i,j,k,0) = d0;
-    dq(i,j,k,1) = d1;
-    dq(i,j,k,2) = d2;
-    dq(i,j,k,3) = d3;
-    dq(i,j,k,4) = d4;
-}
+//     dlft = q(i,j,k,QW) - q(i-1,j,k,QW);
+//     drgt = q(i+1,j,k,QW) - q(i,j,k,QW);
+//     Real d4 = limiter(dlft, drgt);
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_slope_y (int i, int j, int k,
-             amrex::Array4<amrex::Real> const& dq,
-             amrex::Array4<amrex::Real const> const& q) noexcept
-{
-    using amrex::Real;
+//     dq(i,j,k,0) = d0;
+//     dq(i,j,k,1) = d1;
+//     dq(i,j,k,2) = d2;
+//     dq(i,j,k,3) = d3;
+//     dq(i,j,k,4) = d4;
+// }
 
-    Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
-    Real drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
-    Real d0 = limiter(dlft, drgt);
+// AMREX_GPU_DEVICE
+// inline
+// void
+// cns_slope_y (int i, int j, int k,
+//              Array4<Real> const& dq,
+//              Array4<Real const> const& q) noexcept
+// {
+    
 
-    Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
-    dlft = (q(i,j,k,QRHO)-q(i,j-1,k,QRHO)) - (q(i,j,k,QPRES) - q(i,j-1,k,QPRES))/cs2;
-    drgt = (q(i,j+1,k,QRHO)-q(i,j,k,QRHO)) - (q(i,j+1,k,QPRES) - q(i,j,k,QPRES))/cs2;
-    Real d1 = limiter(dlft, drgt);
+//     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
+//     Real drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
+//     Real d0 = limiter(dlft, drgt);
 
-    dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
-    drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
-    Real d2 = limiter(dlft, drgt);
+//     Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
+//     dlft = (q(i,j,k,QRHO)-q(i,j-1,k,QRHO)) - (q(i,j,k,QPRES) - q(i,j-1,k,QPRES))/cs2;
+//     drgt = (q(i,j+1,k,QRHO)-q(i,j,k,QRHO)) - (q(i,j+1,k,QPRES) - q(i,j,k,QPRES))/cs2;
+//     Real d1 = limiter(dlft, drgt);
 
-    dlft = q(i,j,k,QU) - q(i,j-1,k,QU);
-    drgt = q(i,j+1,k,QU) - q(i,j,k,QU);
-    Real d3 = limiter(dlft, drgt);
+//     dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
+//     drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
+//     Real d2 = limiter(dlft, drgt);
 
-    dlft = q(i,j,k,QW) - q(i,j-1,k,QW);
-    drgt = q(i,j+1,k,QW) - q(i,j,k,QW);
-    Real d4 = limiter(dlft, drgt);
+//     dlft = q(i,j,k,QU) - q(i,j-1,k,QU);
+//     drgt = q(i,j+1,k,QU) - q(i,j,k,QU);
+//     Real d3 = limiter(dlft, drgt);
 
-    dq(i,j,k,0) = d0;
-    dq(i,j,k,1) = d1;
-    dq(i,j,k,2) = d2;
-    dq(i,j,k,3) = d3;
-    dq(i,j,k,4) = d4;
-}
+//     dlft = q(i,j,k,QW) - q(i,j-1,k,QW);
+//     drgt = q(i,j+1,k,QW) - q(i,j,k,QW);
+//     Real d4 = limiter(dlft, drgt);
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_slope_z (int i, int j, int k,
-             amrex::Array4<amrex::Real> const& dq,
-             amrex::Array4<amrex::Real const> const& q) noexcept
-{
-    using amrex::Real;
+//     dq(i,j,k,0) = d0;
+//     dq(i,j,k,1) = d1;
+//     dq(i,j,k,2) = d2;
+//     dq(i,j,k,3) = d3;
+//     dq(i,j,k,4) = d4;
+// }
 
-    Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
-    Real drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
-    Real d0 = limiter(dlft, drgt);
+// AMREX_GPU_DEVICE
+// inline
+// void
+// cns_slope_z (int i, int j, int k,
+//              Array4<Real> const& dq,
+//              Array4<Real const> const& q) noexcept
+// {
+    
 
-    Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
-    dlft = (q(i,j,k,QRHO)-q(i,j,k-1,QRHO)) - (q(i,j,k,QPRES) - q(i,j,k-1,QPRES))/cs2;
-    drgt = (q(i,j,k+1,QRHO)-q(i,j,k,QRHO)) - (q(i,j,k+1,QPRES) - q(i,j,k,QPRES))/cs2;
-    Real d1 = limiter(dlft, drgt);
+//     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
+//     Real drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
+//     Real d0 = limiter(dlft, drgt);
 
-    dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
-    drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
-    Real d2 = limiter(dlft, drgt);
+//     Real cs2 = q(i,j,k,QCS)*q(i,j,k,QCS);
+//     dlft = (q(i,j,k,QRHO)-q(i,j,k-1,QRHO)) - (q(i,j,k,QPRES) - q(i,j,k-1,QPRES))/cs2;
+//     drgt = (q(i,j,k+1,QRHO)-q(i,j,k,QRHO)) - (q(i,j,k+1,QPRES) - q(i,j,k,QPRES))/cs2;
+//     Real d1 = limiter(dlft, drgt);
 
-    dlft = q(i,j,k,QU) - q(i,j,k-1,QU);
-    drgt = q(i,j,k+1,QU) - q(i,j,k,QU);
-    Real d3 = limiter(dlft, drgt);
+//     dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
+//     drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/q(i,j,k,QCS) + Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
+//     Real d2 = limiter(dlft, drgt);
 
-    dlft = q(i,j,k,QV) - q(i,j,k-1,QV);
-    drgt = q(i,j,k+1,QV) - q(i,j,k,QV);
-    Real d4 = limiter(dlft, drgt);
+//     dlft = q(i,j,k,QU) - q(i,j,k-1,QU);
+//     drgt = q(i,j,k+1,QU) - q(i,j,k,QU);
+//     Real d3 = limiter(dlft, drgt);
 
-    dq(i,j,k,0) = d0;
-    dq(i,j,k,1) = d1;
-    dq(i,j,k,2) = d2;
-    dq(i,j,k,3) = d3;
-    dq(i,j,k,4) = d4;
-}
+//     dlft = q(i,j,k,QV) - q(i,j,k-1,QV);
+//     drgt = q(i,j,k+1,QV) - q(i,j,k,QV);
+//     Real d4 = limiter(dlft, drgt);
 
-namespace {
+//     dq(i,j,k,0) = d0;
+//     dq(i,j,k,1) = d1;
+//     dq(i,j,k,2) = d2;
+//     dq(i,j,k,3) = d3;
+//     dq(i,j,k,4) = d4;
+// }
 
-AMREX_GPU_DEVICE
-inline
-void
-riemann (const amrex::Real gamma, const amrex::Real smallp, const amrex::Real /*smallr*/,
-         const amrex::Real rl, const amrex::Real ul, const amrex::Real pl,
-         const amrex::Real ut1l, const amrex::Real ut2l,
-         const amrex::Real rr, const amrex::Real ur, const amrex::Real pr,
-         const amrex::Real ut1r, const amrex::Real ut2r,
-         amrex::Real& flxrho, amrex::Real& flxu, amrex::Real& flxut,
-         amrex::Real& flxutt, amrex::Real& flxe) noexcept
-{
-    using amrex::Real;
+// namespace {
 
-    constexpr Real weakwv = Real(1.e-3);
-    constexpr Real small = Real(1.e-6);
+// AMREX_GPU_DEVICE
+// inline
+// void
+// riemann (const Real gamma, const Real smallp, const Real /*smallr*/,
+//          const Real rl, const Real ul, const Real pl,
+//          const Real ut1l, const Real ut2l,
+//          const Real rr, const Real ur, const Real pr,
+//          const Real ut1r, const Real ut2r,
+//          Real& flxrho, Real& flxu, Real& flxut,
+//          Real& flxutt, Real& flxe) noexcept
+// {
+    
 
-    Real clsql = gamma*pl*rl;
-    Real clsqr = gamma*pr*rr;
-    Real wl = std::sqrt(clsql);
-    Real wr = std::sqrt(clsqr);
-    Real cleft = wl/rl;
-    Real cright = wr/rr;
-    Real ccsmall = small*(cleft+cright);
+//     constexpr Real weakwv = Real(1.e-3);
+//     constexpr Real small = Real(1.e-6);
 
-    Real pstar = (wl*pr + wr*pl - wr*wl*(ur-ul))/(wl+wr);
-    pstar = amrex::max(pstar,smallp);
-    Real pstnm1 = pstar;
+//     Real clsql = gamma*pl*rl;
+//     Real clsqr = gamma*pr*rr;
+//     Real wl = std::sqrt(clsql);
+//     Real wr = std::sqrt(clsqr);
+//     Real cleft = wl/rl;
+//     Real cright = wr/rr;
+//     Real ccsmall = small*(cleft+cright);
 
-    Real wlsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pl)+pstar)*rl;
-    Real wrsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pr)+pstar)*rr;
+//     Real pstar = (wl*pr + wr*pl - wr*wl*(ur-ul))/(wl+wr);
+//     pstar = max(pstar,smallp);
+//     Real pstnm1 = pstar;
 
-    wl = std::sqrt(wlsq);
-    wr = std::sqrt(wrsq);
-    Real ustarp = ul - (pstar-pl)/wl;
-    Real ustarm = ur + (pstar-pr)/wr;
+//     Real wlsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pl)+pstar)*rl;
+//     Real wrsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pr)+pstar)*rr;
 
-    pstar = (wl*pr + wr*pl - wr*wl*(ur-ul))/(wl+wr);
-    pstar = amrex::max(pstar,smallp);
+//     wl = std::sqrt(wlsq);
+//     wr = std::sqrt(wrsq);
+//     Real ustarp = ul - (pstar-pl)/wl;
+//     Real ustarm = ur + (pstar-pr)/wr;
 
-    Real ustar;
-    for (int iter = 0; iter < 3; ++iter)
-    {
-        wlsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pl)+pstar)*rl;
-        wrsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pr)+pstar)*rr;
+//     pstar = (wl*pr + wr*pl - wr*wl*(ur-ul))/(wl+wr);
+//     pstar = max(pstar,smallp);
 
-        wl = Real(1.)/std::sqrt(wlsq);
-        wr = Real(1.)/std::sqrt(wrsq);
+//     Real ustar;
+//     for (int iter = 0; iter < 3; ++iter)
+//     {
+//         wlsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pl)+pstar)*rl;
+//         wrsq = (Real(0.5)*(gamma-Real(1.))*(pstar+pr)+pstar)*rr;
 
-        Real ustnm1 = ustarm;
-        Real ustnp1 = ustarp;
+//         wl = Real(1.)/std::sqrt(wlsq);
+//         wr = Real(1.)/std::sqrt(wrsq);
 
-        ustarm = ur - (pr - pstar)*wr;
-        ustarp = ul + (pl - pstar)*wl;
+//         Real ustnm1 = ustarm;
+//         Real ustnp1 = ustarp;
 
-        Real dpditer = amrex::Math::abs(pstnm1-pstar);
-        Real zp = amrex::Math::abs(ustarp-ustnp1);
-        if (zp-weakwv*cleft < Real(0.0) ) {
-            zp = dpditer*wl;
-        }
-        Real zm = amrex::Math::abs(ustarm-ustnm1);
-        if (zm-weakwv*cright < Real(0.0) ) {
-            zm = dpditer*wr;
-        }
+//         ustarm = ur - (pr - pstar)*wr;
+//         ustarp = ul + (pl - pstar)*wl;
 
-        Real zz = zp+zm;
-        Real denom = dpditer/ amrex::max(zz,ccsmall);
-        pstnm1 = pstar;
-        pstar = pstar - denom*(ustarm-ustarp);
-        pstar = amrex::max(pstar,smallp);
-        ustar = Real(0.5)*(ustarm+ustarp);
-    }
+//         Real dpditer = Math::abs(pstnm1-pstar);
+//         Real zp = Math::abs(ustarp-ustnp1);
+//         if (zp-weakwv*cleft < Real(0.0) ) {
+//             zp = dpditer*wl;
+//         }
+//         Real zm = Math::abs(ustarm-ustnm1);
+//         if (zm-weakwv*cright < Real(0.0) ) {
+//             zm = dpditer*wr;
+//         }
 
-    Real ro, uo, po, sgnm, utrans1, utrans2;
-    if (ustar > Real(0.)) {
-        ro = rl;
-        uo = ul;
-        po = pl;
-        sgnm = Real(1.);
-        utrans1 = ut1l;
-        utrans2 = ut2l;
-    } else if (ustar < Real(0.)) {
-        ro = rr;
-        uo = ur;
-        po = pr;
-        sgnm = Real(-1.);
-        utrans1 = ut1r;
-        utrans2 = ut2r;
-    } else {
-        uo = Real(0.5)*(ur+ul);
-        po = Real(0.5)*(pr+pl);
-        ro = Real(2.)*(rl*rr)/(rl+rr);
-        sgnm = Real(1.);
-        utrans1 = Real(0.5)*(ut1l+ut1r);
-        utrans2 = Real(0.5)*(ut2l+ut2r);
-    }
-    Real wosq = (Real(0.5)*(gamma-Real(1.))*(pstar+po)+pstar)*ro;
-    Real co = std::sqrt(gamma * po / ro);
-    Real wo = std::sqrt(wosq);
-    Real dpjmp = pstar-po;
-    Real rstar = ro/(Real(1.)-ro*dpjmp/wosq);
-    Real cstar = std::sqrt(gamma * pstar / rstar);
-    Real spout = co-sgnm*uo;
-    Real spin = cstar - sgnm*uo;
-    if(pstar >= po) {
-        spin = wo/ro-sgnm*uo;
-        spout = spin;
-    }
-    Real ss = amrex::max(spout-spin, spout+spin);
-    Real frac = Real(0.5)*(Real(1.)+(spin+spout)/amrex::max(ss,ccsmall));
+//         Real zz = zp+zm;
+//         Real denom = dpditer/ max(zz,ccsmall);
+//         pstnm1 = pstar;
+//         pstar = pstar - denom*(ustarm-ustarp);
+//         pstar = max(pstar,smallp);
+//         ustar = Real(0.5)*(ustarm+ustarp);
+//     }
 
-    Real rgdnv, ugdnv, pgdnv;
-    if (spout < Real(0.)) {
-        rgdnv = ro;
-        ugdnv = uo;
-        pgdnv = po;
-    } else if(spin >= Real(0.)) {
-        rgdnv = rstar;
-        ugdnv = ustar;
-        pgdnv = pstar;
-    } else {
-        rgdnv = frac*rstar + (Real(1.) - frac)* ro;
-        ugdnv = frac*ustar + (Real(1.) - frac)* uo;
-        pgdnv = frac*pstar + (Real(1.) - frac)* po;
-    }
+//     Real ro, uo, po, sgnm, utrans1, utrans2;
+//     if (ustar > Real(0.)) {
+//         ro = rl;
+//         uo = ul;
+//         po = pl;
+//         sgnm = Real(1.);
+//         utrans1 = ut1l;
+//         utrans2 = ut2l;
+//     } else if (ustar < Real(0.)) {
+//         ro = rr;
+//         uo = ur;
+//         po = pr;
+//         sgnm = Real(-1.);
+//         utrans1 = ut1r;
+//         utrans2 = ut2r;
+//     } else {
+//         uo = Real(0.5)*(ur+ul);
+//         po = Real(0.5)*(pr+pl);
+//         ro = Real(2.)*(rl*rr)/(rl+rr);
+//         sgnm = Real(1.);
+//         utrans1 = Real(0.5)*(ut1l+ut1r);
+//         utrans2 = Real(0.5)*(ut2l+ut2r);
+//     }
+//     Real wosq = (Real(0.5)*(gamma-Real(1.))*(pstar+po)+pstar)*ro;
+//     Real co = std::sqrt(gamma * po / ro);
+//     Real wo = std::sqrt(wosq);
+//     Real dpjmp = pstar-po;
+//     Real rstar = ro/(Real(1.)-ro*dpjmp/wosq);
+//     Real cstar = std::sqrt(gamma * pstar / rstar);
+//     Real spout = co-sgnm*uo;
+//     Real spin = cstar - sgnm*uo;
+//     if(pstar >= po) {
+//         spin = wo/ro-sgnm*uo;
+//         spout = spin;
+//     }
+//     Real ss = max(spout-spin, spout+spin);
+//     Real frac = Real(0.5)*(Real(1.)+(spin+spout)/max(ss,ccsmall));
 
-    flxrho = rgdnv*ugdnv;
-    flxu = rgdnv*ugdnv*ugdnv+pgdnv;
-    flxut = rgdnv*ugdnv*utrans1;
-    flxutt = rgdnv*ugdnv*utrans2;
-    flxe = ugdnv*(Real(0.5)*rgdnv*(ugdnv*ugdnv+utrans1*utrans1+utrans2*utrans2) + pgdnv/(gamma -Real(1.)) + pgdnv);
-}
-}
+//     Real rgdnv, ugdnv, pgdnv;
+//     if (spout < Real(0.)) {
+//         rgdnv = ro;
+//         ugdnv = uo;
+//         pgdnv = po;
+//     } else if(spin >= Real(0.)) {
+//         rgdnv = rstar;
+//         ugdnv = ustar;
+//         pgdnv = pstar;
+//     } else {
+//         rgdnv = frac*rstar + (Real(1.) - frac)* ro;
+//         ugdnv = frac*ustar + (Real(1.) - frac)* uo;
+//         pgdnv = frac*pstar + (Real(1.) - frac)* po;
+//     }
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_riemann_x (int i, int j, int k,
-               amrex::Array4<amrex::Real> const& fx,
-               amrex::Array4<amrex::Real const> const& dq,
-               amrex::Array4<amrex::Real const> const& q,
-               Parm const& parm) noexcept
-{
-    using amrex::Real;
+//     flxrho = rgdnv*ugdnv;
+//     flxu = rgdnv*ugdnv*ugdnv+pgdnv;
+//     flxut = rgdnv*ugdnv*utrans1;
+//     flxutt = rgdnv*ugdnv*utrans2;
+//     flxe = ugdnv*(Real(0.5)*rgdnv*(ugdnv*ugdnv+utrans1*utrans1+utrans2*utrans2) + pgdnv/(gamma -Real(1.)) + pgdnv);
+// }
+// }
 
-    Real cspeed = q(i-1,j,k,QCS);
-    Real rl = q(i-1,j,k,QRHO) + Real(0.5) * ( (dq(i-1,j,k,0)+dq(i-1,j,k,2))/cspeed + dq(i-1,j,k,1));
-    rl = amrex::max(rl, parm.smallr);
-    Real ul = q(i-1,j,k,QU) + Real(0.5) * ( (dq(i-1,j,k,2)-dq(i-1,j,k,0))/q(i-1,j,k,QRHO));
-    Real pl = q(i-1,j,k,QPRES) + Real(0.5) *  (dq(i-1,j,k,0)+dq(i-1,j,k,2))*cspeed;
-    pl = amrex::max(pl, parm.smallp);
-    Real ut1l = q(i-1,j,k,QV) + Real(0.5) * dq(i-1,j,k,3);
-    Real ut2l = q(i-1,j,k,QW) + Real(0.5) * dq(i-1,j,k,4);
+// AMREX_GPU_DEVICE
+// inline
+// void
+// cns_riemann_x (int i, int j, int k,
+//                Array4<Real> const& fx,
+//                Array4<Real const> const& dq,
+//                Array4<Real const> const& q,
+//                Parm const& parm) noexcept
+// {
+    
 
-    cspeed = q(i,j,k,QCS);
-    Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
-    rr = amrex::max(rr, parm.smallr);
-    Real ur = q(i,j,k,QU) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
-    Real pr = q(i,j,k,QPRES) - Real(0.5) * (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
-    pr = amrex::max(pr, parm.smallp);
-    Real ut1r = q(i,j,k,QV) - Real(0.5) * dq(i,j,k,3);
-    Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
+//     Real cspeed = q(i-1,j,k,QCS);
+//     Real rl = q(i-1,j,k,QRHO) + Real(0.5) * ( (dq(i-1,j,k,0)+dq(i-1,j,k,2))/cspeed + dq(i-1,j,k,1));
+//     rl = max(rl, parm.smallr);
+//     Real ul = q(i-1,j,k,QU) + Real(0.5) * ( (dq(i-1,j,k,2)-dq(i-1,j,k,0))/q(i-1,j,k,QRHO));
+//     Real pl = q(i-1,j,k,QPRES) + Real(0.5) *  (dq(i-1,j,k,0)+dq(i-1,j,k,2))*cspeed;
+//     pl = max(pl, parm.smallp);
+//     Real ut1l = q(i-1,j,k,QV) + Real(0.5) * dq(i-1,j,k,3);
+//     Real ut2l = q(i-1,j,k,QW) + Real(0.5) * dq(i-1,j,k,4);
 
-    riemann(parm.eos_gamma, parm.smallp, parm.smallr,
-            rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
-            fx(i,j,k,URHO), fx(i,j,k,UMX), fx(i,j,k,UMY), fx(i,j,k,UMZ), fx(i,j,k,UEDEN));
-}
+//     cspeed = q(i,j,k,QCS);
+//     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
+//     rr = max(rr, parm.smallr);
+//     Real ur = q(i,j,k,QU) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
+//     Real pr = q(i,j,k,QPRES) - Real(0.5) * (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
+//     pr = max(pr, parm.smallp);
+//     Real ut1r = q(i,j,k,QV) - Real(0.5) * dq(i,j,k,3);
+//     Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_riemann_y (int i, int j, int k,
-               amrex::Array4<amrex::Real> const& fy,
-               amrex::Array4<amrex::Real const> const& dq,
-               amrex::Array4<amrex::Real const> const& q,
-               Parm const& parm) noexcept
-{
-    using amrex::Real;
+//     riemann(parm.eos_gamma, parm.smallp, parm.smallr,
+//             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
+//             fx(i,j,k,URHO), fx(i,j,k,UMX), fx(i,j,k,UMY), fx(i,j,k,UMZ), fx(i,j,k,UEDEN));
+// }
 
-    Real cspeed = q(i,j-1,k,QCS);
-    Real rl = q(i,j-1,k,QRHO) + Real(0.5) * ( (dq(i,j-1,k,0)+dq(i,j-1,k,2))/cspeed + dq(i,j-1,k,1));
-    rl = amrex::max(rl, parm.smallr);
-    Real ul = q(i,j-1,k,QV) + Real(0.5) * ( (dq(i,j-1,k,2)-dq(i,j-1,k,0))/q(i,j-1,k,QRHO));
-    Real pl = q(i,j-1,k,QPRES) + Real(0.5) *  (dq(i,j-1,k,0)+dq(i,j-1,k,2))*cspeed;
-    pl = amrex::max(pl, parm.smallp);
-    Real ut1l = q(i,j-1,k,QU) + Real(0.5) * dq(i,j-1,k,3);
-    Real ut2l = q(i,j-1,k,QW) + Real(0.5) * dq(i,j-1,k,4);
+// AMREX_GPU_DEVICE
+// inline
+// void
+// cns_riemann_y (int i, int j, int k,
+//                Array4<Real> const& fy,
+//                Array4<Real const> const& dq,
+//                Array4<Real const> const& q,
+//                Parm const& parm) noexcept
+// {
+    
 
-    cspeed = q(i,j,k,QCS);
-    Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
-    rr = amrex::max(rr, parm.smallr);
-    Real ur = q(i,j,k,QV) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
-    Real pr = q(i,j,k,QPRES) - Real(0.5) * (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
-    pr = amrex::max(pr, parm.smallp);
-    Real ut1r = q(i,j,k,QU) - Real(0.5) * dq(i,j,k,3);
-    Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
+//     Real cspeed = q(i,j-1,k,QCS);
+//     Real rl = q(i,j-1,k,QRHO) + Real(0.5) * ( (dq(i,j-1,k,0)+dq(i,j-1,k,2))/cspeed + dq(i,j-1,k,1));
+//     rl = max(rl, parm.smallr);
+//     Real ul = q(i,j-1,k,QV) + Real(0.5) * ( (dq(i,j-1,k,2)-dq(i,j-1,k,0))/q(i,j-1,k,QRHO));
+//     Real pl = q(i,j-1,k,QPRES) + Real(0.5) *  (dq(i,j-1,k,0)+dq(i,j-1,k,2))*cspeed;
+//     pl = max(pl, parm.smallp);
+//     Real ut1l = q(i,j-1,k,QU) + Real(0.5) * dq(i,j-1,k,3);
+//     Real ut2l = q(i,j-1,k,QW) + Real(0.5) * dq(i,j-1,k,4);
 
-    riemann(parm.eos_gamma, parm.smallp, parm.smallr,
-            rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
-            fy(i,j,k,URHO), fy(i,j,k,UMY), fy(i,j,k,UMX), fy(i,j,k,UMZ), fy(i,j,k,UEDEN));
-}
+//     cspeed = q(i,j,k,QCS);
+//     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
+//     rr = max(rr, parm.smallr);
+//     Real ur = q(i,j,k,QV) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
+//     Real pr = q(i,j,k,QPRES) - Real(0.5) * (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
+//     pr = max(pr, parm.smallp);
+//     Real ut1r = q(i,j,k,QU) - Real(0.5) * dq(i,j,k,3);
+//     Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_riemann_z (int i, int j, int k,
-               amrex::Array4<amrex::Real> const& fz,
-               amrex::Array4<amrex::Real const> const& dq,
-               amrex::Array4<amrex::Real const> const& q,
-               Parm const& parm) noexcept
-{
-    using amrex::Real;
+//     riemann(parm.eos_gamma, parm.smallp, parm.smallr,
+//             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
+//             fy(i,j,k,URHO), fy(i,j,k,UMY), fy(i,j,k,UMX), fy(i,j,k,UMZ), fy(i,j,k,UEDEN));
+// }
 
-    Real cspeed = q(i,j,k-1,QCS);
-    Real rl = q(i,j,k-1,QRHO) + Real(0.5) * ( (dq(i,j,k-1,0)+dq(i,j,k-1,2))/cspeed + dq(i,j,k-1,1));
-    rl = amrex::max(rl, parm.smallr);
-    Real ul = q(i,j,k-1,QW) + Real(0.5) * ( (dq(i,j,k-1,2)-dq(i,j,k-1,0))/q(i,j,k-1,QRHO));
-    Real pl = q(i,j,k-1,QPRES) + Real(0.5) *  (dq(i,j,k-1,0)+dq(i,j,k-1,2))*cspeed;
-    pl = amrex::max(pl, parm.smallp);
-    Real ut1l = q(i,j,k-1,QU) + Real(0.5) * dq(i,j,k-1,3);
-    Real ut2l = q(i,j,k-1,QV) + Real(0.5) * dq(i,j,k-1,4);
+// AMREX_GPU_DEVICE
+// inline
+// void
+// cns_riemann_z (int i, int j, int k,
+//                Array4<Real> const& fz,
+//                Array4<Real const> const& dq,
+//                Array4<Real const> const& q,
+//                Parm const& parm) noexcept
+// {
+    
 
-    cspeed = q(i,j,k,QCS);
-    Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
-    rr = amrex::max(rr, parm.smallr);
-    Real ur = q(i,j,k,QW) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
-    Real pr = q(i,j,k,QPRES) - Real(0.5) *  (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
-    pr = amrex::max(pr, parm.smallp);
-    Real ut1r = q(i,j,k,QU) - Real(0.5) * dq(i,j,k,3);
-    Real ut2r = q(i,j,k,QV) - Real(0.5) * dq(i,j,k,4);
+//     Real cspeed = q(i,j,k-1,QCS);
+//     Real rl = q(i,j,k-1,QRHO) + Real(0.5) * ( (dq(i,j,k-1,0)+dq(i,j,k-1,2))/cspeed + dq(i,j,k-1,1));
+//     rl = max(rl, parm.smallr);
+//     Real ul = q(i,j,k-1,QW) + Real(0.5) * ( (dq(i,j,k-1,2)-dq(i,j,k-1,0))/q(i,j,k-1,QRHO));
+//     Real pl = q(i,j,k-1,QPRES) + Real(0.5) *  (dq(i,j,k-1,0)+dq(i,j,k-1,2))*cspeed;
+//     pl = max(pl, parm.smallp);
+//     Real ut1l = q(i,j,k-1,QU) + Real(0.5) * dq(i,j,k-1,3);
+//     Real ut2l = q(i,j,k-1,QV) + Real(0.5) * dq(i,j,k-1,4);
 
-    riemann(parm.eos_gamma, parm.smallp, parm.smallr,
-            rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
-            fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UEDEN));
-}
+//     cspeed = q(i,j,k,QCS);
+//     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
+//     rr = max(rr, parm.smallr);
+//     Real ur = q(i,j,k,QW) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
+//     Real pr = q(i,j,k,QPRES) - Real(0.5) *  (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
+//     pr = max(pr, parm.smallp);
+//     Real ut1r = q(i,j,k,QU) - Real(0.5) * dq(i,j,k,3);
+//     Real ut2r = q(i,j,k,QV) - Real(0.5) * dq(i,j,k,4);
+
+//     riemann(parm.eos_gamma, parm.smallp, parm.smallr,
+//             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
+//             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UEDEN));
+// }
 
 #endif
