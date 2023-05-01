@@ -90,7 +90,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   //Euler Fluxes //////////////////////////////////////////////////////////////
   // Riemann solver
-if (euler_flux_type==0) {
+  if (euler_flux_type==0) {
     FArrayBox qtmp, slopetmp;
     for (MFIter mfi(statemf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -174,8 +174,11 @@ if (euler_flux_type==0) {
         });
     }
   }
-// weno fvs
-else {
+  
+  // central-split KEEP + JST artificial dissipation
+
+  // weno5js fvs
+  else {
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -227,12 +230,26 @@ else {
     }
 }
 
-        // Viscous terms
-        // amrex::ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        //     cns_viscflux(i, j, k, cdir, q, w, 0);
-        // });
+    // Viscous terms
+    // amrex::ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+    //     cns_viscflux(i, j, k, cdir, q, w, 0);
+    // });
 
-        // Source terms ////////////////////////////////////////////////////////
+    // Source terms ////////////////////////////////////////////////////////
+    // if (gravity != Real(0.0)) {
+    //     const Real g = gravity;
+    //     const int irho = Density;
+    //     const int imz = Zmom;
+    //     const int irhoE = Eden;
+    //     amrex::ParallelFor(bx,
+    //     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    //     {
+    //         dsdtfab(i,j,k,imz) += g * statefab(i,j,k,irho);
+    //         dsdtfab(i,j,k,irhoE) += g * statefab(i,j,k,imz);
+    //     });
+    // }
+
+    // Re-fluxing
     if (fr_as_crse) {
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
@@ -248,18 +265,5 @@ else {
             fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
         }
     }
-
 }
 
-// if (gravity != Real(0.0)) {
-//     const Real g = gravity;
-//     const int irho = Density;
-//     const int imz = Zmom;
-//     const int irhoE = Eden;
-//     amrex::ParallelFor(bx,
-//     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-//     {
-//         dsdtfab(i,j,k,imz) += g * statefab(i,j,k,irho);
-//         dsdtfab(i,j,k,irhoE) += g * statefab(i,j,k,imz);
-//     });
-// }
