@@ -89,96 +89,9 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     }
 
   //Euler Fluxes //////////////////////////////////////////////////////////////
-  // Riemann solver
-  if (euler_flux_type==0) {
-    FArrayBox qtmp, slopetmp;
-    for (MFIter mfi(statemf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        const Box& bx = mfi.tilebox();
-
-        auto const& sfab = statemf.array(mfi);
-        auto const& dsdtfab = dSdt.array(mfi);
-        AMREX_D_TERM(auto const& fxfab = numflxmf[0].array(mfi);,
-                     auto const& fyfab = numflxmf[1].array(mfi);,
-                     auto const& fzfab = numflxmf[2].array(mfi););
-
-        const Box& bxg2 = amrex::grow(bx,2);
-        qtmp.resize(bxg2, NPRIM);
-        Elixir qeli = qtmp.elixir();
-        auto const& q = qtmp.array();
-
-        amrex::ParallelFor(bxg2,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cons2prim(i, j, k, sfab, q, *lparm);
-        });
-
-        const Box& bxg1 = amrex::grow(bx,1);
-        slopetmp.resize(bxg1,NCONS);
-        Elixir slopeeli = slopetmp.elixir();
-        auto const& slope = slopetmp.array();
-
-        // x-direction
-        int cdir = 0;
-        const Box& xslpbx = amrex::grow(bx, cdir, 1);
-        amrex::ParallelFor(xslpbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_slope_x(i, j, k, slope, q,*lparm);
-        });
-        const Box& xflxbx = amrex::surroundingNodes(bx,cdir);
-        amrex::ParallelFor(xflxbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_riemann_x(i, j, k, fxfab, slope, q, *lparm);
-        });
-
-        // y-direction
-        cdir = 1;
-        const Box& yslpbx = amrex::grow(bx, cdir, 1);
-        amrex::ParallelFor(yslpbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_slope_y(i, j, k, slope, q, *lparm);
-        });
-        const Box& yflxbx = amrex::surroundingNodes(bx,cdir);
-        amrex::ParallelFor(yflxbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_riemann_y(i, j, k, fyfab, slope, q, *lparm);
-        });
-
-        // z-direction
-        cdir = 2;
-        const Box& zslpbx = amrex::grow(bx, cdir, 1);
-        amrex::ParallelFor(zslpbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_slope_z(i, j, k, slope, q, *lparm);
-        });
-        const Box& zflxbx = amrex::surroundingNodes(bx,cdir);
-        amrex::ParallelFor(zflxbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_riemann_z(i, j, k, fzfab, slope, q, *lparm);
-        });
-
-        // don't have to do this, but we could
-        qeli.clear(); // don't need them anymore
-        slopeeli.clear();
-
-        amrex::ParallelFor(bx, NCONS,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-        {
-            cns_flux_to_dudt(i, j, k, n, dsdtfab, AMREX_D_DECL(fxfab,fyfab,fzfab), dxinv);
-        });
-    }
-  }
-  
-  // central-split KEEP + JST artificial dissipation
 
   // weno5js fvs
-  else {
+  if (euler_flux_type==2) {
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -186,7 +99,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       pntflxmf[idim] = 0.0;
     }
 
-    FArrayBox lambdafab;
+    FArrayBox lambdafab; //store eigenvalues max(u+c,u,u-c) in all directions
     // loop over all fabs
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -221,19 +134,148 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         //       // printf("i,j,k,n  -  %i %i %i %i %f \n",i,j,k,n, nfabfx(i,j,k,n) );
         });
 
-        // add to rhs
-        amrex::ParallelFor(bx, int(NCONS),
+        // add euler derivatives to rhs
+        amrex::ParallelFor(bx, NCONS,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
         {
-            cns_flux_to_dudt(i, j, k, n, dsdtfab, AMREX_D_DECL(nfabfx,nfabfy,nfabfz), dxinv);
+        dsdtfab(i,j,k,n) = dxinv[0] * (nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
+        +           dxinv[1] * (nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
+        +           dxinv[2] * (nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
         });
     }
-}
+  }
+  
+  // central-split KEEP + JST artificial dissipation
+  else if (euler_flux_type==1) {
 
-    // Viscous terms
-    // amrex::ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-    //     cns_viscflux(i, j, k, cdir, q, w, 0);
-    // });
+  }
+
+  // Riemann solver
+  else {
+    FArrayBox qtmp, slopetmp;
+    for (MFIter mfi(statemf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        const Box& bx = mfi.tilebox();
+
+        auto const& sfab = statemf.array(mfi);
+        auto const& dsdtfab = dSdt.array(mfi);
+        AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                     auto const& nfabfy = numflxmf[1].array(mfi);,
+                     auto const& nfabfz = numflxmf[2].array(mfi););
+
+        const Box& bxg2 = amrex::grow(bx,2);
+        qtmp.resize(bxg2, NPRIM);
+        Elixir qeli = qtmp.elixir();
+        auto const& q = qtmp.array();
+
+        amrex::ParallelFor(bxg2,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            cons2prim(i, j, k, sfab, q, *lparm);
+        });
+
+        const Box& bxg1 = amrex::grow(bx,1);
+        slopetmp.resize(bxg1,NCONS);
+        Elixir slopeeli = slopetmp.elixir();
+        auto const& slope = slopetmp.array();
+
+        // x-direction
+        int cdir = 0;
+        const Box& xslpbx = amrex::grow(bx, cdir, 1);
+        amrex::ParallelFor(xslpbx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            cns_slope_x(i, j, k, slope, q,*lparm);
+        });
+        const Box& xflxbx = amrex::surroundingNodes(bx,cdir);
+        amrex::ParallelFor(xflxbx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            cns_riemann_x(i, j, k, nfabfx, slope, q, *lparm);
+        });
+
+        // y-direction
+        cdir = 1;
+        const Box& yslpbx = amrex::grow(bx, cdir, 1);
+        amrex::ParallelFor(yslpbx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            cns_slope_y(i, j, k, slope, q, *lparm);
+        });
+        const Box& yflxbx = amrex::surroundingNodes(bx,cdir);
+        amrex::ParallelFor(yflxbx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            cns_riemann_y(i, j, k, nfabfy, slope, q, *lparm);
+        });
+
+        // z-direction
+        cdir = 2;
+        const Box& zslpbx = amrex::grow(bx, cdir, 1);
+        amrex::ParallelFor(zslpbx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            cns_slope_z(i, j, k, slope, q, *lparm);
+        });
+        const Box& zflxbx = amrex::surroundingNodes(bx,cdir);
+        amrex::ParallelFor(zflxbx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            cns_riemann_z(i, j, k, nfabfz, slope, q, *lparm);
+        });
+
+        // don't have to do this, but we could
+        qeli.clear(); // don't need them anymore
+        slopeeli.clear();
+
+        // add euler derivatives to rhs
+        amrex::ParallelFor(bx, NCONS,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+        {
+        dsdtfab(i,j,k,n) = dxinv[0] * (nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
+        +           dxinv[1] * (nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
+        +           dxinv[2] * (nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
+        });
+    }
+  }
+    
+  // Viscous Fluxes //////////////////////////////////////////////////////////
+  // We have a separate MFIter loop here than the Euler fluxes and the source terms, so the work can be further parallised. As different MFIter loops can be in different GPU streams. 
+
+  // clear euler fluxes from earlier
+  for (int i = 0; i< AMREX_SPACEDIM; ++i) {numflxmf[i] = 0.0;}
+  FArrayBox temp; // make multifab for primitive variables
+
+  // loop over all fabs
+  for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+  {
+      const Box& bx   = mfi.tilebox();
+      const Box& bxg  = mfi.growntilebox(NUM_GROW);
+
+      auto const& statefab = statemf.array(mfi);
+
+      temp.resize(bxg, NPRIM+2); // NPRIM+1 = mu (viscosity) --- NPRIM+2 = k (thermal conductivity) 
+      // Elixir qeli = temp.elixir();
+      auto const& prim_trans_fab = temp.array();
+
+      AMREX_D_TERM(auto const& vderx = numflxmf[0].array(mfi);,
+                   auto const& vdery = numflxmf[1].array(mfi);,
+                   auto const& vderz = numflxmf[2].array(mfi););
+
+      // Convert to primitive variables and get transport coefficients
+      amrex::ParallelFor(bxg,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      {
+          cons2prim(i, j, k, statefab, prim_trans_fab, *lparm);
+      });
+
+      // compute viscous fluxes
+      amrex::ParallelFor(bx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        viscfluxes(i, j, k, prim_trans_fab ,vderx, vdery, vderz, dxinv);
+      });
+
+      // add viscous derivatives to rhs
+  }
 
     // Source terms ////////////////////////////////////////////////////////
     // if (gravity != Real(0.0)) {

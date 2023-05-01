@@ -147,19 +147,6 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
 //         w(i,j,k,WUT+1) = q(i,j,k,QUTT););
 // }
 
-AMREX_GPU_DEVICE inline
-void cns_flux_to_dudt (int i, int j, int k, int n,
-                  Array4<Real> const& dudt,
-                  Array4<Real const> const& fx,
-                  Array4<Real const> const& fy,
-                  Array4<Real const> const& fz,
-                  GpuArray<Real,AMREX_SPACEDIM> const& dxinv) noexcept
-{
-    dudt(i,j,k,n) = dxinv[0] * (fx(i,j,k,n) - fx(i+1,j,k,n))
-        +           dxinv[1] * (fy(i,j,k,n) - fy(i,j+1,k,n))
-        +           dxinv[2] * (fz(i,j,k,n) - fz(i,j,k+1,n));
-}
-
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 Real weno5js(const GpuArray<Real,5>& s)
 { 
@@ -663,5 +650,22 @@ void cns_riemann_z (int i, int j, int k,
             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UET));
 }
+
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+void viscfluxes (int i, int j, int k,
+          Array4<const Real> const& primfab,
+          Array4<const Real> const& vderx,
+          Array4<const Real> const& vdery,
+          Array4<const Real> const& vderz,
+          GpuArray<Real,AMREX_SPACEDIM> const& dxinv) noexcept
+{
+    // cns_diff_x(i, j, k, cons, coeffs, dxinv, flx);
+    // cns_diff_y(i, j, k, cons, coeffs, dxinv, flx);
+    // cns_diff_z(i, j, k, cons, coeffs, dxinv, flx);
+}
+
+
+
 
 #endif
