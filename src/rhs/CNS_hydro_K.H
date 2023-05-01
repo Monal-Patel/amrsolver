@@ -21,17 +21,15 @@ AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const 
     Real uy = u(i,j,k,UMY)*rhoinv;
     Real uz = u(i,j,k,UMZ)*rhoinv;
     Real ke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-    Real ei = (u(i,j,k,UET) - ke)*rhoinv;
-    Real p = (parm.eos_gamma-Real(1.0))*ei;
+    Real rhoei = (u(i,j,k,UET) - ke);
+    Real p = (parm.eos_gamma-Real(1.0))*rhoei;
 
     q(i,j,k,QRHO)  = rho;
     q(i,j,k,QU)    = ux;
     q(i,j,k,QV)    = uy;
     q(i,j,k,QW)    = uz;
-    // q(i,j,k,QEINT) = ei;
     q(i,j,k,QPRES) = p;
-    // q(i,j,k,QCS)   = std::sqrt(parm.eos_gamma*p*rhoinv);
-    q(i,j,k,QTEMP) = ei/parm.cv;
+    q(i,j,k,QTEMP) = rhoei*rhoinv/parm.cv;
 }
 
 // computes Euler fluxes from conserved variable vector 
