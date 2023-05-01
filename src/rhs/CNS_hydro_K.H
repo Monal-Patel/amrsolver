@@ -20,8 +20,8 @@ AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const 
     Real ux = u(i,j,k,UMX)*rhoinv;
     Real uy = u(i,j,k,UMY)*rhoinv;
     Real uz = u(i,j,k,UMZ)*rhoinv;
-    Real ke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-    Real rhoei = (u(i,j,k,UET) - ke);
+    Real rhoke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
+    Real rhoei = (u(i,j,k,UET) - rhoke);
     Real p = (parm.eos_gamma-Real(1.0))*rhoei;
 
     q(i,j,k,QRHO)  = rho;
@@ -45,27 +45,27 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
   Real uy     = momy*rhoinv;
   Real uz     = momz*rhoinv;
 
-  Real rhoekin = rhoinv*(momx*momx + momy*momy + momz*momz);
+  Real rhoekin = Real(0.5)*rhoinv*(momx*momx + momy*momy + momz*momz);
   Real rhoeint = rhoet - rhoekin;
-  Real P       = (parm->eos_gamma - 1.0)*rhoeint;
+  Real P       = (parm->eos_gamma - Real(1.0))*rhoeint;
 
   fx(i,j,k,URHO)  = momx;
   fx(i,j,k,UMX)   = momx*ux + P;
   fx(i,j,k,UMY)   = momy*ux;
   fx(i,j,k,UMZ)   = momz*ux;
-  fx(i,j,k,UET) = rhoet*ux + P*ux;
+  fx(i,j,k,UET)   = rhoet*ux + P*ux;
 
   fy(i,j,k,URHO)  = momy;
   fy(i,j,k,UMX)   = momx*uy;
   fy(i,j,k,UMY)   = momy*uy + P;
   fy(i,j,k,UMZ)   = momz*uy;
-  fy(i,j,k,UET) = rhoet*uy + P*uy;
+  fy(i,j,k,UET)   = rhoet*uy + P*uy;
 
   fz(i,j,k,URHO)  = momz;
   fz(i,j,k,UMX)   = momx*uz;
   fz(i,j,k,UMY)   = momy*uz;
   fz(i,j,k,UMZ)   = momz*uz + P;
-  fz(i,j,k,UET) = rhoet*uz + P*uz;
+  fz(i,j,k,UET)   = rhoet*uz + P*uz;
 
   // for (int n=0;n<5;n++){
     // printf("%i %i %i %i \n",i,j,k,n);
@@ -121,7 +121,8 @@ void cns_flux_to_dudt (int i, int j, int k, int n,
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 Real weno5js(const GpuArray<Real,5>& s)
 { 
-  constexpr Real eps = 1e-6;
+  constexpr Real eps = 1e-40;
+  constexpr Real q   = 2.0;
 
   Real vl[3];
   Real beta[3];
@@ -131,8 +132,8 @@ Real weno5js(const GpuArray<Real,5>& s)
             0.25 * pow(s[0] - 4.0 * s[1] + 3.0 * s[2], 2);
   beta[1] = (13.0 / 12.0) * pow(s[1] - 2.0 * s[2] + s[3], 2) +
             0.25 * (s[1] - s[3]) * (s[1] - s[3]);
-  beta[0] = (13.0 / 12.0) * pow(s[2] - 2.0 * s[3] + s[4], 2) +
-            0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], 2);
+  beta[0] = (13.0 / 12.0) * pow(s[2] - 2.0 * s[3] + s[4], q) +
+            0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], q);
 
   beta[2] = 1.0 / ((eps + beta[2]) * (eps + beta[2]));
   beta[1] = 1.0 / ((eps + beta[1]) * (eps + beta[1]));
@@ -147,7 +148,9 @@ Real weno5js(const GpuArray<Real,5>& s)
   vl[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
   vl[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
 
-  return (1.0 / 6.0) * alpha1 * (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
+  Real sl = (Real(1.0)/6.0) * alpha1 * (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
+
+  return sl ;
 }
 
 // Fluxes
