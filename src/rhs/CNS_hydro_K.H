@@ -53,19 +53,19 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
   fx(i,j,k,UMX)   = momx*ux + P;
   fx(i,j,k,UMY)   = momy*ux;
   fx(i,j,k,UMZ)   = momz*ux;
-  fx(i,j,k,UET)   = rhoet*ux + P*ux;
+  fx(i,j,k,UET)   = (rhoet + P)*ux;
 
   fy(i,j,k,URHO)  = momy;
   fy(i,j,k,UMX)   = momx*uy;
   fy(i,j,k,UMY)   = momy*uy + P;
   fy(i,j,k,UMZ)   = momz*uy;
-  fy(i,j,k,UET)   = rhoet*uy + P*uy;
+  fy(i,j,k,UET)   = (rhoet + P)*uy;
 
   fz(i,j,k,URHO)  = momz;
   fz(i,j,k,UMX)   = momx*uz;
   fz(i,j,k,UMY)   = momy*uz;
   fz(i,j,k,UMZ)   = momz*uz + P;
-  fz(i,j,k,UET)   = rhoet*uz + P*uz;
+  fz(i,j,k,UET)   = (rhoet + P)*uz;
 
   // for (int n=0;n<5;n++){
     // printf("%i %i %i %i \n",i,j,k,n);
