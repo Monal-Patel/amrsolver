@@ -75,6 +75,48 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
     // printf("fx %f %f %f %f %f\n",fx(i,j,k,0), fx(i,j,k,1), fx(i,j,k,2), fx(i,j,k,3),fx(i,j,k,4));
 }
 
+// computes Euler fluxes from conserved variable vector and maxeigen value
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz,auto const& lambda ,Parm const* parm) {
+
+  Real rhoinv = Real(1.0)/cons(i,j,k,URHO);
+  Real momx   = cons(i,j,k,UMX);
+  Real momy   = cons(i,j,k,UMY);
+  Real momz   = cons(i,j,k,UMZ);
+  Real rhoet  = cons(i,j,k,UET);
+  Real ux     = momx*rhoinv;
+  Real uy     = momy*rhoinv;
+  Real uz     = momz*rhoinv;
+
+  Real rhoekin = Real(0.5)*rhoinv*(momx*momx + momy*momy + momz*momz);
+  Real rhoeint = rhoet - rhoekin;
+  Real P       = (parm->eos_gamma - Real(1.0))*rhoeint;
+
+  fx(i,j,k,URHO)  = momx;
+  fx(i,j,k,UMX)   = momx*ux + P;
+  fx(i,j,k,UMY)   = momy*ux;
+  fx(i,j,k,UMZ)   = momz*ux;
+  fx(i,j,k,UET)   = (rhoet + P)*ux;
+
+  fy(i,j,k,URHO)  = momy;
+  fy(i,j,k,UMX)   = momx*uy;
+  fy(i,j,k,UMY)   = momy*uy + P;
+  fy(i,j,k,UMZ)   = momz*uy;
+  fy(i,j,k,UET)   = (rhoet + P)*uy;
+
+  fz(i,j,k,URHO)  = momz;
+  fz(i,j,k,UMX)   = momx*uz;
+  fz(i,j,k,UMY)   = momy*uz;
+  fz(i,j,k,UMZ)   = momz*uz + P;
+  fz(i,j,k,UET)   = (rhoet + P)*uz;
+
+  Real cs = pow(parm->eos_gamma*P*rhoinv,Real(0.5));
+  lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux));
+  lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy));
+  lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz));
+
+}
+
 // AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 // void cons2char (int i, int j, int k, int dir, Array4<const Real> const& q, const Array4<const Real>& w, const int sys)
 // {
@@ -155,6 +197,93 @@ Real weno5js(const GpuArray<Real,5>& s)
 
 // Fluxes
 //------------------------------------------------------------------------------
+// Computes Euler fluxes with global lax-friedrichs splitting at i-1/2,j-1/2,k-1/2
+AMREX_GPU_DEVICE inline 
+void numericalflux_globallaxsplit (int i, int j, int k, int n, const auto& cons, const auto& pfx, const auto& pfy, const auto& pfz, const auto& lambda, const auto& nfx, const auto& nfy, const auto& nfz) {
+
+GpuArray<Real,5> sten;
+GpuArray<Real,6> df;
+
+// x direction /////////////////////////////////////////////////////////
+Real maxeigen = max(lambda(i-3,j,k,0),lambda(i-2,j,k,0),lambda(i-1,j,k,0),lambda(i,j,k,0), lambda(i+1,j,k,0), lambda(i+2,j,k,0));
+
+df[0] = maxeigen*cons(i-3,j,k,n);
+df[1] = maxeigen*cons(i-2,j,k,n);
+df[2] = maxeigen*cons(i-1,j,k,n);
+df[3] = maxeigen*cons(i  ,j,k,n);
+df[4] = maxeigen*cons(i+1,j,k,n);
+df[5] = maxeigen*cons(i+2,j,k,n);
+
+// f(i-1/2)^+
+sten[0] = Real(0.5)*(pfx(i-3,j,k,n) + df[0]);
+sten[1] = Real(0.5)*(pfx(i-2,j,k,n) + df[1]);
+sten[2] = Real(0.5)*(pfx(i-1,j,k,n) + df[2]);
+sten[3] = Real(0.5)*(pfx(i  ,j,k,n) + df[3]);
+sten[4] = Real(0.5)*(pfx(i+1,j,k,n) + df[4]);
+Real flx = weno5js(sten);
+
+// f(i-1/2)^-
+sten[0] = Real(0.5)*(pfx(i-2,j,k,n) - df[1]);
+sten[1] = Real(0.5)*(pfx(i-1,j,k,n) - df[2]);
+sten[2] = Real(0.5)*(pfx(i  ,j,k,n) - df[3]);
+sten[3] = Real(0.5)*(pfx(i+1,j,k,n) - df[4]);
+sten[4] = Real(0.5)*(pfx(i+2,j,k,n) - df[5]);
+flx += weno5js(sten);
+nfx(i,j,k,n) = flx;
+
+// y direction /////////////////////////////////////////////////////////
+maxeigen = max(lambda(i,j-3,k,0),lambda(i,j-2,k,0),lambda(i,j-1,k,0),lambda(i,j,k,0), lambda(i,j+1,k,0), lambda(i,j+2,k,0));
+df[0] = maxeigen*cons(i,j-3,k,n);
+df[1] = maxeigen*cons(i,j-2,k,n);
+df[2] = maxeigen*cons(i,j-1,k,n);
+df[3] = maxeigen*cons(i,j  ,k,n);
+df[4] = maxeigen*cons(i,j+1,k,n);
+df[5] = maxeigen*cons(i,j+2,k,n);
+
+// f(j-1/2)^+
+sten[0] = Real(0.5)*(pfx(i,j-3,k,n) + df[0]);
+sten[1] = Real(0.5)*(pfx(i,j-2,k,n) + df[1]);
+sten[2] = Real(0.5)*(pfx(i,j-1,k,n) + df[2]);
+sten[3] = Real(0.5)*(pfx(i,j  ,k,n) + df[3]);
+sten[4] = Real(0.5)*(pfx(i,j+1,k,n) + df[4]);
+flx = weno5js(sten);
+
+// f(j-1/2)^-
+sten[0] = Real(0.5)*(pfx(i,j-2,k,n) - df[1]);
+sten[1] = Real(0.5)*(pfx(i,j-1,k,n) - df[2]);
+sten[2] = Real(0.5)*(pfx(i,j  ,k,n) - df[3]);
+sten[3] = Real(0.5)*(pfx(i,j+1,k,n) - df[4]);
+sten[4] = Real(0.5)*(pfx(i,j+2,k,n) - df[5]);
+flx += weno5js(sten);
+nfy(i,j,k,n) = flx;
+
+// z direction /////////////////////////////////////////////////////////
+maxeigen = max(lambda(i,j,k-3,0),lambda(i,j,k-2,0),lambda(i,j,k-1,0),lambda(i,j,k,0), lambda(i,j,k+1,0), lambda(i,j,k+2,0));
+df[0] = maxeigen*cons(i,j,k-3,n);
+df[1] = maxeigen*cons(i,j,k-2,n);
+df[2] = maxeigen*cons(i,j,k-1,n);
+df[3] = maxeigen*cons(i,j,k  ,n);
+df[4] = maxeigen*cons(i,j,k+1,n);
+df[5] = maxeigen*cons(i,j,k+2,n);
+
+// f(k-1/2)^+
+sten[0] = Real(0.5)*(pfx(i,j,k-3,n) + df[0]);
+sten[1] = Real(0.5)*(pfx(i,j,k-2,n) + df[1]);
+sten[2] = Real(0.5)*(pfx(i,j,k-1,n) + df[2]);
+sten[3] = Real(0.5)*(pfx(i,j,k  ,n) + df[3]);
+sten[4] = Real(0.5)*(pfx(i,j,k+1,n) + df[4]);
+flx = weno5js(sten);
+
+// f(k-1/2)^-
+sten[0] = Real(0.5)*(pfx(i,j,k-2,n) - df[1]);
+sten[1] = Real(0.5)*(pfx(i,j,k-1,n) - df[2]);
+sten[2] = Real(0.5)*(pfx(i,j,k  ,n) - df[3]);
+sten[3] = Real(0.5)*(pfx(i,j,k+1,n) - df[4]);
+sten[4] = Real(0.5)*(pfx(i,j,k+2,n) - df[5]);
+flx += weno5js(sten);
+nfz(i,j,k,n) = flx;
+}
+
 // Computes Euler fluxes at i-1/2,j-1/2,k-1/2
 AMREX_GPU_DEVICE inline 
 void numericalflux (int i, int j, int k, int n, const auto& pfx, const auto& pfy, const auto& pfz, const auto& nfx, const auto& nfy, const auto& nfz) {

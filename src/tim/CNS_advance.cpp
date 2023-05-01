@@ -183,6 +183,7 @@ else {
       pntflxmf[idim] = 0.0;
     }
 
+    FArrayBox lambdafab;
     // loop over all fabs
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -200,9 +201,12 @@ else {
                      auto const& pfabfy = pntflxmf[1].array(mfi);,
                      auto const& pfabfz = pntflxmf[2].array(mfi););
 
-        
+        lambdafab.resize(bxg, 3);
+        Elixir lambdagpu   = lambdafab.elixir();
+        auto const& lambda = lambdafab.array();
+
         ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            cons2eulerflux(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lparm);
+            cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,lparm);
         });
 
         // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -210,7 +214,7 @@ else {
         // });
 
         ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-              numericalflux(i, j, k, n, pfabfx, pfabfy, pfabfz ,nfabfx, nfabfy, nfabfz); // Storage of numerical fluxes in nfabfx, nfabfy, nfabfz - index i contains i-1/2 interface flux.
+              numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); // Storage of numerical fluxes in nfabfx, nfabfy, nfabfz - index i contains i-1/2 interface flux.
         //       // printf("i,j,k,n  -  %i %i %i %i %f \n",i,j,k,n, nfabfx(i,j,k,n) );
         });
 
