@@ -77,7 +77,7 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
 
 // computes Euler fluxes from conserved variable vector and maxeigen value
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz,auto const& lambda ,Parm const* parm) {
+void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, auto const& lambda ,Parm const* parm) {
 
   Real rhoinv = Real(1.0)/cons(i,j,k,URHO);
   Real momx   = cons(i,j,k,UMX);
@@ -651,21 +651,109 @@ void cns_riemann_z (int i, int j, int k,
             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UET));
 }
 
+// 2nd order accurate standard finite central differences
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+// void primsder (int i, int j, int k,
+//           const auto& prims,
+//           const auto& derx,
+//           const auto& dery,
+//           const auto& derz,
+//           GpuArray<Real,AMREX_SPACEDIM> const& dxinv) noexcept
+// {
+//     // x 
+//     derx(i,j,k,0) = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*dxinv[0];
+//     derx(i,j,k,1) = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*dxinv[0];
+//     derx(i,j,k,2) = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*dxinv[0];
+//     derx(i,j,k,3) = (prims(i+1,j,k,QTEMP) - prims(i-1,j,k,QTEMP))*dxinv[0];
+
+//     // y
+//     dery(i,j,k,0) = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*dxinv[1];
+//     dery(i,j,k,1) = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*dxinv[1];
+//     dery(i,j,k,2) = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*dxinv[1];
+//     dery(i,j,k,3) = (prims(i,j+1,k,QTEMP) - prims(i,j-1,k,QTEMP))*dxinv[1];
+
+//     // y
+//     derz(i,j,k,0) = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*dxinv[2];
+//     derz(i,j,k,1) = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*dxinv[2];
+//     derz(i,j,k,2) = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*dxinv[2];
+//     derz(i,j,k,3) = (prims(i,j,k+1,QTEMP) - prims(i,j,k-1,QTEMP))*dxinv[2];
+// }
+
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void viscfluxes (int i, int j, int k,
-          Array4<const Real> const& primfab,
-          Array4<const Real> const& vderx,
-          Array4<const Real> const& vdery,
-          Array4<const Real> const& vderz,
-          GpuArray<Real,AMREX_SPACEDIM> const& dxinv) noexcept
+void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto const& fy, auto const& fz, GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parm) noexcept
 {
-    // cns_diff_x(i, j, k, cons, coeffs, dxinv, flx);
-    // cns_diff_y(i, j, k, cons, coeffs, dxinv, flx);
-    // cns_diff_z(i, j, k, cons, coeffs, dxinv, flx);
+    // 2nd order accurate central difference of primitive vars /////////////////
+    // x direction
+    Real ux   =  prims(i,j,k,QU);
+    Real dudx = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*dxinv[0];
+    Real dvdx = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*dxinv[0];
+    Real dwdx = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*dxinv[0];
+    Real dTdx = (prims(i+1,j,k,QTEMP) - prims(i-1,j,k,QTEMP))*dxinv[0];
+
+    // y direction
+    Real uy   =  prims(i,j,k,QV);
+    Real dudy = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*dxinv[1];
+    Real dvdy = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*dxinv[1];
+    Real dwdy = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*dxinv[1];
+    Real dTdy = (prims(i,j+1,k,QTEMP) - prims(i,j-1,k,QTEMP))*dxinv[1];
+
+    // z direction
+    Real uz   =  prims(i,j,k,QW);
+    Real dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*dxinv[2];
+    Real dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*dxinv[2];
+    Real dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*dxinv[2];
+    Real dTdz = (prims(i,j,k+1,QTEMP) - prims(i,j,k-1,QTEMP))*dxinv[2];
+
+    // divergence
+    Real div  = dudx + dudy + dudz;
+
+    // constants
+    Real mu    = 1.0e-5;
+    Real lambda= 1.0e-2;
+    Real r1_3 = Real(1.0)/Real(3.0);
+
+    // viscous fluxes
+    Real tauxx = Real(2.0)*mu*(dudx - r1_3*div);
+    Real tauxy = mu*(dudy + dvdx);
+    Real tauxz = mu*(dudz + dwdx);
+
+    // tauxy = tauyx
+    Real tauyy = Real(2.0)*mu*(dvdy - r1_3*div);
+    Real tauyz = mu*(dvdz + dwdy);
+
+    // tauzx = tauxz;
+    // tauzy = tauyz;
+    Real tauzz = Real(2.0)*mu*(dwdz - r1_3*div);
+
+    // assemble fluxes
+    fx(i,j,k,URHO)= Real(0.0);
+    fx(i,j,k,UMX) = tauxx;
+    fx(i,j,k,UMY) = tauxy;
+    fx(i,j,k,UMZ) = tauxz;
+    fx(i,j,k,UET) =-lambda*dTdx + tauxx*ux + tauxy*uy + tauxz*uz ;
+
+    fy(i,j,k,URHO)= Real(0.0);
+    fy(i,j,k,UMX) = tauxy;
+    fy(i,j,k,UMY) = tauyy;
+    fy(i,j,k,UMZ) = tauyz;
+    fy(i,j,k,UET) =-lambda*dTdy + tauxy*ux + tauyy*uy + tauyz*uz;
+
+    fz(i,j,k,URHO)= Real(0.0);
+    fz(i,j,k,UMX) = tauxz;
+    fz(i,j,k,UMY) = tauyz;
+    fz(i,j,k,UMZ) = tauzz;
+    fz(i,j,k,UET) =-lambda*dTdz + tauxz*ux + tauyz*uy + tauzz*uz;
 }
 
+// 2nd order accurate interpolation at i-1/2,j-1/2,k-1/2
+AMREX_GPU_DEVICE inline 
+void visc_numericalfluxes(int i, int j, int k, int n, const auto& pfx, const auto& pfy, const auto& pfz, const auto& nfx, const auto& nfy, const auto& nfz) {
 
+nfx(i,j,k,n) += Real(0.5)*(pfx(i-1,j,k,n) + pfx(i,j,k,n));
+nfy(i,j,k,n) += Real(0.5)*(pfy(i,j-1,k,n) + pfy(i,j,k,n));
+nfz(i,j,k,n) += Real(0.5)*(pfz(i,j,k-1,n) + pfz(i,j,k,n));
 
+}
 
 #endif

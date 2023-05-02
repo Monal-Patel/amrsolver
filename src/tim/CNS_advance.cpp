@@ -88,8 +88,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         numflxmf[idim] = 0.0;
     }
 
-  //Euler Fluxes //////////////////////////////////////////////////////////////
-
+  //Euler Fluxes ///////////////////////////////////////////////////////////////
   // weno5js fvs
   if (euler_flux_type==2) {
     // make multifab for variables
@@ -133,15 +132,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
               numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); // Storage of numerical fluxes in nfabfx, nfabfy, nfabfz - index i contains i-1/2 interface flux.
         //       // printf("i,j,k,n  -  %i %i %i %i %f \n",i,j,k,n, nfabfx(i,j,k,n) );
         });
-
-        // add euler derivatives to rhs
-        amrex::ParallelFor(bx, NCONS,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-        {
-        dsdtfab(i,j,k,n) = dxinv[0] * (nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
-        +           dxinv[1] * (nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
-        +           dxinv[2] * (nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
-        });
     }
   }
   
@@ -149,6 +139,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   else if (euler_flux_type==1) {
 
   }
+  //////////////////////////////////////////////////////////////////////////////
 
   // Riemann solver
   else {
@@ -229,83 +220,105 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         slopeeli.clear();
 
         // add euler derivatives to rhs
-        amrex::ParallelFor(bx, NCONS,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-        {
-        dsdtfab(i,j,k,n) = dxinv[0] * (nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
-        +           dxinv[1] * (nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
-        +           dxinv[2] * (nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
-        });
+        // amrex::ParallelFor(bx, NCONS,
+        // [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+        // {
+        // dsdtfab(i,j,k,n) = dxinv[0] * (nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
+        // +           dxinv[1] * (nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
+        // +           dxinv[2] * (nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
+        // });
     }
   }
-    
+
   // Viscous Fluxes //////////////////////////////////////////////////////////
   // We have a separate MFIter loop here than the Euler fluxes and the source terms, so the work can be further parallised. As different MFIter loops can be in different GPU streams. 
 
-  // clear euler fluxes from earlier
-  for (int i = 0; i< AMREX_SPACEDIM; ++i) {numflxmf[i] = 0.0;}
-  FArrayBox temp; // make multifab for primitive variables
+  // Although conservative FD (finite difference) derivatives of viscous fluxes are not requried in the boundary layer, standard FD are likely sufficient. However, considering grid and flow discontinuities (coarse-interface flux-refluxing and viscous derivatives near shocks), conservative FD derivatives are preferred.
+
+  // Make multifab for primitive variables, derivatives of primitive variables and viscous fluxes
+  FArrayBox temp1;
+  Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
+  for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+    pntvflxmf[idim].define( amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)), statemf.DistributionMap(), NCONS, NUM_GROW);
+    pntvflxmf[idim] = 0.0;
+  }
 
   // loop over all fabs
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
-      const Box& bx   = mfi.tilebox();
       const Box& bxg  = mfi.growntilebox(NUM_GROW);
+      const Box& bxpflx  = mfi.growntilebox(1);
+      const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
       auto const& statefab = statemf.array(mfi);
+      auto const& dsdtfab = dSdt.array(mfi);
 
-      temp.resize(bxg, NPRIM+2); // NPRIM+1 = mu (viscosity) --- NPRIM+2 = k (thermal conductivity) 
-      // Elixir qeli = temp.elixir();
-      auto const& prim_trans_fab = temp.array();
+      AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
+                   auto const& pfabfy = pntvflxmf[1].array(mfi);,
+                   auto const& pfabfz = pntvflxmf[2].array(mfi););
 
-      AMREX_D_TERM(auto const& vderx = numflxmf[0].array(mfi);,
-                   auto const& vdery = numflxmf[1].array(mfi);,
-                   auto const& vderz = numflxmf[2].array(mfi););
+      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                   auto const& nfabfy = numflxmf[1].array(mfi);,
+                   auto const& nfabfz = numflxmf[2].array(mfi););
+
+      // primitive variables storage
+      temp1.resize(bxg, NPRIM); 
+      auto const& prims = temp1.array();
 
       // Convert to primitive variables and get transport coefficients
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cons2prim(i, j, k, statefab, prim_trans_fab, *lparm);
+          cons2prim(i, j, k, statefab, prims, *lparm);
+          // prim2tran(i, j, k, prims, trans, *lparm);
       });
 
-      // compute viscous fluxes
-      amrex::ParallelFor(bx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        viscfluxes(i, j, k, prim_trans_fab ,vderx, vdery, vderz, dxinv);
+      // compute u,v,w,T derivatives and compute physical viscous fluxes
+      amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+          viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, *lparm);
       });
 
-      // add viscous derivatives to rhs
+      // compute numerical viscous fluxes
+      amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+          visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
+      });
+    }
+  //////////////////////////////////////////////////////////////////////////////
+
+  // Re-fluxing ////////////////////////////////////////////////////////////////
+  // Must be done before adding source terms.
+  if (fr_as_crse) {
+      for (int idim = -1; idim < AMREX_SPACEDIM; ++idim) {
+          const Real dA = (idim == -1) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+          const Real scale = -dt*dA;
+          fr_as_crse->CrseInit(numflxmf[idim], idim, -1, 0, NCONS, scale, FluxRegister::ADD);
+      }
   }
+  if (fr_as_fine) {
+      for (int idim = -1; idim < AMREX_SPACEDIM; ++idim) {
+          const Real dA = (idim == -1) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+          const Real scale = dt*dA;
+          fr_as_fine->FineAdd(numflxmf[idim], idim, -1, 0, NCONS, scale);
+      }
+  }
+  //////////////////////////////////////////////////////////////////////////////
 
-    // Source terms ////////////////////////////////////////////////////////
-    // if (gravity != Real(0.0)) {
-    //     const Real g = gravity;
-    //     const int irho = Density;
-    //     const int imz = Zmom;
-    //     const int irhoE = Eden;
-    //     amrex::ParallelFor(bx,
-    //     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    //     {
-    //         dsdtfab(i,j,k,imz) += g * statefab(i,j,k,irho);
-    //         dsdtfab(i,j,k,irhoE) += g * statefab(i,j,k,imz);
-    //     });
-    // }
+  // Assemble RHS and add source terms /////////////////////////////////////////
+  for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
+      const Box& bx   = mfi.tilebox();
+      auto const& dsdtfab = dSdt.array(mfi);
+      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                   auto const& nfabfy = numflxmf[1].array(mfi);,
+                   auto const& nfabfz = numflxmf[2].array(mfi););
 
-    // Re-fluxing
-    if (fr_as_crse) {
-        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-            const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-            const Real scale = -dt*dA;
-            fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
-        }
-    }
-
-    if (fr_as_fine) {
-        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-            const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-            const Real scale = dt*dA;
-            fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
-        }
-    }
+      // add euler and viscous derivatives to rhs
+      amrex::ParallelFor(bx, NCONS,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+      {
+      dsdtfab(i,j,k,n) = dxinv[0]*(nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
+      +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
+      +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
+      });
+  }
+  //////////////////////////////////////////////////////////////////////////////
 }
-

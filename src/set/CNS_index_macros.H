@@ -12,8 +12,8 @@
 #define QU     1
 #define QV     2
 #define QW     3
-#define QPRES  4
-#define QTEMP  5
+#define QTEMP  4
+#define QPRES  5
 #define NPRIM  6
 
 #endif
