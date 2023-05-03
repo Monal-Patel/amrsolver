@@ -242,6 +242,9 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     pntvflxmf[idim].define( amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)), statemf.DistributionMap(), NCONS, NUM_GROW);
     pntvflxmf[idim] = 0.0;
   }
+  MultiFab primsmf;
+  primsmf.define( statemf.boxArray(), statemf.DistributionMap(), NPRIM, NUM_GROW);
+  primsmf = 0.0;
 
   // loop over all fabs
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
@@ -261,9 +264,10 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
                    auto const& nfabfy = numflxmf[1].array(mfi);,
                    auto const& nfabfz = numflxmf[2].array(mfi););
 
-      // primitive variables storage
-      temp1.resize(bxg, NPRIM); 
-      auto const& prims = temp1.array();
+      // primitive variables
+      // temp1.resize(bxg, NPRIM); 
+      // auto const& prims = temp1.array();
+      auto const& prims = primsmf.array(mfi);
 
       // Convert to primitive variables and get transport coefficients
       amrex::ParallelFor(bxg,
