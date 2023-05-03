@@ -247,7 +247,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
       const Box& bxg  = mfi.growntilebox(NUM_GROW);
-      const Box& bxpflx  = mfi.growntilebox(1);
+      const Box& bxpflx  = mfi.growntilebox(2);
       const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
       auto const& statefab = statemf.array(mfi);

@@ -12,7 +12,7 @@
 #define QU     1
 #define QV     2
 #define QW     3
-#define QTEMP  4
+#define QT  4
 #define QPRES  5
 #define NPRIM  6
 
