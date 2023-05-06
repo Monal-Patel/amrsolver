@@ -18,7 +18,7 @@ bool CNS::verbose = true;
 int  CNS::nstep_screen_output=10;
 bool CNS::dt_dynamic=false;
 int  CNS::euler_flux_type=0;
-Real CNS::cfl = 0.3;
+Real CNS::cfl = 0.0;
 Real CNS::dt_constant = 0.0;
 int  CNS::do_reflux = 1;
 int  CNS::refine_max_dengrad_lev = -1;
@@ -76,7 +76,6 @@ void CNS::read_params()
 
   pp.query("gravity", gravity);
 
-  h_parm->Initialize();
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
 #endif

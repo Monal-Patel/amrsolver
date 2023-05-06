@@ -17,21 +17,21 @@ using BndryFunc = StateDescriptor::BndryFunc;
 
 //
 // Components are:
-//  Interior, Inflow, Outflow,  Symmetry,     SlipWall,     NoSlipWall
+//  Interior, Inflow, Outflow, Symmetry, SlipWall, NoSlipWall, User defined 
 //
 static int scalar_bc[] =
 {
-    BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_even, BCType::reflect_even, BCType::reflect_even
+    BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_even, BCType::reflect_even, BCType::reflect_even, BCType::ext_dir
 };
 
 static int norm_vel_bc[] =
 {
-    BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_odd,  BCType::reflect_odd,  BCType::reflect_odd
+    BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_odd,  BCType::reflect_odd,  BCType::reflect_odd, BCType::ext_dir
 };
 
 static int tang_vel_bc[] =
 {
-    BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_even, BCType::reflect_even, BCType::reflect_odd
+    BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_even, BCType::reflect_even, BCType::reflect_odd, BCType::ext_dir
 };
 
 static void set_scalar_bc (BCRec& bc, const BCRec& phys_bc)
@@ -100,15 +100,17 @@ set_z_vel_bc(BCRec& bc, const BCRec& phys_bc)
 void
 CNS::variableSetUp ()
 {
-    // parm = new Parm{}; // This is deleted in CNS::variableCleanUp().
-    // prob_parm = new ProbParm{};
-    // parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
-    // prob_parm = (ProbParm*)The_Arena()->alloc(sizeof(ProbParm));
-
-    h_parm = new Parm{}; // This is deleted in CNS::variableCleanUp().
-    h_prob_parm = new ProbParm{};
-    d_parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
-    d_prob_parm = (ProbParm*)The_Arena()->alloc(sizeof(ProbParm));
+  // Since this is a GPU/CPU code - it is useful to have some basic parameters always available on both CPU and GPU always.
+  // These host and device variables are deleted in CNS::variableCleanUp().
+    CNS::h_parm = new Parm{};
+    CNS::h_prob_parm = new ProbParm{};
+#ifdef AMREX_USE_GPU
+    CNS::d_parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
+    CNS::d_prob_parm = (ProbParm*)The_Arena()->alloc(sizeof(ProbParm));
+#else
+    CNS::d_parm      = h_parm; //new Parm{}; 
+    CNS::d_prob_parm = h_prob_parm;//new ProbParm{};
+#endif
 
     read_params();
 
@@ -122,30 +124,34 @@ CNS::variableSetUp ()
     Vector<std::string> name(NCONS);
 
     // Physical boundary conditions ////////////////////////////////////////////
-    BCRec bc;
     int cnt = 0;
-    set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "density";
-    cnt++; set_x_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "xmom";
-    cnt++; set_y_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "ymom";
+    set_scalar_bc(bcs[cnt],phys_bc); 
+    name[cnt] = "density";
+
+    cnt++; 
+    set_x_vel_bc(bcs[cnt],phys_bc);  
+    name[cnt] = "xmom";
+
+    cnt++; 
+    set_y_vel_bc(bcs[cnt],phys_bc);
+    name[cnt] = "ymom";
+
 #if (AMREX_SPACEDIM == 3)
-    cnt++; set_z_vel_bc(bc,phys_bc);  bcs[cnt] = bc; name[cnt] = "zmom";
+    cnt++;
+    set_z_vel_bc(bcs[cnt],phys_bc);
+    name[cnt] = "zmom";
 #endif
-    // cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_eint";
-    cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "rho_et";
-    // cnt++; set_scalar_bc(bc,phys_bc); bcs[cnt] = bc; name[cnt] = "Temp";
+    cnt++; 
+    set_scalar_bc(bcs[cnt],phys_bc);
+    name[cnt] = "rho_et";
 
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
-    bndryfunc.setRunOnGPU(true);
+    bndryfunc.setRunOnGPU(false);
 
-    desc_lst.setComponent(State_Type,
-                          URHO,
-                          name,
-                          bcs,
-                          bndryfunc);
 
-    // desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
-    //                        0,1, &pc_interp);
-    // desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
+    // applies bndry func to all variables in desc_lst starting from from URHO (0).
+    desc_lst.setComponent(State_Type, URHO,name, bcs, bndryfunc);
+
 
     num_state_data_types = desc_lst.size();
 
@@ -177,6 +183,9 @@ CNS::variableSetUp ()
     derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,1);
     derive_lst.addComponent("z_velocity",desc_lst,State_Type,Zmom,1);
 #endif
+    // desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
+    //                        0,1, &pc_interp);
+    // desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
 
     ////////////////////////////////////////////////////////////////////////////
 }
@@ -186,8 +195,14 @@ CNS::variableCleanUp ()
 {
     delete h_parm;
     delete h_prob_parm;
+
+#ifdef AMREX_USE_GPU
     The_Arena()->free(d_parm);
     The_Arena()->free(d_prob_parm);
+#else
+    delete d_parm;
+    delete d_prob_parm;
+#endif
     desc_lst.clear();
     derive_lst.clear();
 
