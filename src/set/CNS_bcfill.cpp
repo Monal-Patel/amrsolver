@@ -8,7 +8,7 @@ using namespace amrex;
 
 
 // 1st order accurate for 3 ghost points
-AMREX_GPU_DEVICE inline void dirichlet ( Array2D<Real,0,NCONS,0,6>& sten, int n, Real value) noexcept {
+AMREX_GPU_DEVICE inline void dirichlet ( Array2D<Real,0,NCONS,0,5>& sten, int n, Real value) noexcept {
   // reflect
   Real delta = 2*value;
   sten(n,0) = delta-sten(n,5);
@@ -17,7 +17,7 @@ AMREX_GPU_DEVICE inline void dirichlet ( Array2D<Real,0,NCONS,0,6>& sten, int n,
 }
 
 // 1st order accurate for 3 ghost points
-AMREX_GPU_DEVICE inline void neumann ( Array2D<Real,0,NCONS,0,6>& sten, int n,Real grad, Real dx) noexcept {
+AMREX_GPU_DEVICE inline void neumann ( Array2D<Real,0,NCONS,0,5>& sten, int n,Real grad, Real dx) noexcept {
   // linear copy
   Real delta = dx*grad;
   sten(n,0) = sten(n,5) - delta;
@@ -37,13 +37,14 @@ struct CnsFillExtDir
         {
 
           // GpuArray<GpuArray<Real,6>,NCONS> prims;
-          Array2D<Real,0,NCONS,0,6> prims;
+          Array2D<Real,0,NCONS,0,5> prims;
 
           int nghost = 3;
           int i = iv[0]; int j = iv[1]; int k = iv[2];
           int jjadd,jj,jstart;
           int dir = 1;
           const Real dy = geom.CellSize(dir);
+          Real rho,rhoinv,ux,uy,uz,rhoke,rhoei,p,T;
 
           bool notcorner= iv[0] >= geom.Domain().smallEnd(0) 
           && iv[0] <= geom.Domain().bigEnd(0)
@@ -61,10 +62,25 @@ struct CnsFillExtDir
               jstart = geom.Domain().bigEnd(dir) + nghost;
               jjadd  = -1;
             }
-            else {return ;}
+            else {
+              /// DUMMY
+              // p   = 3000;//prims(QPRES,count);
+              // T   = 300;//prims(QT,count);
+              // rho = p/(CNS::d_parm->Rspec * T);
+              // ux  = 0.0;
+              // uy  = 0.0;
+              // uz  = 0.0;
+              // rhoke  = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
+              // rhoei  = p/(CNS::d_parm->eos_gamma - Real(1.0));
+              // data(i,j,k,URHO) = rho;
+              // data(i,j,k,UMX)  = rho*ux;
+              // data(i,j,k,UMY)  = rho*uy;
+              // data(i,j,k,UMZ)  = rho*uz;
+              // data(i,j,k,UET)  = rhoke+rhoei;
+              
+              return ;}
 
             // convert to primitive vars (rho,u,v,w,T,P(T,rho))
-            Real rho,rhoinv,ux,uy,uz,rhoke,rhoei,p,T;
             jj = jstart;
             for (int count=0; count<nghost*2; count++ ) {
               rho    = data(i,jj,k,URHO);

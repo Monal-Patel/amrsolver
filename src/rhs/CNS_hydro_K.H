@@ -724,24 +724,24 @@ void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto co
     // tauzy = tauyz;
     Real tauzz = Real(2.0)*mu*(dwdz - r1_3*div);
 
-    // assemble fluxes
+    // assemble fluxes on LHS
     fx(i,j,k,URHO)= Real(0.0);
-    fx(i,j,k,UMX) = tauxx;
-    fx(i,j,k,UMY) = tauxy;
-    fx(i,j,k,UMZ) = tauxz;
-    fx(i,j,k,UET) =-lambda*dTdx + tauxx*ux + tauxy*uy + tauxz*uz ;
+    fx(i,j,k,UMX) = -tauxx;
+    fx(i,j,k,UMY) = -tauxy;
+    fx(i,j,k,UMZ) = -tauxz;
+    fx(i,j,k,UET) = -lambda*dTdx - tauxx*ux - tauxy*uy - tauxz*uz ;
 
     fy(i,j,k,URHO)= Real(0.0);
-    fy(i,j,k,UMX) = tauxy;
-    fy(i,j,k,UMY) = tauyy;
-    fy(i,j,k,UMZ) = tauyz;
-    fy(i,j,k,UET) =-lambda*dTdy + tauxy*ux + tauyy*uy + tauyz*uz;
+    fy(i,j,k,UMX) = -tauxy;
+    fy(i,j,k,UMY) = -tauyy;
+    fy(i,j,k,UMZ) = -tauyz;
+    fy(i,j,k,UET) = -lambda*dTdy - tauxy*ux - tauyy*uy - tauyz*uz;
 
     fz(i,j,k,URHO)= Real(0.0);
-    fz(i,j,k,UMX) = tauxz;
-    fz(i,j,k,UMY) = tauyz;
-    fz(i,j,k,UMZ) = tauzz;
-    fz(i,j,k,UET) =-lambda*dTdz + tauxz*ux + tauyz*uy + tauzz*uz;
+    fz(i,j,k,UMX) = -tauxz;
+    fz(i,j,k,UMY) = -tauyz;
+    fz(i,j,k,UMZ) = -tauzz;
+    fz(i,j,k,UET) = -lambda*dTdz - tauxz*ux - tauyz*uy - tauzz*uz;
 }
 
 // 2nd order accurate interpolation at i-1/2,j-1/2,k-1/2
