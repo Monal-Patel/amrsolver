@@ -626,8 +626,6 @@ void cns_riemann_z (int i, int j, int k,
                Array4<Real const> const& q,
                Parm const& parm) noexcept
 {
-    
-
     Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k+1,QT),0.5);
     Real rl = q(i,j,k-1,QRHO) + Real(0.5) * ( (dq(i,j,k-1,0)+dq(i,j,k-1,2))/cspeed + dq(i,j,k-1,1));
     rl = max(rl, parm.smallr);
@@ -706,7 +704,7 @@ void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto co
     Real dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*dxinv[2];
 
     // divergence
-    Real div  = dudx + dudy + dudz;
+    Real div  = dudx + dvdy + dwdz;
 
     // constants
     Real mu    = 1.0e-5;

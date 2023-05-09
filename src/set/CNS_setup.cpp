@@ -108,8 +108,8 @@ CNS::variableSetUp ()
     CNS::d_parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
     CNS::d_prob_parm = (ProbParm*)The_Arena()->alloc(sizeof(ProbParm));
 #else
-    CNS::d_parm      = h_parm; //new Parm{}; 
-    CNS::d_prob_parm = h_prob_parm;//new ProbParm{};
+    CNS::d_parm      = h_parm;
+    CNS::d_prob_parm = h_prob_parm;
 #endif
 
     read_params();
@@ -166,7 +166,7 @@ CNS::variableSetUp ()
 
     // Temperature
     derive_lst.add("temperature", IndexType::TheCellType(), 1,
-                 derpres,the_same_box);
+                 dertemp,the_same_box);
     derive_lst.addComponent("temperature", desc_lst, State_Type, URHO,NCONS);
 
     // Velocities
@@ -199,9 +199,9 @@ CNS::variableCleanUp ()
 #ifdef AMREX_USE_GPU
     The_Arena()->free(d_parm);
     The_Arena()->free(d_prob_parm);
-#else
-    delete d_parm;
-    delete d_prob_parm;
+// #else
+//     delete d_parm;
+//     delete d_prob_parm;
 #endif
     desc_lst.clear();
     derive_lst.clear();
