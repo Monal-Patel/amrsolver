@@ -28,6 +28,10 @@ AMREX_GPU_DEVICE inline void neumann ( Array2D<Real,0,NCONS,0,5>& sten, int n,Re
 // This is called per boundary point
 struct CnsFillExtDir
 {
+    // create pointers to device (for gpu) parms
+    ProbParm* lprobparm = CNS::d_prob_parm;
+    Parm*     lparm     = CNS::d_parm;
+
     AMREX_GPU_DEVICE
     void operator() (const IntVect& iv, Array4<Real> const& data,
                      const int /*dcomp*/, const int /*numcomp*/,
@@ -89,14 +93,14 @@ struct CnsFillExtDir
               uz     = data(i,jj,k,UMZ)*rhoinv;
               rhoke  = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
               rhoei  = (data(i,jj,k,UET) - rhoke);
-              p      = (CNS::d_parm->eos_gamma - Real(1.0))*rhoei;
+              p      = (lparm->eos_gamma - Real(1.0))*rhoei;
 
               prims(QRHO,count)  = rho;
               prims(QU,count)    = ux;
               prims(QV,count)    = uy;
               prims(QW,count)    = uz;
               prims(QPRES,count) = p;
-              prims(QT,count)    = p/(rho*CNS::d_parm->Rspec);
+              prims(QT,count)    = p/(rho*lparm->Rspec);
               jj = jj + jjadd;
             }
 
@@ -105,7 +109,7 @@ struct CnsFillExtDir
             // neumann  (prims,QU,Real(0.0),dy); 
             dirichlet(prims,QV,Real(0.0)); 
             dirichlet(prims,QW,Real(0.0)); 
-            dirichlet(prims,QT,CNS::d_prob_parm->Tw); 
+            dirichlet(prims,QT,lprobparm->Tw); 
             neumann  (prims,QPRES,Real(0.0),dy); 
 
             // convert back to conservative vars
@@ -114,12 +118,12 @@ struct CnsFillExtDir
             for (int count=0; count<nghost; count++ ) {
               p   = prims(QPRES,count);
               T   = prims(QT,count);
-              rho = p/(CNS::d_parm->Rspec * T);
+              rho = p/(lparm->Rspec * T);
               ux  = prims(QU,count);
               uy  = prims(QV,count);
               uz  = prims(QW,count);
               rhoke  = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-              rhoei  = p/(CNS::d_parm->eos_gamma - Real(1.0));
+              rhoei  = p/(lparm->eos_gamma - Real(1.0));
 
               data(i,jj,k,URHO) = rho;
               data(i,jj,k,UMX)  = rho*ux;
@@ -159,6 +163,8 @@ void cns_bcfill (Box const& bx, FArrayBox& data,
 
     // Currently we assume ymax and ymin BC is wall 
     // GpuBndryFuncFab class operates on all boundaries of the fab. It calls CnsFillExtDir for each ghost point ijk.
+
     GpuBndryFuncFab<CnsFillExtDir> gpu_bndry_func(CnsFillExtDir{});
+    
     gpu_bndry_func(bx,data,dcomp,numcomp,geom,time,bcr,bcomp,scomp);
 }
