@@ -79,7 +79,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     const auto dx    = geom.CellSizeArray();
     const auto dxinv = geom.InvCellSizeArray();
 
-    Parm const* lparm = d_parm;
+    const Parm& lparm = *d_parm;
 
     Array<MultiFab,AMREX_SPACEDIM> numflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -162,7 +162,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         amrex::ParallelFor(bxg2,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            cons2prim(i, j, k, sfab, q, *lparm);
+            cons2prim(i, j, k, sfab, q, lparm);
         });
 
         const Box& bxg1 = amrex::grow(bx,1);
@@ -176,13 +176,13 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         amrex::ParallelFor(xslpbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            cns_slope_x(i, j, k, slope, q,*lparm);
+            cns_slope_x(i, j, k, slope, q,lparm);
         });
         const Box& xflxbx = amrex::surroundingNodes(bx,cdir);
         amrex::ParallelFor(xflxbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            cns_riemann_x(i, j, k, nfabfx, slope, q, *lparm);
+            cns_riemann_x(i, j, k, nfabfx, slope, q, lparm);
         });
 
         // y-direction
@@ -191,13 +191,13 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         amrex::ParallelFor(yslpbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            cns_slope_y(i, j, k, slope, q, *lparm);
+            cns_slope_y(i, j, k, slope, q, lparm);
         });
         const Box& yflxbx = amrex::surroundingNodes(bx,cdir);
         amrex::ParallelFor(yflxbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            cns_riemann_y(i, j, k, nfabfy, slope, q, *lparm);
+            cns_riemann_y(i, j, k, nfabfy, slope, q, lparm);
         });
 
         // z-direction
@@ -206,13 +206,13 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         amrex::ParallelFor(zslpbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            cns_slope_z(i, j, k, slope, q, *lparm);
+            cns_slope_z(i, j, k, slope, q, lparm);
         });
         const Box& zflxbx = amrex::surroundingNodes(bx,cdir);
         amrex::ParallelFor(zflxbx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
-            cns_riemann_z(i, j, k, nfabfz, slope, q, *lparm);
+            cns_riemann_z(i, j, k, nfabfz, slope, q, lparm);
         });
 
         // don't have to do this, but we could
@@ -260,18 +260,18 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cons2prim(i, j, k, statefab, prims, *lparm);
+          cons2prim(i, j, k, statefab, prims, lparm);
           // prim2tran(i, j, k, prims, trans, *lparm);
       });
 
       // compute u,v,w,T derivatives and compute physical viscous fluxes
       amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-          viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, *lparm);
+          viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
       });
 
       // compute numerical viscous fluxes
       amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-          // visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
+          visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
       });
     }
   //////////////////////////////////////////////////////////////////////////////
@@ -295,6 +295,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   //////////////////////////////////////////////////////////////////////////////
 
   // Assemble RHS and add source terms /////////////////////////////////////////
+  Gpu::streamSynchronize(); // ensure all rhs terms computed before assembly
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
       const Box& bx   = mfi.tilebox();
       auto const& dsdtfab = dSdt.array(mfi);

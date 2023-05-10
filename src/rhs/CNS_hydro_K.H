@@ -13,7 +13,7 @@ using namespace amrex;
 // char = characteristic variables
 // flux = flux variables
 
-AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const Real>& u, Array4<Real> const& q, Parm const& parm) noexcept
+AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const Real>& u, Array4<Real> const& q, const Parm& parm) noexcept
 {
     Real rho = u(i,j,k,URHO);
     Real rhoinv = Real(1.0)/rho;
@@ -34,7 +34,7 @@ AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const 
 
 // computes Euler fluxes from conserved variable vector 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, Parm const* parm) {
+void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, const Parm& parm) {
 
   Real rhoinv = Real(1.0)/cons(i,j,k,URHO);
   Real momx   = cons(i,j,k,UMX);
@@ -47,7 +47,7 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
 
   Real rhoekin = Real(0.5)*rhoinv*(momx*momx + momy*momy + momz*momz);
   Real rhoeint = rhoet - rhoekin;
-  Real P       = (parm->eos_gamma - Real(1.0))*rhoeint;
+  Real P       = (parm.eos_gamma - Real(1.0))*rhoeint;
 
   fx(i,j,k,URHO)  = momx;
   fx(i,j,k,UMX)   = momx*ux + P;
@@ -77,7 +77,7 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
 
 // computes Euler fluxes from conserved variable vector and maxeigen value
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, auto const& lambda ,Parm const* parm) {
+void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, auto const& lambda ,const Parm& parm) {
 
   Real rhoinv = Real(1.0)/cons(i,j,k,URHO);
   Real momx   = cons(i,j,k,UMX);
@@ -90,7 +90,7 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
 
   Real rhoekin = Real(0.5)*rhoinv*(momx*momx + momy*momy + momz*momz);
   Real rhoeint = rhoet - rhoekin;
-  Real P       = (parm->eos_gamma - Real(1.0))*rhoeint;
+  Real P       = (parm.eos_gamma - Real(1.0))*rhoeint;
 
   fx(i,j,k,URHO)  = momx;
   fx(i,j,k,UMX)   = momx*ux + P;
@@ -110,7 +110,7 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
   fz(i,j,k,UMZ)   = momz*uz + P;
   fz(i,j,k,UET)   = (rhoet + P)*uz;
 
-  Real cs = pow(parm->eos_gamma*P*rhoinv,Real(0.5));
+  Real cs = pow(parm.eos_gamma*P*rhoinv,Real(0.5));
   lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux));
   lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy));
   lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz));
