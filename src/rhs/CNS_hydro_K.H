@@ -29,7 +29,7 @@ AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const 
     q(i,j,k,QV)    = uy;
     q(i,j,k,QW)    = uz;
     q(i,j,k,QPRES) = p;
-    q(i,j,k,QT) = rhoei*rhoinv/parm.cv;
+    q(i,j,k,QT) = p/(rho*parm.Rspec);
 }
 
 // computes Euler fluxes from conserved variable vector 
@@ -148,7 +148,7 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
 // }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-Real weno5js(const GpuArray<Real,5>& s)
+Real weno5js(const GpuArray<Real,NCONS>& s)
 { 
   constexpr Real eps = 1e-40;
   constexpr Real q   = 2.0;

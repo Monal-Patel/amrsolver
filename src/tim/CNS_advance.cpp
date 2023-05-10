@@ -20,7 +20,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     MultiFab& S_new = get_new_data(State_Type);
     MultiFab& S_old = get_old_data(State_Type);
     MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
-    MultiFab Sborder(grids,dmap,NCONS,NUM_GROW,MFInfo(),Factory());
+    MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
 
     FluxRegister* fr_as_crse = nullptr;
     if (do_reflux && level < parent->finestLevel()) {
@@ -40,7 +40,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 
     // RK2 stage 1
     // After fillpatch Sborder = U^n
-    FillPatch(*this, Sborder, NUM_GROW, time, State_Type, 0, NCONS);
+    FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
     // fillpatch copies data from leveldata to sborder
 
 #ifdef AMREX_USE_GPIBM
@@ -54,7 +54,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 
     // RK2 stage 2
     // After fillpatch Sborder = U^n+dt*dUdt^n
-    FillPatch(*this, Sborder, NUM_GROW, time+dt, State_Type, 0, NCONS);
+    FillPatch(*this, Sborder, NGHOST, time+dt, State_Type, 0, NCONS);
 
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(level,Sborder);
@@ -84,7 +84,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     Array<MultiFab,AMREX_SPACEDIM> numflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
         numflxmf[idim].define(amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)),
-                            statemf.DistributionMap(), NCONS, NUM_GROW);
+                            statemf.DistributionMap(), NCONS, NGHOST);
         numflxmf[idim] = 0.0;
     }
 
@@ -94,7 +94,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntflxmf[idim].define( amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)), statemf.DistributionMap(), NCONS, NUM_GROW);
+      pntflxmf[idim].define( amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)), statemf.DistributionMap(), NCONS, NGHOST);
       pntflxmf[idim] = 0.0;
     }
 
@@ -103,7 +103,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         const Box& bx   = mfi.tilebox();
-        const Box& bxg  = mfi.growntilebox(NUM_GROW);
+        const Box& bxg  = mfi.growntilebox(NGHOST);
         const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
         auto const& statefab = statemf.array(mfi);
@@ -218,15 +218,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         // don't have to do this, but we could
         qeli.clear(); // don't need them anymore
         slopeeli.clear();
-
-        // add euler derivatives to rhs
-        // amrex::ParallelFor(bx, NCONS,
-        // [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-        // {
-        // dsdtfab(i,j,k,n) = dxinv[0] * (nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
-        // +           dxinv[1] * (nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
-        // +           dxinv[2] * (nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
-        // });
     }
   }
 
@@ -239,22 +230,23 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   FArrayBox temp1;
   Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    pntvflxmf[idim].define( amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)), statemf.DistributionMap(), NCONS, NUM_GROW);
+    pntvflxmf[idim].define( amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)), statemf.DistributionMap(), NCONS, NGHOST);
     pntvflxmf[idim] = 0.0;
   }
   MultiFab primsmf;
-  primsmf.define( statemf.boxArray(), statemf.DistributionMap(), NPRIM, NUM_GROW);
+  primsmf.define( statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
   primsmf = 0.0;
 
   // loop over all fabs
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
-      const Box& bxg  = mfi.growntilebox(NUM_GROW);
+      const Box& bxg  = mfi.growntilebox(NGHOST);
       const Box& bxpflx  = mfi.growntilebox(2);
       const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
       auto const& statefab = statemf.array(mfi);
       auto const& dsdtfab = dSdt.array(mfi);
+      auto const& prims = primsmf.array(mfi);
 
       AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
                    auto const& pfabfy = pntvflxmf[1].array(mfi);,
@@ -263,11 +255,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
                    auto const& nfabfy = numflxmf[1].array(mfi);,
                    auto const& nfabfz = numflxmf[2].array(mfi););
-
-      // primitive variables
-      // temp1.resize(bxg, NPRIM); 
-      // auto const& prims = temp1.array();
-      auto const& prims = primsmf.array(mfi);
 
       // Convert to primitive variables and get transport coefficients
       amrex::ParallelFor(bxg,
@@ -284,7 +271,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
       // compute numerical viscous fluxes
       amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-          visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
+          // visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
       });
     }
   //////////////////////////////////////////////////////////////////////////////

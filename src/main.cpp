@@ -62,7 +62,7 @@ int main (int argc, char* argv[]) {
 #endif
         amr.init(start_time,stop_time);
 #ifdef AMREX_USE_GPIBM
-        IBM::ib.initialise(&amr,2,CNS::NUM_GROW);
+        IBM::ib.initialise(&amr,2,CNS::NGHOST);
 #endif
         timer_init = amrex::second() - timer_init;
     // -------------------------------------------------------------------------

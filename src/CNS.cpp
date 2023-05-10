@@ -11,7 +11,7 @@
 
 using namespace amrex;
 
-constexpr int CNS::NUM_GROW;
+constexpr int CNS::NGHOST;
 BCRec CNS::phys_bc;
 
 bool CNS::verbose = true;
@@ -360,7 +360,7 @@ void CNS::avgDown()
   amrex::average_down(S_fine, S_crse, fine_lev.geom, geom,
                       0, S_fine.nComp(), parent->refRatio(level));
 
-  const int nghost = 0;
+  // const int nghost = 0;
   // computeTemp(S_crse, nghost);
 }
 

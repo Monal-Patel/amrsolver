@@ -36,7 +36,6 @@ struct CnsFillExtDir
                      const int /*orig_comp*/) const
         {
 
-          // GpuArray<GpuArray<Real,6>,NCONS> prims;
           Array2D<Real,0,NCONS,0,5> prims;
 
           int nghost = 3;
