@@ -163,8 +163,8 @@ void cns_bcfill (Box const& bx, FArrayBox& data,
 
     // Currently we assume ymax and ymin BC is wall 
     // GpuBndryFuncFab class operates on all boundaries of the fab. It calls CnsFillExtDir for each ghost point ijk.
-
     GpuBndryFuncFab<CnsFillExtDir> gpu_bndry_func(CnsFillExtDir{});
     
     gpu_bndry_func(bx,data,dcomp,numcomp,geom,time,bcr,bcomp,scomp);
+    Gpu::streamSynchronize();
 }
