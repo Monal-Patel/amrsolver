@@ -97,8 +97,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { cons2prim(i, j, k, statefab, prims, lparm);});
   }
-  // note: with multiple streams might need gpu stream syncronise here
-  // Gpu::streamSynchronize();
+  // ensure primitive variables mf computed before starting mfiter
+  Gpu::streamSynchronize();
   //////////////////////////////////////////////////////////////////////////////
 
 
@@ -238,6 +238,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
 
   // Viscous Fluxes ////////////////////////////////////////////////////////////
+  // Gpu::streamSynchronize(); // ensure all rhs terms computed before assembly
   // We have a separate MFIter loop here than the Euler fluxes and the source terms, so the work can be further parallised. As different MFIter loops can be in different GPU streams. 
 
   // Although conservative FD (finite difference) derivatives of viscous fluxes are not requried in the boundary layer, standard FD are likely sufficient. However, considering grid and flow discontinuities (coarse-interface flux-refluxing and viscous derivatives near shocks), conservative FD derivatives are preferred.

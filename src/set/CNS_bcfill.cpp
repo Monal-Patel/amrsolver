@@ -49,12 +49,12 @@ struct CnsFillExtDir
           const Real dy = geom.CellSize(dir);
           Real rho,rhoinv,ux,uy,uz,rhoke,rhoei,p,T;
 
-          bool notcorner= iv[0] >= geom.Domain().smallEnd(0) 
-          && iv[0] <= geom.Domain().bigEnd(0)
-          && iv[2] >= geom.Domain().smallEnd(2) 
-          && iv[2] <= geom.Domain().bigEnd(2);
+          // bool notcorner= iv[0] >= geom.Domain().smallEnd(0) 
+          // && iv[0] <= geom.Domain().bigEnd(0)
+          // && iv[2] >= geom.Domain().smallEnd(2) 
+          // && iv[2] <= geom.Domain().bigEnd(2);
 
-          if (notcorner) {
+          // if (notcorner) {
             // y=0 boundary/plane
             if (iv[dir]==geom.Domain().smallEnd(dir)-1) {
               jstart = -nghost;
@@ -136,7 +136,7 @@ struct CnsFillExtDir
 
           }
 
-        }
+        // }
 };
 
 // bx                  : Cells outside physical domain and inside bx are filled.
