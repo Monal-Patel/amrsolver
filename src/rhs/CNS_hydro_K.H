@@ -110,10 +110,23 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
   fz(i,j,k,UMZ)   = momz*uz + P;
   fz(i,j,k,UET)   = (rhoet + P)*uz;
 
-  Real cs = pow(parm.eos_gamma*P*rhoinv,Real(0.5));
-  lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux));
-  lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy));
-  lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz));
+  // Real cs = pow(parm->eos_gamma*P*rhoinv,Real(0.5));
+  // lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux));
+  // lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy));
+  // lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz));
+
+  Real cs=0.0; 
+  if (i>=0 && j>=0 && k>=0 && i<=15 && j<=31 && k<=15) { 
+  cs = pow(parm.eos_gamma*P*rhoinv,Real(0.5)); 
+  lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux)); 
+  lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy)); 
+  lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
+  } 
+  else { 
+  lambda(i,j,k,0) = 300.0; 
+  lambda(i,j,k,1) = 300.0; 
+  lambda(i,j,k,2) = 300.0; 
+  } 
 
 }
 
