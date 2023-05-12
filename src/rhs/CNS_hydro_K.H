@@ -692,7 +692,7 @@ void cns_riemann_z (int i, int j, int k,
 
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto const& fy, auto const& fz, GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parm) noexcept
+void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto const& fy, auto const& fz, GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parms) noexcept
 {
     // 2nd order accurate central difference of primitive vars /////////////////
     // x direction
@@ -720,9 +720,9 @@ void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto co
     Real div  = dudx + dvdy + dwdz;
 
     // constants
-    Real mu    = 1.0e-5;
-    Real lambda= 1.0e-2;
-    Real r1_3 = Real(1.0)/Real(3.0);
+    Real mu    = parms.visc(prims(i,j,k,QT));
+    Real lambda= parms.cond(prims(i,j,k,QT));
+    Real r1_3  = Real(1.0)/Real(3.0);
 
     // viscous fluxes
     Real tauxx = Real(2.0)*mu*(dudx - r1_3*div);
