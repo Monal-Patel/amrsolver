@@ -160,6 +160,196 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
 //         w(i,j,k,WUT+1) = q(i,j,k,QUTT););
 // }
 
+///////////////////////////
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void ducros_switch(int i, int j, int k, const auto& prims, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
+
+  // sum1  = detect_discon(ip,i,j,k,qvar(:,:,:,nvpr)) + 1.0e-40_wp
+  // sum2  = sum1*sum1
+  // dd    = sum2/sum1
+
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void JSTflux(int i, int j, int k, const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz) {
+
+  Real c2 = 0.5;
+  // x-dir
+
+  // y-dir
+
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+Real fDiv(Real f,Real fl) {
+  return 0.5*(f + fl);}
+
+// divergence split
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+Real fgDiv(Real f,Real fl, Real g, Real gl) {
+  return 0.5*(f*g + fl*gl);}
+
+//Quadratic split
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+Real fgQuad(Real f,Real fl, Real g, Real gl) {
+  return 0.25*(f + fl)*(g + gl);}
+
+//Cubic split
+Real fghCubic(Real f,Real fl, Real g, Real gl,Real h, Real hl) {
+  return 0.1250*(f + fl)*(g + gl)*(h + hl);}
+
+// Computes fluxes at i-1/2, j-1/2 and k-1/2
+// Computational cost can be reduced by computing and storing flux averages between l and m points
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
+
+  GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+  int i1, i2, j1, j2, k1, k2;
+  Real rho1, ux1, uy1, uz1, ie1, p1;
+  Real rho2, ux2, uy2, uz2, ie2, p2;
+  Real massflx,ke;
+
+  // flux at i-1/2
+  for (int l=1; l<=halfsten; l++) {
+    for (int m=0; m<=l-1; m++) {
+      i1 = i + m;
+      rho1 = prims(i1,j,k,QRHO);
+      ux1  = prims(i1,j,k,QU);
+      uy1  = prims(i1,j,k,QV);
+      uz1  = prims(i1,j,k,QW);
+      ie1  = parm.cv*prims(i1,j,k,QT);
+      p1   = prims(i1,j,k,QPRES);
+
+      i2   = i + m - l;
+      rho2 = prims(i2,j,k,QRHO);
+      ux2  = prims(i2,j,k,QU);
+      uy2  = prims(i2,j,k,QV);
+      uz2  = prims(i2,j,k,QW);
+      ie2  = parm.cv*prims(i2,j,k,QT);
+      p2   = prims(i2,j,k,QPRES);
+
+      massflx = fgQuad(rho1,rho2,ux1,ux2);
+      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+
+      flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
+      flx[UMX]  = flx[UMX]  + coeffs[l-1]*(fghCubic(rho1,rho2,ux1,ux2,ux1,ux2) +fDiv(p1,p2));
+      flx[UMY]  = flx[UMY]  + coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uy1,uy2);
+      flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uz1,uz2);
+      flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,ux1,ux2,ie1,ie2) + fgDiv(p1,p2,ux1,ux2));
+      // printf("%d %d %d %d \n",m,l,i1,i2);
+    }
+  }
+  for (int n=0; n<NCONS; n++) {nfabfx(i,j,k,n) = flx[n];}
+  
+  // flux at j-1/2
+  for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+  for (int l=1; l<=halfsten; l++) {
+    for (int m=0; m<=l-1; m++) {
+      j1 = j + m;
+      rho1 = prims(i,j1,k,QRHO);
+      ux1  = prims(i,j1,k,QU);
+      uy1  = prims(i,j1,k,QV);
+      uz1  = prims(i,j1,k,QW);
+      ie1  = parm.cv*prims(i,j1,k,QT);
+      p1   = prims(i,j1,k,QPRES);
+
+      j2   = j + m - l;
+      rho2 = prims(i,j2,k,QRHO);
+      ux2  = prims(i,j2,k,QU);
+      uy2  = prims(i,j2,k,QV);
+      uz2  = prims(i,j2,k,QW);
+      ie2  = parm.cv*prims(i,j2,k,QT);
+      p2   = prims(i,j2,k,QPRES);
+
+      massflx = fgQuad(rho1,rho2,uy1,uy2);
+      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+      flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
+      flx[UMX]  = flx[UMX]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
+      flx[UMY]  = flx[UMY]  + coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2) + fDiv(p1,p2));
+      flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
+      flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
+      // printf("%d %d %d %d \n",m,l,i1,i2);
+    }
+  }
+  for (int n=0; n<NCONS; n++) {nfabfy(i,j,k,n) = flx[n];}
+
+  // flux at k-1/2
+  for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+  for (int l=1; l<=halfsten; l++) {
+    for (int m=0; m<=l-1; m++) {
+      k1 = k + m;
+      rho1 = prims(i,j,k1,QRHO);
+      ux1  = prims(i,j,k1,QU);
+      uy1  = prims(i,j,k1,QV);
+      uz1  = prims(i,j,k1,QW);
+      ie1  = parm.cv*prims(i,j,k1,QT);
+      p1   = prims(i,j,k1,QPRES);
+
+      k2   = k + m - l;
+      rho2 = prims(i,j,k2,QRHO);
+      ux2  = prims(i,j,k2,QU);
+      uy2  = prims(i,j,k2,QV);
+      uz2  = prims(i,j,k2,QW);
+      ie2  = parm.cv*prims(i,j,k2,QT);
+      p2   = prims(i,j,k2,QPRES);
+
+      massflx = fgQuad(rho1,rho2,uz1,uz2);
+      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+      flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
+      flx[UMX]  = flx[UMX]  + coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,ux1,ux2);
+      flx[UMY]  = flx[UMY]  + coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,uy1,uy2);
+      flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*(fghCubic(rho1,rho2,uz1,uz2,uz1,uz2) + fDiv(p1,p2));
+      flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uz1,uz2,ie1,ie2)+ fgDiv(p1,p2,uz1,uz2));
+      // printf("%d %d %d %d \n",m,l,i1,i2);
+    }
+  }
+  for (int n=0; n<NCONS; n++) {nfabfz(i,j,k,n) = flx[n];}
+}
+///////////
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void KEEPy(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& prims, const auto& nfabfy, Parm const& parm) {
+
+  GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+  int i1, i2, j1, j2, k1, k2;
+  Real rho1, ux1, uy1, uz1, ie1, p1;
+  Real rho2, ux2, uy2, uz2, ie2, p2;
+  Real massflx,ke;
+
+  // flux at j-1/2
+  for (int l=1; l<=halfsten; l++) {
+    for (int m=0; m<=l-1; m++) {
+      j1 = j + m;
+      rho1 = prims(i,j1,k,QRHO);
+      ux1  = prims(i,j1,k,QU);
+      uy1  = prims(i,j1,k,QV);
+      uz1  = prims(i,j1,k,QW);
+      ie1  = parm.cv*prims(i,j1,k,QT);
+      p1   = prims(i,j1,k,QPRES);
+
+      j2   = j + m - l;
+      rho2 = prims(i,j2,k,QRHO);
+      ux2  = prims(i,j2,k,QU);
+      uy2  = prims(i,j2,k,QV);
+      uz2  = prims(i,j2,k,QW);
+      ie2  = parm.cv*prims(i,j2,k,QT);
+      p2   = prims(i,j2,k,QPRES);
+
+      massflx = fgQuad(rho1,rho2,uy1,uy2);
+      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+      flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
+      flx[UMX]  = flx[UMX]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
+      flx[UMY]  = flx[UMY]  + coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2) + fDiv(p1,p2));
+      flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
+      flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
+      // printf("%d %d %d %d \n",m,l,j1,j2);
+    }
+  }
+  for (int n=0; n<NCONS; n++) {nfabfy(i,j,k,n) = flx[n];}
+ 
+}
+
+
+//////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 Real weno5js(const GpuArray<Real,NCONS>& s)
 { 

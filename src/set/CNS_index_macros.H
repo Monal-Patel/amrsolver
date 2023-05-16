@@ -16,4 +16,11 @@
 #define QPRES  5
 #define NPRIM  6
 
+// if (order == 2) {
+// #define HALFSTEN  1
+//   }
+// else if (order== 4) {
+// #define HALFSTEN  2
+// }
+
 #endif
