@@ -115,12 +115,12 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     // loop over all fabs
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        const Box& bx      = mfi.tilebox();
+        // const Box& bx      = mfi.tilebox();
         const Box& bxg     = mfi.growntilebox(NGHOST);
         const Box& bxnodal = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
         auto const& statefab = statemf.array(mfi);
-        auto const& dsdtfab = dSdt.array(mfi);
+        // auto const& dsdtfab = dSdt.array(mfi);
         AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
                      auto const& nfabfy = numflxmf[1].array(mfi);,
                      auto const& nfabfz = numflxmf[2].array(mfi););
@@ -153,8 +153,10 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   
   // central-split KEEP + JST artificial dissipation
   else if (euler_flux_type==1) {
-  // make multifab for variables
-    Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
+  // make multifab for spectral radius and sensor for artificial dissipation
+    MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+    MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+
     int order = 4;
     int halfsten = order/2;
 
@@ -170,14 +172,17 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     {
       const Box& bx      = mfi.tilebox();
       const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
+      const Box& bxg     = mfi.growntilebox(NGHOST-1);
 
-      auto const& statefab = statemf.array(mfi);
+      auto const& statefab    = statemf.array(mfi);
+      auto const& sensor   = sensormf.array(mfi);
+      auto const& lambda   = lambdamf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
       AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
                     auto const& nfabfy = numflxmf[1].array(mfi);,
                     auto const& nfabfz = numflxmf[2].array(mfi););
 
-      amrex::ParallelFor(bxnodal, 
+      amrex::ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
         KEEP(i,j,k,halfsten,coeffs4,prims,nfabfx,nfabfy,nfabfz,lparm);
@@ -230,11 +235,16 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
 
       // JST artificial dissipation shock capturing
-      // amrex::ParallelFor(bxnodal, 
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      // {
-      //   JSTflux(i,j,k,sensor,statefab,nfabfx,nfabfy,nfabfz,lparm);
-      // });
+     amrex::ParallelFor(bxg,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      {
+        ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
+      });
+      amrex::ParallelFor(bxnodal, NCONS,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+      {
+        JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz);
+      });
 
 
       }
@@ -248,7 +258,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         const Box& bx = mfi.tilebox();
 
         auto const& sfab = statemf.array(mfi);
-        auto const& dsdtfab = dSdt.array(mfi);
+        // auto const& dsdtfab = dSdt.array(mfi);
         AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
                      auto const& nfabfy = numflxmf[1].array(mfi);,
                      auto const& nfabfz = numflxmf[2].array(mfi););
@@ -337,12 +347,12 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // loop over all fabs
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
-      const Box& bxg  = mfi.growntilebox(NGHOST);
+      // const Box& bxg  = mfi.growntilebox(NGHOST);
       const Box& bxpflx  = mfi.growntilebox(2);
       const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
-      auto const& statefab = statemf.array(mfi);
-      auto const& dsdtfab  = dSdt.array(mfi);
+      // auto const& statefab = statemf.array(mfi);
+      // auto const& dsdtfab  = dSdt.array(mfi);
       auto const& prims    = primsmf.array(mfi);
 
       AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,

@@ -162,22 +162,54 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
 
 ///////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void ducros_switch(int i, int j, int k, const auto& prims, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
+Real sensor(Real pp, Real pl, Real pr) {
+    Real pjst = pr + 2.0*pp  + pl;
+    Real ptvd = std::abs(pr-pp) + std::abs(pp -pl);
+    return std::abs(2.0* (pr -2.0*pp + pl)/(pjst + ptvd + Real(1.0e-40)));
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lambda, const auto& sen, Parm const& parm) {
+
+  Real pp=prims(i,j,k,QPRES);
+  sen(i,j,k,0) = sensor(pp,prims(i-1,j,k,QPRES),prims(i+1,j,k,QPRES));
+  sen(i,j,k,1) = sensor(pp,prims(i,j-1,k,QPRES),prims(i,j+1,k,QPRES));
+  sen(i,j,k,2) = sensor(pp,prims(i,j,k-1,QPRES),prims(i,j,k+1,QPRES));
 
   // sum1  = detect_discon(ip,i,j,k,qvar(:,:,:,nvpr)) + 1.0e-40_wp
   // sum2  = sum1*sum1
   // dd    = sum2/sum1
 
+  Real ux = prims(i,j,k,QU); 
+  Real uy = prims(i,j,k,QV);
+  Real uz = prims(i,j,k,QW);
+  Real cs = pow(parm.eos_gamma*prims(i,j,k,QPRES)/prims(i,j,k,QRHO),Real(0.5)); 
+  lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux)); 
+  lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy)); 
+  lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
+
 }
 
+// calculates dissipative flux at i-1/2, j-1/2 and k-1/2
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void JSTflux(int i, int j, int k, const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz) {
+void JSTflux(int i, int j, int k, int n, const auto& lambda , const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz) {
 
   Real c2 = 0.5;
+  Real dw;
+  Real u_ijk = cons(i,j,k,n);
+  Real lambda_ijk = lambda(i,j,k);
+
   // x-dir
+  dw = (u_ijk - cons(i-1,j,k,n));
+  nfabfx(i,j,k,n) -= c2*max(lambda_ijk,lambda(i-1,j,k))*max(sensor(i,j,k,0),sensor(i-1,j,k,0))*dw;
 
   // y-dir
+  dw = (u_ijk - cons(i,j-1,k,n));
+  nfabfy(i,j,k,n) -= c2*max(lambda_ijk,lambda(i,j-1,k))*max(sensor(i,j,k,1),sensor(i,j-1,k,1))*dw;
 
+  // z-dir
+  dw = (u_ijk - cons(i,j,k-1,n));
+  nfabfz(i,j,k,n) -= c2*max(lambda(i,j,k),lambda(i,j,k-1))*max(sensor(i,j,k,2),sensor(i,j,k-1,2))*dw;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
@@ -195,6 +227,7 @@ Real fgQuad(Real f,Real fl, Real g, Real gl) {
   return 0.25*(f + fl)*(g + gl);}
 
 //Cubic split
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 Real fghCubic(Real f,Real fl, Real g, Real gl,Real h, Real hl) {
   return 0.1250*(f + fl)*(g + gl)*(h + hl);}
 
@@ -310,7 +343,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void KEEPy(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& prims, const auto& nfabfy, Parm const& parm) {
 
   GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
-  int i1, i2, j1, j2, k1, k2;
+  int j1, j2;
   Real rho1, ux1, uy1, uz1, ie1, p1;
   Real rho2, ux2, uy2, uz2, ie2, p2;
   Real massflx,ke;
@@ -431,19 +464,19 @@ df[4] = maxeigen*cons(i,j+1,k,n);
 df[5] = maxeigen*cons(i,j+2,k,n);
 
 // f(j-1/2)^+
-sten[0] = Real(0.5)*(pfx(i,j-3,k,n) + df[0]);
-sten[1] = Real(0.5)*(pfx(i,j-2,k,n) + df[1]);
-sten[2] = Real(0.5)*(pfx(i,j-1,k,n) + df[2]);
-sten[3] = Real(0.5)*(pfx(i,j  ,k,n) + df[3]);
-sten[4] = Real(0.5)*(pfx(i,j+1,k,n) + df[4]);
+sten[0] = Real(0.5)*(pfy(i,j-3,k,n) + df[0]);
+sten[1] = Real(0.5)*(pfy(i,j-2,k,n) + df[1]);
+sten[2] = Real(0.5)*(pfy(i,j-1,k,n) + df[2]);
+sten[3] = Real(0.5)*(pfy(i,j  ,k,n) + df[3]);
+sten[4] = Real(0.5)*(pfy(i,j+1,k,n) + df[4]);
 flx = weno5js(sten);
 
 // f(j-1/2)^-
-sten[0] = Real(0.5)*(pfx(i,j-2,k,n) - df[1]);
-sten[1] = Real(0.5)*(pfx(i,j-1,k,n) - df[2]);
-sten[2] = Real(0.5)*(pfx(i,j  ,k,n) - df[3]);
-sten[3] = Real(0.5)*(pfx(i,j+1,k,n) - df[4]);
-sten[4] = Real(0.5)*(pfx(i,j+2,k,n) - df[5]);
+sten[0] = Real(0.5)*(pfy(i,j-2,k,n) - df[1]);
+sten[1] = Real(0.5)*(pfy(i,j-1,k,n) - df[2]);
+sten[2] = Real(0.5)*(pfy(i,j  ,k,n) - df[3]);
+sten[3] = Real(0.5)*(pfy(i,j+1,k,n) - df[4]);
+sten[4] = Real(0.5)*(pfy(i,j+2,k,n) - df[5]);
 flx += weno5js(sten);
 nfy(i,j,k,n) = flx;
 
@@ -457,19 +490,19 @@ df[4] = maxeigen*cons(i,j,k+1,n);
 df[5] = maxeigen*cons(i,j,k+2,n);
 
 // f(k-1/2)^+
-sten[0] = Real(0.5)*(pfx(i,j,k-3,n) + df[0]);
-sten[1] = Real(0.5)*(pfx(i,j,k-2,n) + df[1]);
-sten[2] = Real(0.5)*(pfx(i,j,k-1,n) + df[2]);
-sten[3] = Real(0.5)*(pfx(i,j,k  ,n) + df[3]);
-sten[4] = Real(0.5)*(pfx(i,j,k+1,n) + df[4]);
+sten[0] = Real(0.5)*(pfz(i,j,k-3,n) + df[0]);
+sten[1] = Real(0.5)*(pfz(i,j,k-2,n) + df[1]);
+sten[2] = Real(0.5)*(pfz(i,j,k-1,n) + df[2]);
+sten[3] = Real(0.5)*(pfz(i,j,k  ,n) + df[3]);
+sten[4] = Real(0.5)*(pfz(i,j,k+1,n) + df[4]);
 flx = weno5js(sten);
 
 // f(k-1/2)^-
-sten[0] = Real(0.5)*(pfx(i,j,k-2,n) - df[1]);
-sten[1] = Real(0.5)*(pfx(i,j,k-1,n) - df[2]);
-sten[2] = Real(0.5)*(pfx(i,j,k  ,n) - df[3]);
-sten[3] = Real(0.5)*(pfx(i,j,k+1,n) - df[4]);
-sten[4] = Real(0.5)*(pfx(i,j,k+2,n) - df[5]);
+sten[0] = Real(0.5)*(pfz(i,j,k-2,n) - df[1]);
+sten[1] = Real(0.5)*(pfz(i,j,k-1,n) - df[2]);
+sten[2] = Real(0.5)*(pfz(i,j,k  ,n) - df[3]);
+sten[3] = Real(0.5)*(pfz(i,j,k+1,n) - df[4]);
+sten[4] = Real(0.5)*(pfz(i,j,k+2,n) - df[5]);
 flx += weno5js(sten);
 nfz(i,j,k,n) = flx;
 }
@@ -489,19 +522,19 @@ sten[4] = pfx(i+1,j,k,n);
 nfx(i,j,k,n) = weno5js(sten);
 
 // j-1/2
-sten[0] = pfx(i,j-3,k,n);
-sten[1] = pfx(i,j-2,k,n);
-sten[2] = pfx(i,j-1,k,n);
-sten[3] = pfx(i,j  ,k,n);
-sten[4] = pfx(i,j+1,k,n);
+sten[0] = pfy(i,j-3,k,n);
+sten[1] = pfy(i,j-2,k,n);
+sten[2] = pfy(i,j-1,k,n);
+sten[3] = pfy(i,j  ,k,n);
+sten[4] = pfy(i,j+1,k,n);
 nfy(i,j,k,n) = weno5js(sten);
 
 // k-1/2
-sten[0] = pfx(i,j,k-3,n);
-sten[1] = pfx(i,j,k-2,n);
-sten[2] = pfx(i,j,k-1,n);
-sten[3] = pfx(i,j,k  ,n);
-sten[4] = pfx(i,j,k+1,n);
+sten[0] = pfz(i,j,k-3,n);
+sten[1] = pfz(i,j,k-2,n);
+sten[2] = pfz(i,j,k-1,n);
+sten[3] = pfz(i,j,k  ,n);
+sten[4] = pfz(i,j,k+1,n);
 nfz(i,j,k,n) = weno5js(sten);
 }
 
