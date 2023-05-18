@@ -14,14 +14,17 @@ using namespace amrex;
 constexpr int CNS::NGHOST;
 BCRec CNS::phys_bc;
 
+bool CNS::RHSeuler=false;
+bool CNS::RHSvisc=false;
+bool CNS::RHSsource=false;
 bool CNS::verbose = true;
-int  CNS::nstep_screen_output=10;
 bool CNS::dt_dynamic=false;
+int  CNS::nstep_screen_output=10;
 int  CNS::euler_flux_type=0;
-Real CNS::cfl = 0.0;
-Real CNS::dt_constant = 0.0;
 int  CNS::do_reflux = 1;
 int  CNS::refine_max_dengrad_lev = -1;
+Real CNS::cfl = 0.0;
+Real CNS::dt_constant = 0.0;
 Real CNS::refine_dengrad = 1.0e10;
 
 Real CNS::gravity = 0.0;
@@ -66,6 +69,9 @@ void CNS::read_params()
     phys_bc.setHi(i, hi_bc[i]);
   }
 
+  pp.query("RHSeuler", RHSeuler);
+  pp.query("RHSvisc" , RHSvisc);
+  pp.query("RHSsource",RHSsource);
   pp.query("do_reflux", do_reflux);
 
   if (!pp.query("euler_flux_type",euler_flux_type)) {

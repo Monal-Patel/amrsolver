@@ -141,6 +141,9 @@ public:
     static bool dt_dynamic;
     static int nstep_screen_output;
     static int euler_flux_type;
+    static bool RHSeuler;
+    static bool RHSvisc;
+    static bool RHSsource;
 
 public:
     static Parm* h_parm;
