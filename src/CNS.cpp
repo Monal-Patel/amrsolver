@@ -120,6 +120,7 @@ void CNS::initData()
 
   const auto geomdata = geom.data();
   MultiFab &S_new = get_new_data(State_Type);
+  // S_new = 0.0;
 
   Parm const *lparm = d_parm;
   ProbParm const *lprobparm = d_prob_parm;
@@ -351,6 +352,46 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 // -----------------------------------------------------------------------------
 
 // misc ------------------------------------------------------------------------
+
+// const IntVect& len = bx.length();
+
+// void CNS::ghostboxes(int nghost,const Box& bx,const Box& bxg,Array<Box,AMREX_SPACEDIM*2>& dom_edge_boxes){
+
+//   imin  = 
+//   imax  = 
+//   igmax = 
+//   const IntVect& len = bx.length();
+//   Box tempbox(bx.smallEnd(),bx.bigEnd(),bx.ixType());
+//   dom.edge_boxes[0] = tempbox; 
+
+  // Array<Box,2*AMREX_SPACEDIM> dom_face_boxes = {
+  // AMREX_D_DECL(amrex::convert(amrex::adjCellLo(bxg, 0, len[0]),bx.ixType()),
+  //              amrex::convert(amrex::adjCellLo(bxg, 1, len[1]),bx.ixType()),
+  //              amrex::convert(amrex::adjCellLo(bxg, 2, len[2]),bx.ixType())),
+  // AMREX_D_DECL(amrex::convert(amrex::adjCellHi(bxg, 0, len[0]),bx.ixType()),
+  //              amrex::convert(amrex::adjCellHi(bxg, 1, len[1]),bx.ixType()),
+  //              amrex::convert(amrex::adjCellHi(bxg, 2, len[2]),bx.ixType())) };
+
+// }
+
+// dom_edge_boxes
+//   = {{ amrex::convert(amrex::adjCellLo(amrex::adjCellLo(gdomain,0,len[0]),1,len[1]),idxType),
+//         amrex::convert(amrex::adjCellLo(adjCellHi(gdomain,0,len[0]),1,len[1]),idxType),
+//         amrex::convert(amrex::adjCellHi(amrex::adjCellLo(gdomain,0,len[0]),1,len[1]),idxType),
+//         amrex::convert(amrex::adjCellHi(amrex::adjCellHi(gdomain,0,len[0]),1,len[1]),idxType),
+//         //
+//         amrex::convert(amrex::adjCellLo(amrex::adjCellLo(gdomain,0,len[0]),2,len[2]),idxType),
+//         amrex::convert(amrex::adjCellLo(amrex::adjCellHi(gdomain,0,len[0]),2,len[2]),idxType),
+//         amrex::convert(amrex::adjCellHi(amrex::adjCellLo(gdomain,0,len[0]),2,len[2]),idxType),
+//         amrex::convert(amrex::adjCellHi(amrex::adjCellHi(gdomain,0,len[0]),2,len[2]),idxType),
+//         //
+//         amrex::convert(amrex::adjCellLo(amrex::adjCellLo(gdomain,1,len[1]),2,len[2]),idxType),
+//         amrex::convert(amrex::adjCellLo(amrex::adjCellHi(gdomain,1,len[1]),2,len[2]),idxType),
+//         amrex::convert(amrex::adjCellHi(amrex::adjCellLo(gdomain,1,len[1]),2,len[2]),idxType),
+//         amrex::convert(amrex::adjCellHi(amrex::adjCellHi(gdomain,1,len[1]),2,len[2]),idxType) }};
+// #endif
+
+// }
 
 void CNS::avgDown()
 {

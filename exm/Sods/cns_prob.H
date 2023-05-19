@@ -29,9 +29,9 @@ void cns_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   state(i,j,k,UMY  ) = Real(0.0);
   state(i,j,k,UMZ  ) = Real(0.0);
   Real et = Pt/(parm.eos_gamma-Real(1.0));
-  state(i,j,k,UEINT) = et;
-  state(i,j,k,UEDEN) = et + Real(0.5)*rhot*uxt*uxt;
-  state(i,j,k,UTEMP) = Real(0.0);
+  // state(i,j,k,UET) = et;
+  state(i,j,k,UET) = et + Real(0.5)*rhot*uxt*uxt;
+  // state(i,j,k,UTEMP) = Real(0.0);
 }
 
 void tagging(amrex::TagBoxArray& tags, amrex::MultiFab &sdata, int level) {

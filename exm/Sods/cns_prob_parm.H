@@ -14,6 +14,8 @@ struct ProbParm
     amrex::Real rho_r = 0.125;
     amrex::Real u_l = 0.0;
     amrex::Real u_r = 0.0;
+
+    amrex::Real Tw   = 000.0_rt; // wall temperature (K)
 };
 
 #endif

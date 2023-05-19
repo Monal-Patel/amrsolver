@@ -75,6 +75,38 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
     // printf("fx %f %f %f %f %f\n",fx(i,j,k,0), fx(i,j,k,1), fx(i,j,k,2), fx(i,j,k,3),fx(i,j,k,4));
 }
 
+// AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+// void cons2char (int i, int j, int k, int dir, Array4<const Real> const& q, const Array4<const Real>& w, const int sys)
+// {
+//     int QUN, QUT, QUTT;
+//     if      (dir == 0) { QUN = QU;  QUT = QV;  QUTT = QW; } 
+//     else if (dir == 1) { QUN = QV;  QUT = QU;  QUTT = QW; } 
+//     else               { QUN = QW;  QUT = QU;  QUTT = QV; }
+    
+//     if (sys == 0) { // speed of sound system
+//         // Real rmpoc2 = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
+//         w(i,j,k,WRHO) = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
+//         w(i,j,k,WACO)   = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) + q(i,j,k,QRHO)*q(i,j,k,QUN));
+//         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) - q(i,j,k,QRHO)*q(i,j,k,QUN));
+
+//     } else { // gamma system
+//         w(i,j,k,WRHO) = q(i,j,k,QRHO) * (1.0 - 1.0 / q(i,j,k,QG));
+//         w(i,j,k,WACO) = 0.5 * (q(i,j,k,QPRES) + std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
+//         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES) - std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
+//     }
+
+//     // Passive scalars are the same for both systems
+//     for (int n = 0; n < NUM_SPECIES; ++n) {
+//         w(i,j,k,WY+n) = q(i,j,k,QFS+n);
+//     }
+//     w(i,j,k,WC) = q(i,j,k,QC);
+//     AMREX_D_TERM(,
+//         w(i,j,k,WUT)   = q(i,j,k,QUT);,
+//         w(i,j,k,WUT+1) = q(i,j,k,QUTT););
+// }
+
+///////////////////////////
+
 // computes Euler fluxes from conserved variable vector and maxeigen value
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, auto const& lambda ,const Parm& parm) {
@@ -110,59 +142,15 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
   fz(i,j,k,UMZ)   = momz*uz + P;
   fz(i,j,k,UET)   = (rhoet + P)*uz;
 
-  // Real cs = pow(parm->eos_gamma*P*rhoinv,Real(0.5));
-  // lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux));
-  // lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy));
-  // lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz));
-
-  Real cs=0.0; 
-  if (i>=0 && j>=0 && k>=0 && i<=15 && j<=31 && k<=15) { 
-  cs = pow(parm.eos_gamma*P*rhoinv,Real(0.5)); 
+  Real cs=pow(parm.eos_gamma*P*rhoinv,Real(0.5)); 
   lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux)); 
   lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy)); 
   lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
-  } 
-  else { 
-  lambda(i,j,k,0) = 300.0; 
-  lambda(i,j,k,1) = 300.0; 
-  lambda(i,j,k,2) = 300.0; 
-  } 
-
 }
 
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-// void cons2char (int i, int j, int k, int dir, Array4<const Real> const& q, const Array4<const Real>& w, const int sys)
-// {
-//     int QUN, QUT, QUTT;
-//     if      (dir == 0) { QUN = QU;  QUT = QV;  QUTT = QW; } 
-//     else if (dir == 1) { QUN = QV;  QUT = QU;  QUTT = QW; } 
-//     else               { QUN = QW;  QUT = QU;  QUTT = QV; }
-    
-//     if (sys == 0) { // speed of sound system
-//         // Real rmpoc2 = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
-//         w(i,j,k,WRHO) = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
-//         w(i,j,k,WACO)   = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) + q(i,j,k,QRHO)*q(i,j,k,QUN));
-//         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) - q(i,j,k,QRHO)*q(i,j,k,QUN));
-
-//     } else { // gamma system
-//         w(i,j,k,WRHO) = q(i,j,k,QRHO) * (1.0 - 1.0 / q(i,j,k,QG));
-//         w(i,j,k,WACO) = 0.5 * (q(i,j,k,QPRES) + std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
-//         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES) - std::sqrt(q(i,j,k,QG)*q(i,j,k,QRHO)*q(i,j,k,QPRES))*q(i,j,k,QUN));
-//     }
-
-//     // Passive scalars are the same for both systems
-//     for (int n = 0; n < NUM_SPECIES; ++n) {
-//         w(i,j,k,WY+n) = q(i,j,k,QFS+n);
-//     }
-//     w(i,j,k,WC) = q(i,j,k,QC);
-//     AMREX_D_TERM(,
-//         w(i,j,k,WUT)   = q(i,j,k,QUT);,
-//         w(i,j,k,WUT+1) = q(i,j,k,QUTT););
-// }
-
-///////////////////////////
+// Discontinuity sensor
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-Real sensor(Real pp, Real pl, Real pr) {
+Real disconSensor(Real pp, Real pl, Real pr) {
     Real pjst = pr + 2.0*pp  + pl;
     Real ptvd = std::abs(pr-pp) + std::abs(pp -pl);
     return std::abs(2.0* (pr -2.0*pp + pl)/(pjst + ptvd + Real(1.0e-40)));
@@ -171,14 +159,20 @@ Real sensor(Real pp, Real pl, Real pr) {
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lambda, const auto& sen, Parm const& parm) {
 
-  Real pp=prims(i,j,k,QPRES);
-  sen(i,j,k,0) = sensor(pp,prims(i-1,j,k,QPRES),prims(i+1,j,k,QPRES));
-  sen(i,j,k,1) = sensor(pp,prims(i,j-1,k,QPRES),prims(i,j+1,k,QPRES));
-  sen(i,j,k,2) = sensor(pp,prims(i,j,k-1,QPRES),prims(i,j,k+1,QPRES));
+  // Real pp=prims(i,j,k,QPRES)*prims(i,j,k,QRHO);
+  // sen(i,j,k,0) = disconSensor(pp,prims(i-1,j,k,QPRES)*prims(i-1,j,k,QRHO),prims(i+1,j,k,QPRES)*prims(i+1,j,k,QRHO));
+  // sen(i,j,k,1) = disconSensor(pp,prims(i,j-1,k,QPRES)*prims(i,j-1,k,QRHO),prims(i,j+1,k,QPRES)*prims(i,j+1,k,QRHO));
+  // sen(i,j,k,2) = disconSensor(pp,prims(i,j,k-1,QPRES)*prims(i,j,k-1,QRHO),prims(i,j,k+1,QPRES)*prims(i,j,k+1,QRHO));
 
-  // sum1  = detect_discon(ip,i,j,k,qvar(:,:,:,nvpr)) + 1.0e-40_wp
-  // sum2  = sum1*sum1
-  // dd    = sum2/sum1
+  // Real pp=prims(i,j,k,QRHO);
+  // sen(i,j,k,0) = disconSensor(pp,prims(i-1,j,k,QRHO),prims(i+1,j,k,QRHO));
+  // sen(i,j,k,1) = disconSensor(pp,prims(i,j-1,k,QRHO),prims(i,j+1,k,QRHO));
+  // sen(i,j,k,2) = disconSensor(pp,prims(i,j,k-1,QRHO),prims(i,j,k+1,QRHO));
+
+  Real pp=prims(i,j,k,QPRES);
+  sen(i,j,k,0) = disconSensor(pp,prims(i-1,j,k,QPRES),prims(i+1,j,k,QPRES));
+  sen(i,j,k,1) = disconSensor(pp,prims(i,j-1,k,QPRES),prims(i,j+1,k,QPRES));
+  sen(i,j,k,2) = disconSensor(pp,prims(i,j,k-1,QPRES),prims(i,j,k+1,QPRES));
 
   Real ux = prims(i,j,k,QU); 
   Real uy = prims(i,j,k,QV);
@@ -194,22 +188,21 @@ void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lam
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void JSTflux(int i, int j, int k, int n, const auto& lambda , const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz) {
 
-  Real c2 = 0.5;
+  Real c2 = 1.0;
   Real dw;
   Real u_ijk = cons(i,j,k,n);
-  Real lambda_ijk = lambda(i,j,k);
 
   // x-dir
   dw = (u_ijk - cons(i-1,j,k,n));
-  nfabfx(i,j,k,n) -= c2*max(lambda_ijk,lambda(i-1,j,k))*max(sensor(i,j,k,0),sensor(i-1,j,k,0))*dw;
+  nfabfx(i,j,k,n) -= c2*max(lambda(i,j,k,0),lambda(i-1,j,k,0))*max(sensor(i,j,k,0),sensor(i-1,j,k,0))*dw;
 
   // y-dir
   dw = (u_ijk - cons(i,j-1,k,n));
-  nfabfy(i,j,k,n) -= c2*max(lambda_ijk,lambda(i,j-1,k))*max(sensor(i,j,k,1),sensor(i,j-1,k,1))*dw;
+  nfabfy(i,j,k,n) -= c2*max(lambda(i,j,k,1),lambda(i,j-1,k,1))*max(sensor(i,j,k,1),sensor(i,j-1,k,1))*dw;
 
   // z-dir
   dw = (u_ijk - cons(i,j,k-1,n));
-  nfabfz(i,j,k,n) -= c2*max(lambda(i,j,k),lambda(i,j,k-1))*max(sensor(i,j,k,2),sensor(i,j,k-1,2))*dw;
+  nfabfz(i,j,k,n) -= c2*max(lambda(i,j,k,2),lambda(i,j,k-1,2))*max(sensor(i,j,k,2),sensor(i,j,k-1,2))*dw;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 

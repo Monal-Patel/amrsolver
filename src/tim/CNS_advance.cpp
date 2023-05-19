@@ -88,14 +88,18 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   // primitive variables multifab
   MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
+  primsmf= 0.0;
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
       auto const& statefab = statemf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
       const Box& bxg       = mfi.growntilebox(NGHOST);
-
+      // const Box& bx        = mfi.tilebox();
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { cons2prim(i, j, k, statefab, prims, lparm);});
+
+      // halos to do
+      // ghostboxes(NGHOST,bx,bxg,ghost_boxes);
   }
   // ensure primitive variables mf computed before starting mfiter
   Gpu::streamSynchronize();
@@ -104,6 +108,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
   // IMPROVEMENT: Can have pointer function (dynamic casting?) (main euler_flux function) which can be pointed to different flux schemes in the initialisation. The function can pass a parameter struct to include any scheme specfic parameters.
+  if(RHSeuler) {
   // weno5js fvs
   if (euler_flux_type==2) {
     // make multifab for variables
@@ -133,7 +138,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         Elixir lambdagpu   = lambdafab.elixir();
         auto const& lambda = lambdafab.array();
 
-        // x direction
         ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
             cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,lparm);
         });
@@ -143,10 +147,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         // });
 
         ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-              numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); // Storage of numerical fluxes in nfabfx, nfabfy, nfabfz - index i contains i-1/2 interface flux.
-        //       // printf("i,j,k,n  -  %i %i %i %i %f \n",i,j,k,n, nfabfx(i,j,k,n) );
-
-        // y direction
+              numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); 
         });
     }
   }
@@ -156,6 +157,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // make multifab for spectral radius and sensor for artificial dissipation
     MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
     MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+    lambdamf = 0.0;
+    sensormf = 0.0;
 
     int order = 4;
     int halfsten = order/2;
@@ -174,7 +177,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
       const Box& bxg     = mfi.growntilebox(NGHOST-1);
 
-      auto const& statefab    = statemf.array(mfi);
+      auto const& statefab = statemf.array(mfi);
       auto const& sensor   = sensormf.array(mfi);
       auto const& lambda   = lambdamf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
@@ -190,56 +193,57 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
 
       // Order reduction at ymin wall boundary
-      if (geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
-        int jbndry = bxnodal.smallEnd(1);
-        IntVect small,big;
-        small.setVal(0,bxnodal.smallEnd(0));
-        small.setVal(1,jbndry);
-        small.setVal(2,bxnodal.smallEnd(2));
+      // if (geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
+      //   int jbndry = bxnodal.smallEnd(1);
+      //   IntVect small,big;
+      //   small.setVal(0,bxnodal.smallEnd(0));
+      //   small.setVal(1,jbndry);
+      //   small.setVal(2,bxnodal.smallEnd(2));
 
-        big.setVal(0,bxnodal.bigEnd(0));
-        big.setVal(1,jbndry);
-        big.setVal(2,bxnodal.bigEnd(2));
-        Box bxboundary(small,big);
+      //   big.setVal(0,bxnodal.bigEnd(0));
+      //   big.setVal(1,jbndry);
+      //   big.setVal(2,bxnodal.bigEnd(2));
+      //   Box bxboundary(small,big);
 
-        amrex::ParallelFor(bxboundary, 
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-          // printf("6th ord %f \n",nfabfy(i,j,k,2));
-          KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
-          // printf("2nd ord %f \n",nfabfy(i,j,k,2));
-          // KEEPy(i,j,k,2,coeffs4,prims,nfabfy,lparm);
-          // printf("4th ord %f \n \n",nfabfy(i,j,k,2));
-        });
-      }
+      //   amrex::ParallelFor(bxboundary, 
+      //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      //   {
+      //     // printf("6th ord %f \n",nfabfy(i,j,k,2));
+      //     KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
+      //     // printf("2nd ord %f \n",nfabfy(i,j,k,2));
+      //     // KEEPy(i,j,k,2,coeffs4,prims,nfabfy,lparm);
+      //     // printf("4th ord %f \n \n",nfabfy(i,j,k,2));
+      //   });
+      // }
 
-      // Order reduction at ymax wall boundary
-      if (geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
-        int jbndry = bxnodal.bigEnd(1);
-        IntVect small,big;
-        small.setVal(0,bxnodal.smallEnd(0));
-        small.setVal(1,jbndry);
-        small.setVal(2,bxnodal.smallEnd(2));
+      // // Order reduction at ymax wall boundary
+      // if (geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
+      //   int jbndry = bxnodal.bigEnd(1);
+      //   IntVect small,big;
+      //   small.setVal(0,bxnodal.smallEnd(0));
+      //   small.setVal(1,jbndry);
+      //   small.setVal(2,bxnodal.smallEnd(2));
 
-        big.setVal(0,bxnodal.bigEnd(0));
-        big.setVal(1,jbndry);
-        big.setVal(2,bxnodal.bigEnd(2));
-        Box bxboundary(small,big);
+      //   big.setVal(0,bxnodal.bigEnd(0));
+      //   big.setVal(1,jbndry);
+      //   big.setVal(2,bxnodal.bigEnd(2));
+      //   Box bxboundary(small,big);
 
-        amrex::ParallelFor(bxboundary, 
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-          KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
-        });
-      }
+      //   amrex::ParallelFor(bxboundary, 
+      //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      //   {
+      //     KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
+      //   });
+      // }
 
 
       // JST artificial dissipation shock capturing
-     amrex::ParallelFor(bxg,
+     amrex::ParallelFor(bx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
         ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
       });
+
       amrex::ParallelFor(bxnodal, NCONS,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
       {
@@ -263,19 +267,11 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
                      auto const& nfabfy = numflxmf[1].array(mfi);,
                      auto const& nfabfz = numflxmf[2].array(mfi););
 
-        const Box& bxg2 = amrex::grow(bx,2);
-        qtmp.resize(bxg2, NPRIM);
-        Elixir qeli = qtmp.elixir();
-        auto const& q = qtmp.array();
-
-        amrex::ParallelFor(bxg2,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cons2prim(i, j, k, sfab, q, lparm);
-        });
+        auto const& q = primsmf.array(mfi);
 
         const Box& bxg1 = amrex::grow(bx,1);
         slopetmp.resize(bxg1,NCONS);
+        slopetmp = 0.0;
         Elixir slopeeli = slopetmp.elixir();
         auto const& slope = slopetmp.array();
 
@@ -325,10 +321,11 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         });
 
         // don't have to do this, but we could
-        qeli.clear(); // don't need them anymore
+        // qeli.clear(); // don't need them anymore
         slopeeli.clear();
     }
   }
+  } 
   //////////////////////////////////////////////////////////////////////////////
 
 
@@ -337,50 +334,51 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // We have a separate MFIter loop here than the Euler fluxes and the source terms, so the work can be further parallised. As different MFIter loops can be in different GPU streams. 
 
   // Although conservative FD (finite difference) derivatives of viscous fluxes are not requried in the boundary layer, standard FD are likely sufficient. However, considering grid and flow discontinuities (coarse-interface flux-refluxing and viscous derivatives near shocks), conservative FD derivatives are preferred.
+  if (RHSvisc) {
+    // Make multifab for derivatives of primitive variables and viscous fluxes
+    FArrayBox temp1;
+    Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+      pntvflxmf[idim].define(statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntvflxmf[idim] = 0.0;}
 
-  // Make multifab for derivatives of primitive variables and viscous fluxes
-  FArrayBox temp1;
-  Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
-  for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    pntvflxmf[idim].define(statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntvflxmf[idim] = 0.0;}
+    // loop over all fabs
+    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        // const Box& bxg  = mfi.growntilebox(NGHOST);
+        const Box& bxpflx  = mfi.growntilebox(0);
+        const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
-  // loop over all fabs
-  for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-  {
-      // const Box& bxg  = mfi.growntilebox(NGHOST);
-      const Box& bxpflx  = mfi.growntilebox(2);
-      const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
+        // auto const& statefab = statemf.array(mfi);
+        // auto const& dsdtfab  = dSdt.array(mfi);
+        auto const& prims    = primsmf.array(mfi);
 
-      // auto const& statefab = statemf.array(mfi);
-      // auto const& dsdtfab  = dSdt.array(mfi);
-      auto const& prims    = primsmf.array(mfi);
+        AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
+                    auto const& pfabfy = pntvflxmf[1].array(mfi);,
+                    auto const& pfabfz = pntvflxmf[2].array(mfi););
 
-      AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
-                   auto const& pfabfy = pntvflxmf[1].array(mfi);,
-                   auto const& pfabfz = pntvflxmf[2].array(mfi););
+        AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                    auto const& nfabfy = numflxmf[1].array(mfi);,
+                    auto const& nfabfz = numflxmf[2].array(mfi););
 
-      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                   auto const& nfabfy = numflxmf[1].array(mfi);,
-                   auto const& nfabfz = numflxmf[2].array(mfi););
+        // Compute transport coefficients
+        // amrex::ParallelFor(bxg,
+        // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        // {
+        //     cons2prim(i, j, k, statefab, prims, *lparm);
+        //     // prim2tran(i, j, k, prims, trans, *lparm);
+        // });
 
-      // Compute transport coefficients
-      // amrex::ParallelFor(bxg,
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      // {
-      //     cons2prim(i, j, k, statefab, prims, *lparm);
-      //     // prim2tran(i, j, k, prims, trans, *lparm);
-      // });
+        // compute u,v,w,T derivatives and compute physical viscous fluxes
+        amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
+        });
 
-      // compute u,v,w,T derivatives and compute physical viscous fluxes
-      amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-          viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
-      });
-
-      // compute numerical viscous fluxes
-      amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-          visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
-      });
-    }
+        // compute numerical viscous fluxes
+        amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+            visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
+        });
+      }
+  }
   //////////////////////////////////////////////////////////////////////////////
 
   // Re-fluxing ////////////////////////////////////////////////////////////////
@@ -401,7 +399,13 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
   //////////////////////////////////////////////////////////////////////////////
 
-  // Assemble RHS and add source terms /////////////////////////////////////////
+  // Add source term ///////////////////////////////////////////////////////////
+  if (RHSsource) {
+    amrex::Abort("RHS source not ready yet");
+  }
+  //////////////////////////////////////////////////////////////////////////////
+
+  // Assemble RHS //////////////////////////////////////////////////////////////
   Gpu::streamSynchronize(); // ensure all rhs terms computed before assembly
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
       const Box& bx   = mfi.tilebox();

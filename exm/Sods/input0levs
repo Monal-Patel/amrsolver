@@ -4,9 +4,9 @@ amrex.fpe_trap_invalid=1
 # start time is assumed to be 0, unless re-starting
 max_step  = 100
 stop_time = 0.2
-#time_step = 0.1e-1 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
+time_step = 0.1e-1 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
-cfl = 0.7
+#cfl = 0.7
 
 # computational domain 
 geometry.is_periodic = 0 1 1
@@ -21,7 +21,10 @@ geometry.prob_hi     = 2.0     1.0     1.0
 # >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
 cns.lo_bc   = 2   0   0
 cns.hi_bc   = 2   0   0
-cns.cfl     = 0.3 # cfl number for hyperbolic system
+cns.RHSeuler =1
+cns.RHSvisc  =0
+cns.RHSsource=0
+cns.euler_flux_type = 2 #(0 - default riemann solver; 1-KEEP/AD   ;2 - weno5)
 cns.verbose = 1 #(0 - quiet, 1 not quiet)
 
 # REFINEMENT / REGRIDDING 
