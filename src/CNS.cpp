@@ -11,16 +11,17 @@
 
 using namespace amrex;
 
-constexpr int CNS::NGHOST;
+int CNS::NGHOST;
 BCRec CNS::phys_bc;
 
-bool CNS::RHSeuler=false;
-bool CNS::RHSvisc=false;
-bool CNS::RHSsource=false;
+bool CNS::rhs_euler=false;
+bool CNS::rhs_visc=false;
+bool CNS::rhs_source=false;
 bool CNS::verbose = true;
 bool CNS::dt_dynamic=false;
 int  CNS::nstep_screen_output=10;
-int  CNS::euler_flux_type=0;
+int  CNS::flux_euler=0;
+int  CNS::order_keep=2;
 int  CNS::do_reflux = 1;
 int  CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0;
@@ -69,13 +70,19 @@ void CNS::read_params()
     phys_bc.setHi(i, hi_bc[i]);
   }
 
-  pp.query("RHSeuler", RHSeuler);
-  pp.query("RHSvisc" , RHSvisc);
-  pp.query("RHSsource",RHSsource);
+  pp.query("rhs_euler", rhs_euler);
+  pp.query("rhs_visc" , rhs_visc);
+  pp.query("rhs_source",rhs_source);
   pp.query("do_reflux", do_reflux);
 
-  if (!pp.query("euler_flux_type",euler_flux_type)) {
-    amrex::Abort("Need to specify euler_flux_type.");}
+  if (!pp.query("flux_euler",flux_euler)) {
+    amrex::Abort("Need to specify Euler flux type.");}
+  
+  if (flux_euler==1) {
+    if (!pp.query("order_keep",order_keep)) {
+      amrex::Abort("Need to specify KEEP scheme order of accuracy (2, 4 or 6)");
+    }
+  }
 
   pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
   pp.query("refine_dengrad", refine_dengrad);

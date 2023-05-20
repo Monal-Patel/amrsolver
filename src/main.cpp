@@ -34,6 +34,8 @@ int main (int argc, char* argv[]) {
       pp.query("amr.max_level",max_level);
       pp.query("max_step",max_step);
       pp.query("stop_time",stop_time);
+      if(!pp.query("cns.nghost",CNS::NGHOST)) {
+        amrex::Abort("MUST SPECIFY number of ghost points with cns.nghost");};
 
       if (pp.query("cfl",CNS::cfl)) {CNS::dt_dynamic = true;}
 

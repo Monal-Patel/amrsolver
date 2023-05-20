@@ -125,7 +125,7 @@ public:
 
     // Parameters
     static int num_state_data_types;
-    static constexpr int NGHOST = 3;
+    static int NGHOST;
     std::unique_ptr<amrex::FluxRegister> flux_reg;
     static int do_reflux;
 
@@ -142,10 +142,11 @@ public:
     static amrex::Real dt_constant;
     static bool dt_dynamic;
     static int nstep_screen_output;
-    static int euler_flux_type;
-    static bool RHSeuler;
-    static bool RHSvisc;
-    static bool RHSsource;
+    static int flux_euler;
+    static int order_keep;
+    static bool rhs_euler;
+    static bool rhs_visc;
+    static bool rhs_source;
 
 public:
     static Parm* h_parm;

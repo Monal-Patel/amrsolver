@@ -42,7 +42,7 @@ struct CnsFillExtDir
 
           Array2D<Real,0,NCONS,0,5> prims;
 
-          int nghost = 3;
+          // int nghost = 3;
           int i = iv[0]; int j = iv[1]; int k = iv[2];
           int jjadd,jj,jstart;
           int dir = 1;
@@ -57,12 +57,12 @@ struct CnsFillExtDir
           // if (notcorner) {
             // y=0 boundary/plane
             if (iv[dir]==geom.Domain().smallEnd(dir)-1) {
-              jstart = -nghost;
+              jstart = -CNS::NGHOST;
               jjadd  = 1;
             }
             // y=ymax boundary/plane
             else if (iv[dir]==geom.Domain().bigEnd(dir)+1) {
-              jstart = geom.Domain().bigEnd(dir) + nghost;
+              jstart = geom.Domain().bigEnd(dir) + CNS::NGHOST;
               jjadd  = -1;
             }
             else {
@@ -85,7 +85,7 @@ struct CnsFillExtDir
 
             // convert to primitive vars (rho,u,v,w,T,P(T,rho))
             jj = jstart;
-            for (int count=0; count<nghost*2; count++ ) {
+            for (int count=0; count<CNS::NGHOST*2; count++ ) {
               rho    = data(i,jj,k,URHO);
               rhoinv = Real(1.0)/rho;
               ux     = data(i,jj,k,UMX)*rhoinv;
@@ -115,7 +115,7 @@ struct CnsFillExtDir
             // convert back to conservative vars
             // compute rho
             jj = jstart;
-            for (int count=0; count<nghost; count++ ) {
+            for (int count=0; count<CNS::NGHOST; count++ ) {
               p   = prims(QPRES,count);
               T   = prims(QT,count);
               rho = p/(lparm->Rspec * T);

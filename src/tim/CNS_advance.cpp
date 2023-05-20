@@ -100,6 +100,10 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
       // halos to do
       // ghostboxes(NGHOST,bx,bxg,ghost_boxes);
+      // for each ghost box
+      // amrex::ParallelFor(bxg,
+      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      // { cons2prim(i, j, k, statefab, prims, lparm);});
   }
   // ensure primitive variables mf computed before starting mfiter
   Gpu::streamSynchronize();
@@ -108,9 +112,9 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
   // IMPROVEMENT: Can have pointer function (dynamic casting?) (main euler_flux function) which can be pointed to different flux schemes in the initialisation. The function can pass a parameter struct to include any scheme specfic parameters.
-  if(RHSeuler) {
+  if(rhs_euler) {
   // weno5js fvs
-  if (euler_flux_type==2) {
+  if (flux_euler==2) {
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
@@ -153,23 +157,28 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
   
   // central-split KEEP + JST artificial dissipation
-  else if (euler_flux_type==1) {
+  else if (flux_euler==1) {
   // make multifab for spectral radius and sensor for artificial dissipation
     MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
     MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
     lambdamf = 0.0;
     sensormf = 0.0;
 
-    int order = 4;
-    int halfsten = order/2;
+    // int order = 4;
+    // int halfsten = order/2;
 
     // Move this somewhere else
     //2 * standard finite difference coefficients
-    GpuArray<Real,1> coeffs2; coeffs2[0]=Real(1.0);
-    GpuArray<Real,2> coeffs4; coeffs4[0]=Real(4.0)/3 ,coeffs4[1]=Real(-2.0)/12;
-    GpuArray<Real,3> coeffs6; coeffs6[0]=Real(6.0)/4; coeffs6[1]=Real(-6.0)/20;coeffs6[2]=Real(2.0)/60; 
-    // elseif (halfCentOrder .eq. 8) then
-    //    coeff(1:halfCentOrder) = (/ 4.d0/5.d0 , -1.d0/5.d0 , 4.d0/105.d0 , -1.d0/280.d0  /)
+    GpuArray<Real,3> coeffs; coeffs[0]=0.0;coeffs[1]=0.0;coeffs[2]=0.0;
+    if (order_keep==4) {
+      coeffs[0]=Real(4.0)/3 ,coeffs[1]=Real(-2.0)/12;
+    }
+    else if (order_keep==6) {
+      coeffs[0]=Real(6.0)/4; coeffs[1]=Real(-6.0)/20;coeffs[2]=Real(2.0)/60; 
+    }
+    else {
+      coeffs[0]=Real(1.0);
+    }
 
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -188,7 +197,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       amrex::ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-        KEEP(i,j,k,halfsten,coeffs4,prims,nfabfx,nfabfy,nfabfz,lparm);
+        KEEP(i,j,k,order_keep/2,coeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
       });
 
 
@@ -334,7 +343,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // We have a separate MFIter loop here than the Euler fluxes and the source terms, so the work can be further parallised. As different MFIter loops can be in different GPU streams. 
 
   // Although conservative FD (finite difference) derivatives of viscous fluxes are not requried in the boundary layer, standard FD are likely sufficient. However, considering grid and flow discontinuities (coarse-interface flux-refluxing and viscous derivatives near shocks), conservative FD derivatives are preferred.
-  if (RHSvisc) {
+  if (rhs_visc) {
     // Make multifab for derivatives of primitive variables and viscous fluxes
     FArrayBox temp1;
     Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
@@ -400,7 +409,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   //////////////////////////////////////////////////////////////////////////////
 
   // Add source term ///////////////////////////////////////////////////////////
-  if (RHSsource) {
+  if (rhs_source) {
     amrex::Abort("RHS source not ready yet");
   }
   //////////////////////////////////////////////////////////////////////////////
