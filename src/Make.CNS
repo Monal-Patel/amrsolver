@@ -1,5 +1,4 @@
-##AMREX_HOME:=
-TOP := ..
+TOP := $(AMREX_HOME)/../..
 
 #EBASE := CNS
 
