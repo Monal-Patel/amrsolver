@@ -127,7 +127,7 @@ void CNS::initData()
 
   const auto geomdata = geom.data();
   MultiFab &S_new = get_new_data(State_Type);
-  // S_new = 0.0;
+  // S_new = 0.0; // default initialistiaon with Nans (preferred).
 
   Parm const *lparm = d_parm;
   ProbParm const *lprobparm = d_prob_parm;
@@ -362,43 +362,56 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 
 // const IntVect& len = bx.length();
 
-// void CNS::ghostboxes(int nghost,const Box& bx,const Box& bxg,Array<Box,AMREX_SPACEDIM*2>& dom_edge_boxes){
+void CNS::ghostboxes(int ng, const Box& bx, Array<Box,AMREX_SPACEDIM*2>& boxes){
 
-//   imin  = 
-//   imax  = 
-//   igmax = 
-//   const IntVect& len = bx.length();
-//   Box tempbox(bx.smallEnd(),bx.bigEnd(),bx.ixType());
-//   dom.edge_boxes[0] = tempbox; 
+  int imin  = bx.smallEnd(0);
+  int imax  = bx.bigEnd(0);
+  int igmax = imax + ng;
+  int igmin = imin - ng;
 
-  // Array<Box,2*AMREX_SPACEDIM> dom_face_boxes = {
-  // AMREX_D_DECL(amrex::convert(amrex::adjCellLo(bxg, 0, len[0]),bx.ixType()),
-  //              amrex::convert(amrex::adjCellLo(bxg, 1, len[1]),bx.ixType()),
-  //              amrex::convert(amrex::adjCellLo(bxg, 2, len[2]),bx.ixType())),
-  // AMREX_D_DECL(amrex::convert(amrex::adjCellHi(bxg, 0, len[0]),bx.ixType()),
-  //              amrex::convert(amrex::adjCellHi(bxg, 1, len[1]),bx.ixType()),
-  //              amrex::convert(amrex::adjCellHi(bxg, 2, len[2]),bx.ixType())) };
+  int jmin  = bx.smallEnd(1);
+  int jmax  = bx.bigEnd(1);
+  int jgmax = jmax + ng;
+  int jgmin = jmin - ng;
 
-// }
+  int kmin  = bx.smallEnd(2);
+  int kmax  = bx.bigEnd(2);
+  int kgmax = kmax + ng;
+  int kgmin = kmin - ng;
 
-// dom_edge_boxes
-//   = {{ amrex::convert(amrex::adjCellLo(amrex::adjCellLo(gdomain,0,len[0]),1,len[1]),idxType),
-//         amrex::convert(amrex::adjCellLo(adjCellHi(gdomain,0,len[0]),1,len[1]),idxType),
-//         amrex::convert(amrex::adjCellHi(amrex::adjCellLo(gdomain,0,len[0]),1,len[1]),idxType),
-//         amrex::convert(amrex::adjCellHi(amrex::adjCellHi(gdomain,0,len[0]),1,len[1]),idxType),
-//         //
-//         amrex::convert(amrex::adjCellLo(amrex::adjCellLo(gdomain,0,len[0]),2,len[2]),idxType),
-//         amrex::convert(amrex::adjCellLo(amrex::adjCellHi(gdomain,0,len[0]),2,len[2]),idxType),
-//         amrex::convert(amrex::adjCellHi(amrex::adjCellLo(gdomain,0,len[0]),2,len[2]),idxType),
-//         amrex::convert(amrex::adjCellHi(amrex::adjCellHi(gdomain,0,len[0]),2,len[2]),idxType),
-//         //
-//         amrex::convert(amrex::adjCellLo(amrex::adjCellLo(gdomain,1,len[1]),2,len[2]),idxType),
-//         amrex::convert(amrex::adjCellLo(amrex::adjCellHi(gdomain,1,len[1]),2,len[2]),idxType),
-//         amrex::convert(amrex::adjCellHi(amrex::adjCellLo(gdomain,1,len[1]),2,len[2]),idxType),
-//         amrex::convert(amrex::adjCellHi(amrex::adjCellHi(gdomain,1,len[1]),2,len[2]),idxType) }};
-// #endif
+  IntVect big,small;
 
-// }
+  // left box
+  big[0]=imin; big[1]=jmax; big[2]=kmax;
+  small[0]=igmin; small[1]=jmin; small[2]=kmin;
+  boxes[0].setBig(big); boxes[0].setSmall(small);
+
+  // right box
+  big[0]=igmax; big[1]=jmax; big[2]=kmax;
+  small[0]=imax; small[1]=jmin; small[2]=kmin;
+  boxes[1].setBig(big); boxes[1].setSmall(small);
+
+  // top box
+  big[0]=imax; big[1]=jgmax; big[2]=kmax;
+  small[0]=imin; small[1]=jmax; small[2]=kmin;
+  boxes[2].setBig(big); boxes[2].setSmall(small);
+
+  // bottom box
+  big[0]=imax; big[1]=jmin; big[2]=kmax;
+  small[0]=imin; small[1]=jgmin; small[2]=kmin;
+  boxes[3].setBig(big); boxes[3].setSmall(small);
+
+  // front box
+  big[0]=imax; big[1]=jmax; big[2]=kmin;
+  small[0]=imin; small[1]=jmin; small[2]=kgmin;
+  boxes[4].setBig(big); boxes[4].setSmall(small);
+
+  // back box
+  big[0]=imax; big[1]=jmax; big[2]=kgmax;
+  small[0]=imin; small[1]=jmin; small[2]=kmax;
+  boxes[5].setBig(big); boxes[5].setSmall(small);
+}
+
 
 void CNS::avgDown()
 {

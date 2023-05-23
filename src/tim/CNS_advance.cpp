@@ -43,6 +43,11 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
     // fillpatch copies data from leveldata to sborder
 
+    // Sborder.setBndry(0.0);
+    // if(Sborder.contains_nan(true)) {
+    //   amrex::Abort("NAN in ghost points after fillpatch");
+    // }
+
 #ifdef AMREX_USE_GPIBM
     IBM::ib.computeGPs(level,Sborder);
     // exit(0);
@@ -89,21 +94,23 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // primitive variables multifab
   MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
   primsmf= 0.0;
-  for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+  Array<Box,AMREX_SPACEDIM*2> ghost_boxes;
+  for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
       auto const& statefab = statemf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
-      const Box& bxg       = mfi.growntilebox(NGHOST);
-      // const Box& bx        = mfi.tilebox();
-      amrex::ParallelFor(bxg,
+      const Box& bx        = mfi.tilebox();
+      amrex::ParallelFor(bx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { cons2prim(i, j, k, statefab, prims, lparm);});
 
-      // halos to do
-      // ghostboxes(NGHOST,bx,bxg,ghost_boxes);
       // for each ghost box
-      // amrex::ParallelFor(bxg,
-      // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      // { cons2prim(i, j, k, statefab, prims, lparm);});
+      ghostboxes(NGHOST,bx,ghost_boxes);
+      for (const Box& tempbx : ghost_boxes) {
+        ParallelFor(tempbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {cons2prim(i, j, k, statefab, prims, lparm);});
+      }
+
   }
   // ensure primitive variables mf computed before starting mfiter
   Gpu::streamSynchronize();
@@ -163,11 +170,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
     lambdamf = 0.0;
     sensormf = 0.0;
+    int halfsten = order_keep/2;
 
-    // int order = 4;
-    // int halfsten = order/2;
-
-    // Move this somewhere else
     //2 * standard finite difference coefficients
     GpuArray<Real,3> coeffs; coeffs[0]=0.0;coeffs[1]=0.0;coeffs[2]=0.0;
     if (order_keep==4) {
@@ -197,7 +201,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       amrex::ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-        KEEP(i,j,k,order_keep/2,coeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
+        KEEP(i,j,k,halfsten,coeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
       });
 
 

@@ -146,7 +146,7 @@ CNS::variableSetUp ()
     name[cnt] = "rho_et";
 
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
-    bndryfunc.setRunOnGPU(false);
+    bndryfunc.setRunOnGPU(true);
 
 
     // applies bndry func to all variables in desc_lst starting from from URHO (0).

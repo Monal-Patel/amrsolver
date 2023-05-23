@@ -550,7 +550,7 @@ cns_slope_x (int i, int j, int k,
              Array4<Real const> const& q, Parm const& parm) noexcept
 {
     
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5);
+    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
     Real drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
     Real d0 = limiter(dlft, drgt);
@@ -587,7 +587,7 @@ cns_slope_y (int i, int j, int k,
              Array4<Real const> const& q, Parm const& parm) noexcept
 {
 
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5);
+    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
     Real drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
     Real d0 = limiter(dlft, drgt);
@@ -622,7 +622,7 @@ void cns_slope_z (int i, int j, int k,
              Array4<Real const> const& q, Parm const& parm) noexcept
 {
     
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5);
+    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
     Real drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
     Real d0 = limiter(dlft, drgt);
@@ -793,7 +793,7 @@ cns_riemann_x (int i, int j, int k,
 {
     
 
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i-1,j,k,QT),0.5);
+    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i-1,j,k,QT),0.5) + 1.e-40;
     Real rl = q(i-1,j,k,QRHO) + Real(0.5) * ( (dq(i-1,j,k,0)+dq(i-1,j,k,2))/cspeed + dq(i-1,j,k,1));
     rl = max(rl, parm.smallr);
     Real ul = q(i-1,j,k,QU) + Real(0.5) * ( (dq(i-1,j,k,2)-dq(i-1,j,k,0))/q(i-1,j,k,QRHO));
@@ -802,7 +802,7 @@ cns_riemann_x (int i, int j, int k,
     Real ut1l = q(i-1,j,k,QV) + Real(0.5) * dq(i-1,j,k,3);
     Real ut2l = q(i-1,j,k,QW) + Real(0.5) * dq(i-1,j,k,4);
 
-    cspeed =  pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5);
+    cspeed =  pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
     rr = max(rr, parm.smallr);
     Real ur = q(i,j,k,QU) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
@@ -825,7 +825,7 @@ void cns_riemann_y (int i, int j, int k,
 {
     
 
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j-1,k,QT),0.5);
+    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j-1,k,QT),0.5) + 1.e-40;
     Real rl = q(i,j-1,k,QRHO) + Real(0.5) * ( (dq(i,j-1,k,0)+dq(i,j-1,k,2))/cspeed + dq(i,j-1,k,1));
     rl = max(rl, parm.smallr);
     Real ul = q(i,j-1,k,QV) + Real(0.5) * ( (dq(i,j-1,k,2)-dq(i,j-1,k,0))/q(i,j-1,k,QRHO));
@@ -834,7 +834,7 @@ void cns_riemann_y (int i, int j, int k,
     Real ut1l = q(i,j-1,k,QU) + Real(0.5) * dq(i,j-1,k,3);
     Real ut2l = q(i,j-1,k,QW) + Real(0.5) * dq(i,j-1,k,4);
 
-    cspeed =  pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5);
+    cspeed =  pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
     rr = max(rr, parm.smallr);
     Real ur = q(i,j,k,QV) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
@@ -855,7 +855,7 @@ void cns_riemann_z (int i, int j, int k,
                Array4<Real const> const& q,
                Parm const& parm) noexcept
 {
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k+1,QT),0.5);
+    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k+1,QT),0.5) + 1.e-40;
     Real rl = q(i,j,k-1,QRHO) + Real(0.5) * ( (dq(i,j,k-1,0)+dq(i,j,k-1,2))/cspeed + dq(i,j,k-1,1));
     rl = max(rl, parm.smallr);
     Real ul = q(i,j,k-1,QW) + Real(0.5) * ( (dq(i,j,k-1,2)-dq(i,j,k-1,0))/q(i,j,k-1,QRHO));
@@ -864,7 +864,7 @@ void cns_riemann_z (int i, int j, int k,
     Real ut1l = q(i,j,k-1,QU) + Real(0.5) * dq(i,j,k-1,3);
     Real ut2l = q(i,j,k-1,QV) + Real(0.5) * dq(i,j,k-1,4);
 
-    cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5);
+    cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
     rr = max(rr, parm.smallr);
     Real ur = q(i,j,k,QW) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));

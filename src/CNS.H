@@ -103,7 +103,7 @@ public:
     CNS& getLevel (int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
     enum StateVariable {
-        Density = 0, Xmom, Ymom, Zmom, Eden
+        Density = 0, Xmom, Ymom, Zmom, Etot
     };
 
     enum StateDataType {
@@ -115,7 +115,7 @@ public:
 
     void avgDown ();
 
-    // void ghostboxes(int nghost, const Box& bx, const Box& bxg,Array<Box,AMREX_SPACEDIM*2>& dom_edge_boxes);
+    void ghostboxes(int nghost, const Box& bx,Array<Box,AMREX_SPACEDIM*2>& dom_edge_boxes);
 
     void printTotal () const;
 

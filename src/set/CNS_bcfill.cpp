@@ -40,6 +40,8 @@ struct CnsFillExtDir
                      const int /*orig_comp*/) const
         {
 
+        // IMPROVEMENT TODO: Avoid if statement by having different options for user defined BCs in cns_bcfill
+        if (bcr->lo(1)==6 || bcr->hi(1)==6) {
           Array2D<Real,0,NCONS,0,5> prims;
 
           // int nghost = 3;
@@ -135,8 +137,7 @@ struct CnsFillExtDir
             }
 
           }
-
-        // }
+        }
 };
 
 // bx                  : Cells outside physical domain and inside bx are filled.
@@ -164,7 +165,6 @@ void cns_bcfill (Box const& bx, FArrayBox& data,
     // Currently we assume ymax and ymin BC is wall 
     // GpuBndryFuncFab class operates on all boundaries of the fab. It calls CnsFillExtDir for each ghost point ijk.
     GpuBndryFuncFab<CnsFillExtDir> gpu_bndry_func(CnsFillExtDir{});
-    
     gpu_bndry_func(bx,data,dcomp,numcomp,geom,time,bcr,bcomp,scomp);
     Gpu::streamSynchronize();
 }
