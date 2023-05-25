@@ -89,7 +89,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // numerical flux multifab array
   Array<MultiFab,AMREX_SPACEDIM> numflxmf; 
   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      numflxmf[idim].define(statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); numflxmf[idim] = 0.0;}
+      numflxmf[idim].define(amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)),statemf.DistributionMap(), NCONS, NGHOST);
+      numflxmf[idim] = 0.0;}
 
   // primitive variables multifab
   MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);

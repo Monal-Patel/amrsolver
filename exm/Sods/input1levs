@@ -2,7 +2,7 @@ amrex.fpe_trap_invalid=1
 # amrex.use_gpu_aware_mpi = 1
 
 # start time is assumed to be 0, unless re-starting
-max_step  = 20
+max_step  = 100
 stop_time = 0.2
 time_step = 0.1e-1 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
@@ -15,13 +15,21 @@ geometry.prob_lo     = 0.0     0.0     0.0
 geometry.prob_hi     = 2.0     1.0     1.0
 
 # >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
+#-1 = N/A (Incase of periodic)
 # 0 = Interior           3 = Symmetry
 # 1 = Inflow             4 = SlipWall
 # 2 = Outflow            5 = NoSlipWall
+# 6 = user defined
 # >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
-cns.lo_bc   = 2   0   0
-cns.hi_bc   = 2   0   0
-cns.verbose = 1 #(0 - quiet, 1 not quiet)
+cns.lo_bc      = 2  -1   -1
+cns.hi_bc      = 2  -1   -1
+cns.rhs_euler  = 1 # 0=false, 1=true
+cns.rhs_visc   = 0 # 0=false, 1=true
+cns.rhs_source = 0 # 0=false, 1=true
+cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
+cns.order_keep = 4 # Order of accuracy=2, 4 or 6
+cns.nghost     = 2 
+cns.verbose    = 1 # 0=quiet, 1=verbose)
 
 # REFINEMENT / REGRIDDING 
 amr.n_cell          = 64 16 16
@@ -32,7 +40,7 @@ amr.blocking_factor = 16
 amr.max_grid_size   = 32
 amr.n_error_buf     = 0 0 0 0 # number of buffer cells in error est
 amr.grid_eff        = 0.99     # what constitutes an efficient grid
-amr.v = 1
+amr.v               = 1
 # amr.subcycling_mode = # None, Manual, Optimal (n_cycle[lev] is set dynamically), Auto (n_cycle[lev]=ref_ratio[lev])
 
 # CHECKPOINT FILES
@@ -42,9 +50,9 @@ amr.check_int               = 100    # number of timesteps between checkpoints
 
 # PLOTFILES
 amr.plot_files_output = 1
-amr.plot_file         = plt     # root name of plotfile
+amr.plot_file         = ./plot/plt     # root name of plotfile
 amr.plot_int          = 10      # number of timesteps between plotfiles
-amr.derive_plot_vars  = pressure x_velocity y_velocity z_velocity
+amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
 amr.screen_output     = 5
 
 # problem specific parameter
