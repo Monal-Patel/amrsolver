@@ -144,6 +144,7 @@ public:
     static int nstep_screen_output;
     static int flux_euler;
     static int order_keep;
+    static int order_rk;
     static bool rhs_euler;
     static bool rhs_visc;
     static bool rhs_source;

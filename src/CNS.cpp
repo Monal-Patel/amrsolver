@@ -22,6 +22,7 @@ bool CNS::dt_dynamic=false;
 int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
 int  CNS::order_keep=2;
+int  CNS::order_rk=2;
 int  CNS::do_reflux = 1;
 int  CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0;
@@ -82,6 +83,10 @@ void CNS::read_params()
     if (!pp.query("order_keep",order_keep)) {
       amrex::Abort("Need to specify KEEP scheme order of accuracy (2, 4 or 6)");
     }
+  }
+
+  if (!pp.query("order_rk",order_rk)) {
+    amrex::Abort("Need to specify SSPRK scheme order of accuracy (2 or 3)");
   }
 
   pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);

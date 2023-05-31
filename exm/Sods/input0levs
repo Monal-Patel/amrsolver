@@ -4,7 +4,7 @@ amrex.fpe_trap_invalid=1
 # start time is assumed to be 0, unless re-starting
 max_step  = 100
 stop_time = 0.2
-time_step = 0.1e-1 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
+time_step = 0.10e-1 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
 #cfl = 0.7
 
@@ -23,6 +23,7 @@ geometry.prob_hi     = 2.0     1.0     1.0
 # >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
 cns.lo_bc      = 2  -1   -1
 cns.hi_bc      = 2  -1   -1
+cns.order_rk   = 2 # 2 or 3 
 cns.rhs_euler  = 1 # 0=false, 1=true
 cns.rhs_visc   = 0 # 0=false, 1=true
 cns.rhs_source = 0 # 0=false, 1=true

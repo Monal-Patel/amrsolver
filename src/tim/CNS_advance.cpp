@@ -17,8 +17,8 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
         state[i].swapTimeLevels(dt);
     }
 
-    MultiFab& S_new = get_new_data(State_Type);
-    MultiFab& S_old = get_old_data(State_Type);
+    MultiFab& S2 = get_new_data(State_Type);
+    MultiFab& S1 = get_old_data(State_Type);
     MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
     MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
 
@@ -37,42 +37,48 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
         fr_as_crse->setVal(Real(0.0));
     }
 
+  if (order_rk==2) {
+  // Low storage SSPRK2 with m stages - (Ceff=1-1/m) 
+  int m = 2;
+  // from pg 84 STRONG STABILITY PRESERVING RUNGE–KUTTA AND MULTISTEP TIME DISCRETIZATIONS
+  // Copy S2 from S1
+  MultiFab::Copy(S2,S1,0,0,NCONS,0);
+  for (int i=1; i<=m-1; i++) {
+    FillPatch(*this, Sborder, NGHOST, time + dt*(i-1)/(m-1) , State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt/(m-1), fr_as_crse, fr_as_fine);
+    MultiFab::Saxpy(S2, dt/(m-1), dSdt, 0, 0, NCONS, 0);
+  }
+  // final stage
+  FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
+  compute_rhs(Sborder, dSdt, dt/(m-1), fr_as_crse, fr_as_fine);
+  MultiFab::LinComb(S2, Real(m-1), S2, 0, dt, dSdt, 0, 0, NCONS, 0);
+  MultiFab::LinComb(S2, Real(1.0)/m, S1, 0, Real(1.0)/m, S2, 0, 0, NCONS, 0);
+  }
 
-    // RK2 stage 1
-    // After fillpatch Sborder = U^n
-    FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
-    // fillpatch copies data from leveldata to sborder
+  else if (order_rk==3) {
+  // Low storage SSPRK3 with 4 stages (C=2, Ceff=0.5)
+  // from pg 85 STRONG STABILITY PRESERVING RUNGE–KUTTA AND MULTISTEP TIME DISCRETIZATIONS
+  FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
+  compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
+  MultiFab::LinComb(S2, Real(1.0), S1, 0, dt/2, dSdt, 0, 0, NCONS, 0);
 
-    // Sborder.setBndry(0.0);
-    // if(Sborder.contains_nan(true)) {
-    //   amrex::Abort("NAN in ghost points after fillpatch");
-    // }
+  FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
+  compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
+  MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
 
-#ifdef AMREX_USE_GPIBM
-    IBM::ib.computeGPs(level,Sborder);
-    // exit(0);
-#endif
+  FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
+  compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
+  MultiFab::LinComb(S2, Real(2.0)/3, S1, 0, Real(1.0)/3, S2, 0, 0, NCONS, 0);
+  MultiFab::Saxpy(S2, dt/6, dSdt, 0, 0, NCONS, 0);
 
-    compute_rhs(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
-    // U^* = U^n + dt*dUdt^n
-    MultiFab::LinComb(S_new, Real(1.0), Sborder, 0, dt, dSdt, 0, 0, NCONS, 0);
+  FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
+  compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
+  MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
 
-    // RK2 stage 2
-    // After fillpatch Sborder = U^n+dt*dUdt^n
-    FillPatch(*this, Sborder, NGHOST, time+dt, State_Type, 0, NCONS);
-
-#ifdef AMREX_USE_GPIBM
-    IBM::ib.computeGPs(level,Sborder);
-#endif
-
-    compute_rhs(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
-    // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
-    MultiFab::LinComb(S_new, Real(0.5), Sborder, 0, Real(0.5), S_old, 0, 0, NCONS, 0);
-    // S_new += 0.5*dt*dSdt
-    MultiFab::Saxpy(S_new, Real(0.5)*dt, dSdt, 0, 0, NCONS, 0);
-    // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
-
-    return dt;
+  // Generally SSPRK(n^2,3) where n>2 - Ceff=1-1/n
+  }
+  // TODO: SSPRK(10,4) C=6, Ceff=0.6
+  return dt;
 }
 
 
