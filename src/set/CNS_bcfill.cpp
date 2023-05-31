@@ -7,22 +7,20 @@
 using namespace amrex;
 
 
-// 1st order accurate for 3 ghost points
-AMREX_GPU_DEVICE inline void dirichlet ( Array2D<Real,0,NCONS,0,5>& sten, int n, Real value) noexcept {
+// 2st order accurate for 3 ghost points
+AMREX_GPU_DEVICE inline void dirichlet ( auto& sten, int ivar, int nghost, Real value) noexcept {
   // reflect
   Real delta = 2*value;
-  sten(n,0) = delta-sten(n,5);
-  sten(n,1) = delta-sten(n,4);
-  sten(n,2) = delta-sten(n,3);
+  for (int j=0;j<nghost;j++) {
+    sten(ivar,j) = delta - sten(ivar,2*nghost-1-j);
+  }
 }
 
-// 1st order accurate for 3 ghost points
-AMREX_GPU_DEVICE inline void neumann ( Array2D<Real,0,NCONS,0,5>& sten, int n,Real grad, Real dx) noexcept {
+AMREX_GPU_DEVICE inline void zerograd_pres ( auto& sten, int ivar, int nghost) noexcept {
   // linear copy
-  Real delta = dx*grad;
-  sten(n,0) = sten(n,5) - delta;
-  sten(n,1) = sten(n,4) - delta;
-  sten(n,2) = sten(n,3) - delta;
+  for (int j=0;j<nghost;j++) {
+    sten(ivar,j) = sten(ivar,nghost);
+  }
 }
 
 // This is called per boundary point
@@ -41,8 +39,8 @@ struct CnsFillExtDir
         {
 
         // IMPROVEMENT TODO: Avoid if statement by having different options for user defined BCs in cns_bcfill
-        if (bcr->lo(1)==6 || bcr->hi(1)==6) {
-          Array2D<Real,0,NCONS,0,5> prims;
+        if (CNS::phys_bc.lo(1)==6 || CNS::phys_bc.hi(1)==6) {
+          Array2D<Real,0,NPRIM-1,0,5> prims;
 
           // int nghost = 3;
           int i = iv[0]; int j = iv[1]; int k = iv[2];
@@ -51,43 +49,23 @@ struct CnsFillExtDir
           const Real dy = geom.CellSize(dir);
           Real rho,rhoinv,ux,uy,uz,rhoke,rhoei,p,T;
 
-          // bool notcorner= iv[0] >= geom.Domain().smallEnd(0) 
-          // && iv[0] <= geom.Domain().bigEnd(0)
-          // && iv[2] >= geom.Domain().smallEnd(2) 
-          // && iv[2] <= geom.Domain().bigEnd(2);
+          // y=0 boundary/plane
+          if (iv[dir]==geom.Domain().smallEnd(dir)-1) {
+            jstart = -CNS::NGHOST;
+            jjadd  = 1;
+          }
+          // y=ymax boundary/plane
+          else if (iv[dir]==geom.Domain().bigEnd(dir)+1) {
+            jstart = geom.Domain().bigEnd(dir) + CNS::NGHOST;
+            jjadd  = -1;
+          }
+          else {
 
-          // if (notcorner) {
-            // y=0 boundary/plane
-            if (iv[dir]==geom.Domain().smallEnd(dir)-1) {
-              jstart = -CNS::NGHOST;
-              jjadd  = 1;
-            }
-            // y=ymax boundary/plane
-            else if (iv[dir]==geom.Domain().bigEnd(dir)+1) {
-              jstart = geom.Domain().bigEnd(dir) + CNS::NGHOST;
-              jjadd  = -1;
-            }
-            else {
-              /// DUMMY
-              // p   = 3000;//prims(QPRES,count);
-              // T   = 300;//prims(QT,count);
-              // rho = p/(CNS::d_parm->Rspec * T);
-              // ux  = 0.0;
-              // uy  = 0.0;
-              // uz  = 0.0;
-              // rhoke  = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-              // rhoei  = p/(CNS::d_parm->eos_gamma - Real(1.0));
-              // data(i,j,k,URHO) = rho;
-              // data(i,j,k,UMX)  = rho*ux;
-              // data(i,j,k,UMY)  = rho*uy;
-              // data(i,j,k,UMZ)  = rho*uz;
-              // data(i,j,k,UET)  = rhoke+rhoei;
-              
-              return ;}
+          return ;}
 
-            // convert to primitive vars (rho,u,v,w,T,P(T,rho))
-            jj = jstart;
-            for (int count=0; count<CNS::NGHOST*2; count++ ) {
+            // convert domain points near boundary to primitive vars (rho,u,v,w,T,P(T,rho)), in preparation to fill ghost points in primitive vars
+            jj = jstart + jjadd*CNS::NGHOST; // only convert in domain
+            for (int count=CNS::NGHOST; count<2*CNS::NGHOST; count++ ) {
               rho    = data(i,jj,k,URHO);
               rhoinv = Real(1.0)/rho;
               ux     = data(i,jj,k,UMX)*rhoinv;
@@ -106,15 +84,15 @@ struct CnsFillExtDir
               jj = jj + jjadd;
             }
 
-            // u,v,w,T,P
-            dirichlet(prims,QU,Real(0.0)); 
+            // apply BC (fill u,v,w,T,P)
+            dirichlet(prims,QU,CNS::NGHOST,Real(0.0)); 
             // neumann  (prims,QU,Real(0.0),dy); 
-            dirichlet(prims,QV,Real(0.0)); 
-            dirichlet(prims,QW,Real(0.0)); 
-            dirichlet(prims,QT,lprobparm->Tw); 
-            neumann  (prims,QPRES,Real(0.0),dy); 
+            dirichlet(prims,QV,CNS::NGHOST,Real(0.0)); 
+            dirichlet(prims,QW,CNS::NGHOST,Real(0.0)); 
+            dirichlet(prims,QT,CNS::NGHOST,lprobparm->Tw); 
+            zerograd_pres(prims,QPRES,CNS::NGHOST); 
 
-            // convert back to conservative vars
+            // convert ghost points to conservative vars
             // compute rho
             jj = jstart;
             for (int count=0; count<CNS::NGHOST; count++ ) {
@@ -126,6 +104,16 @@ struct CnsFillExtDir
               uz  = prims(QW,count);
               rhoke  = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
               rhoei  = p/(lparm->eos_gamma - Real(1.0));
+
+              // if (rho==Real(0.0)) {
+              //   printf("%d %f %f %f",count,p,rho,T);
+              //   amrex::Abort("rho is 0.0");
+              //   };
+
+              // if (i==0 && k==0) {
+              // printf("fill bc i=%d,jj=%d,k=%d \n",i,jj,k);
+              // printf("fill bc rho %f \n \n",rho);
+              // }
 
               data(i,jj,k,URHO) = rho;
               data(i,jj,k,UMX)  = rho*ux;

@@ -115,7 +115,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       ghostboxes(NGHOST,bx,ghost_boxes);
       for (const Box& tempbx : ghost_boxes) {
         ParallelFor(tempbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {cons2prim(i, j, k, statefab, prims, lparm);});
+        {
+          cons2prim(i, j, k, statefab, prims, lparm);});
       }
 
   }
@@ -212,7 +213,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       });
 
 
-      // Order reduction at ymin wall boundary
+      // // Order reduction at ymin wall boundary
       // if (geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
       //   int jbndry = bxnodal.smallEnd(1);
       //   IntVect small,big;
@@ -229,7 +230,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       //   {
       //     // printf("6th ord %f \n",nfabfy(i,j,k,2));
-      //     KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
+      //     KEEPy(i,j,k,1,coeffs,prims,nfabfy,lparm);
       //     // printf("2nd ord %f \n",nfabfy(i,j,k,2));
       //     // KEEPy(i,j,k,2,coeffs4,prims,nfabfy,lparm);
       //     // printf("4th ord %f \n \n",nfabfy(i,j,k,2));
@@ -252,7 +253,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       //   amrex::ParallelFor(bxboundary, 
       //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       //   {
-      //     KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
+      //     KEEPy(i,j,k,1,coeffs,prims,nfabfy,lparm);
       //   });
       // }
 
@@ -365,7 +366,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
         // const Box& bxg  = mfi.growntilebox(NGHOST);
-        const Box& bxpflx  = mfi.growntilebox(0);
+        const Box& bxpflx  = mfi.growntilebox(1);
         const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
         // auto const& statefab = statemf.array(mfi);
