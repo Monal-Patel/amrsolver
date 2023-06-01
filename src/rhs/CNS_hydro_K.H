@@ -878,34 +878,6 @@ void cns_riemann_z (int i, int j, int k,
             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UET));
 }
 
-// 2nd order accurate standard finite central differences
-// AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-// void primsder (int i, int j, int k,
-//           const auto& prims,
-//           const auto& derx,
-//           const auto& dery,
-//           const auto& derz,
-//           GpuArray<Real,AMREX_SPACEDIM> const& dxinv) noexcept
-// {
-//     // x 
-//     derx(i,j,k,0) = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*dxinv[0];
-//     derx(i,j,k,1) = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*dxinv[0];
-//     derx(i,j,k,2) = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*dxinv[0];
-//     derx(i,j,k,3) = (prims(i+1,j,k,QT) - prims(i-1,j,k,QT))*dxinv[0];
-
-//     // y
-//     dery(i,j,k,0) = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*dxinv[1];
-//     dery(i,j,k,1) = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*dxinv[1];
-//     dery(i,j,k,2) = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*dxinv[1];
-//     dery(i,j,k,3) = (prims(i,j+1,k,QT) - prims(i,j-1,k,QT))*dxinv[1];
-
-//     // y
-//     derz(i,j,k,0) = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*dxinv[2];
-//     derz(i,j,k,1) = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*dxinv[2];
-//     derz(i,j,k,2) = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*dxinv[2];
-//     derz(i,j,k,3) = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*dxinv[2];
-// }
-
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto const& fy, auto const& fz, GpuArray<Real,AMREX_SPACEDIM> const& dxinv, Parm const& parms) noexcept
@@ -913,24 +885,24 @@ void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto co
     // 2nd order accurate central difference of primitive vars /////////////////
     // x direction
     Real ux   =  prims(i,j,k,QU);
-    Real dudx = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*dxinv[0];
-    Real dvdx = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*dxinv[0];
-    Real dwdx = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*dxinv[0];
-    Real dTdx = (prims(i+1,j,k,QT) - prims(i-1,j,k,QT))*dxinv[0];
+    Real dudx = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*0.5*dxinv[0];
+    Real dvdx = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*0.5*dxinv[0];
+    Real dwdx = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*0.5*dxinv[0];
+    Real dTdx = (prims(i+1,j,k,QT) - prims(i-1,j,k,QT))*0.5*dxinv[0];
 
     // y direction
     Real uy   =  prims(i,j,k,QV);
-    Real dudy = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*dxinv[1];
-    Real dvdy = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*dxinv[1];
-    Real dwdy = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*dxinv[1];
-    Real dTdy = (prims(i,j+1,k,QT) - prims(i,j-1,k,QT))*dxinv[1];
+    Real dudy = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*0.5*dxinv[1];
+    Real dvdy = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*0.5*dxinv[1];
+    Real dwdy = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*0.5*dxinv[1];
+    Real dTdy = (prims(i,j+1,k,QT) - prims(i,j-1,k,QT))*0.5*dxinv[1];
 
     // z direction
     Real uz   =  prims(i,j,k,QW);
-    Real dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*dxinv[2];
-    Real dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*dxinv[2];
-    Real dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*dxinv[2];
-    Real dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*dxinv[2];
+    Real dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*0.5*dxinv[2];
+    Real dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*0.5*dxinv[2];
+    Real dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*0.5*dxinv[2];
+    Real dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*0.5*dxinv[2];
 
     // divergence
     Real div  = dudx + dvdy + dwdz;

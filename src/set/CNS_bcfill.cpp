@@ -19,7 +19,7 @@ AMREX_GPU_DEVICE inline void dirichlet ( auto& sten, int ivar, int nghost, Real 
 AMREX_GPU_DEVICE inline void zerograd_pres ( auto& sten, int ivar, int nghost) noexcept {
   // linear copy
   for (int j=0;j<nghost;j++) {
-    sten(ivar,j) = sten(ivar,nghost);
+    sten(ivar,j) = sten(ivar,2*nghost-1-j);
   }
 }
 
