@@ -23,6 +23,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
     MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
     dSdt=0.0;
+    Sborder=0.0;
 
     FluxRegister* fr_as_crse = nullptr;
     if (do_reflux && level < parent->finestLevel()) {
@@ -110,17 +111,18 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       auto const& statefab = statemf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
       const Box& bx        = mfi.tilebox();
-      amrex::ParallelFor(bx,
+      const Box& bxg     = mfi.growntilebox(NGHOST);
+      amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { cons2prim(i, j, k, statefab, prims, lparm);});
 
       // for each ghost box
-      ghostboxes(NGHOST,bx,ghost_boxes);
-      for (const Box& tempbx : ghost_boxes) {
-        ParallelFor(tempbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-          cons2prim(i, j, k, statefab, prims, lparm);});
-      }
+      // ghostboxes(NGHOST,bx,ghost_boxes);
+      // for (const Box& tempbx : ghost_boxes) {
+      //   ParallelFor(tempbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      //   {
+      //     cons2prim(i, j, k, statefab, prims, lparm);});
+      // }
 
   }
   // ensure primitive variables mf computed before starting mfiter
@@ -365,7 +367,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     // loop over all fabs
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        // const Box& bxg  = mfi.growntilebox(NGHOST);
         const Box& bxpflx  = mfi.growntilebox(1);
         const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
