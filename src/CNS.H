@@ -129,7 +129,6 @@ public:
     std::unique_ptr<amrex::FluxRegister> flux_reg;
     static int do_reflux;
 
-    static amrex::BCRec phys_bc;
     static bool verbose;
     // static amrex::IntVect hydro_tile_size;
     static amrex::Real cfl;
@@ -154,6 +153,8 @@ public:
     static Parm* d_parm;
     static ProbParm* h_prob_parm;
     static ProbParm* d_prob_parm;
+    static BCRec* h_phys_bc;
+    static BCRec* d_phys_bc;
 };
 
 void cns_bcfill (amrex::Box const& bx, amrex::FArrayBox& data,

@@ -9,6 +9,8 @@ Parm* CNS::h_parm = nullptr;
 Parm* CNS::d_parm = nullptr;
 ProbParm* CNS::h_prob_parm = nullptr;
 ProbParm* CNS::d_prob_parm = nullptr;
+BCRec* CNS::h_phys_bc=nullptr;
+BCRec* CNS::d_phys_bc=nullptr;
 
 static Box the_same_box (const Box& b) { return b; }
 //static Box grow_box_by_one (const Box& b) { return amrex::grow(b,1); }
@@ -34,10 +36,10 @@ static int tang_vel_bc[] =
     BCType::int_dir, BCType::ext_dir, BCType::foextrap, BCType::reflect_even, BCType::reflect_even, BCType::reflect_odd, BCType::ext_dir
 };
 
-static void set_scalar_bc (BCRec& bc, const BCRec& phys_bc)
+static void set_scalar_bc (BCRec& bc, const BCRec* phys_bc)
 {
-    const int* lo_bc = phys_bc.lo();
-    const int* hi_bc = phys_bc.hi();
+    const int* lo_bc = phys_bc->lo();
+    const int* hi_bc = phys_bc->hi();
     for (int i = 0; i < AMREX_SPACEDIM; i++)
     {
         bc.setLo(i,scalar_bc[lo_bc[i]]);
@@ -47,10 +49,10 @@ static void set_scalar_bc (BCRec& bc, const BCRec& phys_bc)
 
 static
 void
-set_x_vel_bc(BCRec& bc, const BCRec& phys_bc)
+set_x_vel_bc(BCRec& bc, const BCRec* phys_bc)
 {
-    const int* lo_bc = phys_bc.lo();
-    const int* hi_bc = phys_bc.hi();
+    const int* lo_bc = phys_bc->lo();
+    const int* hi_bc = phys_bc->hi();
     bc.setLo(0,norm_vel_bc[lo_bc[0]]);
     bc.setHi(0,norm_vel_bc[hi_bc[0]]);
 #if (AMREX_SPACEDIM >= 2)
@@ -65,10 +67,10 @@ set_x_vel_bc(BCRec& bc, const BCRec& phys_bc)
 
 static
 void
-set_y_vel_bc(BCRec& bc, const BCRec& phys_bc)
+set_y_vel_bc(BCRec& bc, const BCRec* phys_bc)
 {
-    const int* lo_bc = phys_bc.lo();
-    const int* hi_bc = phys_bc.hi();
+    const int* lo_bc = phys_bc->lo();
+    const int* hi_bc = phys_bc->hi();
     bc.setLo(0,tang_vel_bc[lo_bc[0]]);
     bc.setHi(0,tang_vel_bc[hi_bc[0]]);
 #if (AMREX_SPACEDIM >= 2)
@@ -84,10 +86,10 @@ set_y_vel_bc(BCRec& bc, const BCRec& phys_bc)
 #if (AMREX_SPACEDIM == 3)
 static
 void
-set_z_vel_bc(BCRec& bc, const BCRec& phys_bc)
+set_z_vel_bc(BCRec& bc, const BCRec* phys_bc)
 {
-    const int* lo_bc = phys_bc.lo();
-    const int* hi_bc = phys_bc.hi();
+    const int* lo_bc = phys_bc->lo();
+    const int* hi_bc = phys_bc->hi();
     bc.setLo(0,tang_vel_bc[lo_bc[0]]);
     bc.setHi(0,tang_vel_bc[hi_bc[0]]);
     bc.setLo(1,tang_vel_bc[lo_bc[1]]);
@@ -104,12 +106,15 @@ CNS::variableSetUp ()
   // These host and device variables are deleted in CNS::variableCleanUp().
     CNS::h_parm = new Parm{};
     CNS::h_prob_parm = new ProbParm{};
+    CNS::h_phys_bc = new BCRec{};
 #ifdef AMREX_USE_GPU
     CNS::d_parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
     CNS::d_prob_parm = (ProbParm*)The_Arena()->alloc(sizeof(ProbParm));
+    CNS::d_phys_bc = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
 #else
     CNS::d_parm      = h_parm;
     CNS::d_prob_parm = h_prob_parm;
+    CNS::d_phys_bc   = h_phys_bc;
 #endif
 
     read_params();
@@ -125,24 +130,24 @@ CNS::variableSetUp ()
 
     // Physical boundary conditions ////////////////////////////////////////////
     int cnt = 0;
-    set_scalar_bc(bcs[cnt],phys_bc); 
+    set_scalar_bc(bcs[cnt],h_phys_bc); 
     name[cnt] = "density";
 
     cnt++; 
-    set_x_vel_bc(bcs[cnt],phys_bc);  
+    set_x_vel_bc(bcs[cnt],h_phys_bc);  
     name[cnt] = "xmom";
 
     cnt++; 
-    set_y_vel_bc(bcs[cnt],phys_bc);
+    set_y_vel_bc(bcs[cnt],h_phys_bc);
     name[cnt] = "ymom";
 
 #if (AMREX_SPACEDIM == 3)
     cnt++;
-    set_z_vel_bc(bcs[cnt],phys_bc);
+    set_z_vel_bc(bcs[cnt],h_phys_bc);
     name[cnt] = "zmom";
 #endif
     cnt++; 
-    set_scalar_bc(bcs[cnt],phys_bc);
+    set_scalar_bc(bcs[cnt],h_phys_bc);
     name[cnt] = "rho_et";
 
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);

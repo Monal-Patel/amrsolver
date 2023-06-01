@@ -29,6 +29,8 @@ struct CnsFillExtDir
     // create pointers to device (for gpu) parms
     ProbParm* lprobparm = CNS::d_prob_parm;
     Parm*     lparm     = CNS::d_parm;
+    BCRec* l_phys_bc    = CNS::d_phys_bc;
+    int nghost          = CNS::NGHOST;
 
     AMREX_GPU_DEVICE
     void operator() (const IntVect& iv, Array4<Real> const& data,
@@ -39,7 +41,7 @@ struct CnsFillExtDir
         {
 
         // IMPROVEMENT TODO: Avoid if statement by having different options for user defined BCs in cns_bcfill
-        if (CNS::phys_bc.lo(1)==6 || CNS::phys_bc.hi(1)==6) {
+        if (l_phys_bc->lo(1)==6 || l_phys_bc->hi(1)==6) {
           Array2D<Real,0,NPRIM-1,0,5> prims;
 
           // int nghost = 3;
@@ -51,21 +53,19 @@ struct CnsFillExtDir
 
           // y=0 boundary/plane
           if (iv[dir]==geom.Domain().smallEnd(dir)-1) {
-            jstart = -CNS::NGHOST;
+            jstart = -nghost;
             jjadd  = 1;
           }
           // y=ymax boundary/plane
           else if (iv[dir]==geom.Domain().bigEnd(dir)+1) {
-            jstart = geom.Domain().bigEnd(dir) + CNS::NGHOST;
+            jstart = geom.Domain().bigEnd(dir) + nghost;
             jjadd  = -1;
           }
-          else {
-
-          return ;}
+          else { return ;}
 
             // convert domain points near boundary to primitive vars (rho,u,v,w,T,P(T,rho)), in preparation to fill ghost points in primitive vars
-            jj = jstart + jjadd*CNS::NGHOST; // only convert in domain
-            for (int count=CNS::NGHOST; count<2*CNS::NGHOST; count++ ) {
+            jj = jstart + jjadd*nghost; // only convert in domain
+            for (int count=nghost; count<2*nghost; count++ ) {
               rho    = data(i,jj,k,URHO);
               rhoinv = Real(1.0)/rho;
               ux     = data(i,jj,k,UMX)*rhoinv;
@@ -85,17 +85,17 @@ struct CnsFillExtDir
             }
 
             // apply BC (fill u,v,w,T,P)
-            dirichlet(prims,QU,CNS::NGHOST,Real(0.0)); 
+            dirichlet(prims,QU,nghost,Real(0.0)); 
             // neumann  (prims,QU,Real(0.0),dy); 
-            dirichlet(prims,QV,CNS::NGHOST,Real(0.0)); 
-            dirichlet(prims,QW,CNS::NGHOST,Real(0.0)); 
-            dirichlet(prims,QT,CNS::NGHOST,lprobparm->Tw); 
-            zerograd_pres(prims,QPRES,CNS::NGHOST); 
+            dirichlet(prims,QV,nghost,Real(0.0)); 
+            dirichlet(prims,QW,nghost,Real(0.0)); 
+            dirichlet(prims,QT,nghost,lprobparm->Tw); 
+            zerograd_pres(prims,QPRES,nghost); 
 
             // convert ghost points to conservative vars
             // compute rho
             jj = jstart;
-            for (int count=0; count<CNS::NGHOST; count++ ) {
+            for (int count=0; count<nghost; count++ ) {
               p   = prims(QPRES,count);
               T   = prims(QT,count);
               rho = p/(lparm->Rspec * T);

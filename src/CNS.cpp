@@ -12,7 +12,6 @@
 using namespace amrex;
 
 int CNS::NGHOST;
-BCRec CNS::phys_bc;
 
 bool CNS::rhs_euler=false;
 bool CNS::rhs_visc=false;
@@ -67,8 +66,8 @@ void CNS::read_params()
   pp.getarr("hi_bc", hi_bc, 0, AMREX_SPACEDIM);
   for (int i = 0; i < AMREX_SPACEDIM; ++i)
   {
-    phys_bc.setLo(i, lo_bc[i]);
-    phys_bc.setHi(i, hi_bc[i]);
+    h_phys_bc->setLo(i, lo_bc[i]);
+    h_phys_bc->setHi(i, hi_bc[i]);
   }
 
   pp.query("rhs_euler", rhs_euler);
@@ -97,6 +96,7 @@ void CNS::read_params()
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
   amrex::Gpu::htod_memcpy(d_prob_parm, h_prob_parm, sizeof(ProbParm));
+  amrex::Gpu::htod_memcpy(d_phys_bc, h_phys_bc, sizeof(BCRec));
 #endif
 }
 

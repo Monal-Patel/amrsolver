@@ -292,7 +292,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
         const Box& bxg1 = amrex::grow(bx,1);
         slopetmp.resize(bxg1,NCONS);
-        slopetmp = 0.0;
         Elixir slopeeli = slopetmp.elixir();
         auto const& slope = slopetmp.array();
 
