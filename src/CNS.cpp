@@ -24,11 +24,9 @@ int  CNS::order_keep=2;
 int  CNS::order_rk=2;
 int  CNS::do_reflux = 1;
 int  CNS::refine_max_dengrad_lev = -1;
-Real CNS::cfl = 0.0;
-Real CNS::dt_constant = 0.0;
-Real CNS::refine_dengrad = 1.0e10;
-
-Real CNS::gravity = 0.0;
+Real CNS::cfl = 0.0_rt;
+Real CNS::dt_constant = 0.0_rt;
+// Real CNS::refine_dengrad = 1.0e10;
 
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented)
 
@@ -88,10 +86,10 @@ void CNS::read_params()
     amrex::Abort("Need to specify SSPRK scheme order of accuracy (2 or 3)");
   }
 
-  pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
-  pp.query("refine_dengrad", refine_dengrad);
+  // pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
+  // pp.query("refine_dengrad", refine_dengrad);
 
-  pp.query("gravity", gravity);
+  // pp.query("gravity", gravity);
 
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
@@ -281,9 +279,9 @@ void CNS::computeNewDt(int finest_level,
     dt_0 = std::min(dt_0,nfactor*dt_min[i]);}
 
   // Limit dt's by the value of stop_time.
-  const Real eps = 0.001*dt_0;
+  const Real eps = 0.001_rt*dt_0;
   Real cur_time  = state[State_Type].curTime();
-  if (stop_time >= 0.0) {
+  if (stop_time >= 0.0_rt) {
     if ((cur_time + dt_0) > (stop_time - eps)) {
         dt_0 = stop_time - cur_time;}
   }
@@ -675,7 +673,7 @@ void CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how
 
 //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
-  plotMF.setVal(0.0, cnt, 2, nGrow);
+  plotMF.setVal(0.0_rt, cnt, 2, nGrow);
   IBM::ib.mfa.at(level)->copytoRealMF(plotMF, 0, cnt);
 #endif
   //------------------------------------------------------------------------------

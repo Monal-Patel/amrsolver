@@ -22,8 +22,8 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     MultiFab& S1 = get_old_data(State_Type);
     MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
     MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
-    dSdt=0.0;
-    Sborder=0.0;
+    dSdt=0.0_rt;
+    Sborder=0.0_rt;
 
     FluxRegister* fr_as_crse = nullptr;
     if (do_reflux && level < parent->finestLevel()) {
@@ -100,11 +100,11 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   Array<MultiFab,AMREX_SPACEDIM> numflxmf; 
   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
       numflxmf[idim].define(amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)),statemf.DistributionMap(), NCONS, NGHOST);
-      numflxmf[idim] = 0.0;}
+      numflxmf[idim] = 0.0_rt;}
 
   // primitive variables multifab
   MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
-  primsmf= 0.0;
+  primsmf= 0.0_rt;
 
   Array<Box,AMREX_SPACEDIM*2> ghost_boxes;
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
@@ -138,7 +138,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntflxmf[idim] = 0.0; }
+      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntflxmf[idim] = 0.0_rt; }
 
     FArrayBox lambdafab; //store eigenvalues max(u+c,u,u-c) in all directions
     // loop over all fabs
@@ -180,12 +180,12 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // make multifab for spectral radius and sensor for artificial dissipation
     MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
     MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
-    lambdamf = 0.0;
-    sensormf = 0.0;
+    lambdamf = 0.0_rt;
+    sensormf = 0.0_rt;
     int halfsten = order_keep/2;
 
     //2 * standard finite difference coefficients
-    GpuArray<Real,3> coeffs; coeffs[0]=0.0;coeffs[1]=0.0;coeffs[2]=0.0;
+    GpuArray<Real,3> coeffs; coeffs[0]=0.0_rt;coeffs[1]=0.0_rt;coeffs[2]=0.0_rt;
     if (order_keep==4) {
       coeffs[0]=Real(4.0)/3 ,coeffs[1]=Real(-2.0)/12;
     }
@@ -362,7 +362,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     FArrayBox temp1;
     Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntvflxmf[idim].define(statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntvflxmf[idim] = 0.0;}
+      pntvflxmf[idim].define(statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntvflxmf[idim] = 0.0_rt;}
 
     // loop over all fabs
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)

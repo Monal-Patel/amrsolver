@@ -188,7 +188,7 @@ void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lam
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void JSTflux(int i, int j, int k, int n, const auto& lambda , const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz) {
 
-  Real c2 = 1.0;
+  Real c2 = 1.0_rt;
   Real dw;
   Real u_ijk = cons(i,j,k,n);
 
@@ -207,29 +207,29 @@ void JSTflux(int i, int j, int k, int n, const auto& lambda , const auto& sensor
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 Real fDiv(Real f,Real fl) {
-  return 0.5*(f + fl);}
+  return 0.5_rt*(f + fl);}
 
 // divergence split
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 Real fgDiv(Real f,Real fl, Real g, Real gl) {
-  return 0.5*(f*g + fl*gl);}
+  return 0.5_rt*(f*g + fl*gl);}
 
 //Quadratic split
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 Real fgQuad(Real f,Real fl, Real g, Real gl) {
-  return 0.25*(f + fl)*(g + gl);}
+  return 0.25_rt*(f + fl)*(g + gl);}
 
 //Cubic split
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 Real fghCubic(Real f,Real fl, Real g, Real gl,Real h, Real hl) {
-  return 0.1250*(f + fl)*(g + gl)*(h + hl);}
+  return 0.1250_rt*(f + fl)*(g + gl)*(h + hl);}
 
 // Computes fluxes at i-1/2, j-1/2 and k-1/2
 // Computational cost can be reduced by computing and storing flux averages between l and m points
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
 
-  GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+  GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0_rt;};
   int i1, i2, j1, j2, k1, k2;
   Real rho1, ux1, uy1, uz1, ie1, p1;
   Real rho2, ux2, uy2, uz2, ie2, p2;
@@ -380,33 +380,33 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 Real weno5js(const GpuArray<Real,NCONS>& s)
 { 
   constexpr Real eps = 1e-40;
-  constexpr Real q   = 2.0;
+  constexpr Real q   = 2.0_rt;
 
   Real vl[3];
   Real beta[3];
   Real alpha[3];
 
-  beta[2] = (13.0 / 12.0) * pow(s[0] - 2.0 * s[1] + s[2], 2) +
-            0.25 * pow(s[0] - 4.0 * s[1] + 3.0 * s[2], 2);
-  beta[1] = (13.0 / 12.0) * pow(s[1] - 2.0 * s[2] + s[3], 2) +
+  beta[2] = (13.0_rt / 12.0_rt) * pow(s[0] - 2.0_rt * s[1] + s[2], 2) +
+            0.25 * pow(s[0] - 4.0_rt * s[1] + 3.0_rt * s[2], 2);
+  beta[1] = (13.0_rt / 12.0_rt) * pow(s[1] - 2.0_rt * s[2] + s[3], 2) +
             0.25 * (s[1] - s[3]) * (s[1] - s[3]);
-  beta[0] = (13.0 / 12.0) * pow(s[2] - 2.0 * s[3] + s[4], q) +
-            0.25 * pow(3.0 * s[2] - 4.0 * s[3] + s[4], q);
+  beta[0] = (13.0_rt / 12.0_rt) * pow(s[2] - 2.0_rt * s[3] + s[4], q) +
+            0.25_rt * pow(3.0_rt * s[2] - 4.0_rt * s[3] + s[4], q);
 
-  beta[2] = 1.0 / ((eps + beta[2]) * (eps + beta[2]));
-  beta[1] = 1.0 / ((eps + beta[1]) * (eps + beta[1]));
-  beta[0] = 1.0 / ((eps + beta[0]) * (eps + beta[0]));
+  beta[2] = 1.0_rt / ((eps + beta[2]) * (eps + beta[2]));
+  beta[1] = 1.0_rt / ((eps + beta[1]) * (eps + beta[1]));
+  beta[0] = 1.0_rt / ((eps + beta[0]) * (eps + beta[0]));
 
   alpha[2] = beta[2];
-  alpha[1] = 6.0 * beta[1];
-  alpha[0] = 3.0 * beta[0];
-  Real alpha1 = 1.0 / (alpha[2] + alpha[1] + alpha[0]);
+  alpha[1] = 6.0_rt * beta[1];
+  alpha[0] = 3.0_rt * beta[0];
+  Real alpha1 = 1.0_rt / (alpha[2] + alpha[1] + alpha[0]);
 
-  vl[2] = 2.0 * s[0] - 7.0 * s[1] + 11.0 * s[2];
-  vl[1] = -s[1] + 5.0 * s[2] + 2.0 * s[3];
-  vl[0] = 2.0 * s[2] + 5.0 * s[3] - s[4];
+  vl[2] = 2.0_rt * s[0] - 7.0_rt * s[1] + 11.0_rt * s[2];
+  vl[1] = -s[1] + 5.0_rt * s[2] + 2.0_rt * s[3];
+  vl[0] = 2.0_rt * s[2] + 5.0_rt * s[3] - s[4];
 
-  Real sl = (Real(1.0)/6.0) * alpha1 * (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
+  Real sl = (Real(1.0)/6.0_rt) * alpha1 * (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
 
   return sl ;
 }
@@ -885,24 +885,24 @@ void viscfluxes (int i, int j, int k, auto const& prims, auto const& fx, auto co
     // 2nd order accurate central difference of primitive vars /////////////////
     // x direction
     Real ux   =  prims(i,j,k,QU);
-    Real dudx = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*0.5*dxinv[0];
-    Real dvdx = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*0.5*dxinv[0];
-    Real dwdx = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*0.5*dxinv[0];
-    Real dTdx = (prims(i+1,j,k,QT) - prims(i-1,j,k,QT))*0.5*dxinv[0];
+    Real dudx = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*0.5_rt*dxinv[0];
+    Real dvdx = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*0.5_rt*dxinv[0];
+    Real dwdx = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*0.5_rt*dxinv[0];
+    Real dTdx = (prims(i+1,j,k,QT) - prims(i-1,j,k,QT))*0.5_rt*dxinv[0];
 
     // y direction
     Real uy   =  prims(i,j,k,QV);
-    Real dudy = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*0.5*dxinv[1];
-    Real dvdy = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*0.5*dxinv[1];
-    Real dwdy = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*0.5*dxinv[1];
-    Real dTdy = (prims(i,j+1,k,QT) - prims(i,j-1,k,QT))*0.5*dxinv[1];
+    Real dudy = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*0.5_rt*dxinv[1];
+    Real dvdy = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*0.5_rt*dxinv[1];
+    Real dwdy = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*0.5_rt*dxinv[1];
+    Real dTdy = (prims(i,j+1,k,QT) - prims(i,j-1,k,QT))*0.5_rt*dxinv[1];
 
     // z direction
     Real uz   =  prims(i,j,k,QW);
-    Real dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*0.5*dxinv[2];
-    Real dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*0.5*dxinv[2];
-    Real dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*0.5*dxinv[2];
-    Real dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*0.5*dxinv[2];
+    Real dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*0.5_rt*dxinv[2];
+    Real dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*0.5_rt*dxinv[2];
+    Real dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*0.5_rt*dxinv[2];
+    Real dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*0.5_rt*dxinv[2];
 
     // divergence
     Real div  = dudx + dvdy + dwdz;
