@@ -9,22 +9,13 @@ using namespace amrex;
 
 struct ProbParm
 {
-    // amrex::Real p_l = 1.0;
-    // amrex::Real rho_l = 1.0;
-    // amrex::Real u_l = 0.0;
-
-    // amrex::Real p_r = 0.1;
-    // amrex::Real rho_r = 0.125;
-    // amrex::Real u_r = 0.0;
-
-
-    Real h = 0.006845_rt ;  // channel half height (m)
+    Real h       = 0.006845_rt ;  // channel half height (m)
     Real Re_tau  = 220.0_rt;//Re_tau = rho_w u_tau h/mu_w
-    Real Re_b  = 3.0e3;     //bulk Re = rho_b ub h/mu_w
-    Real Ma_b  = 0.5_rt; //originally 1.5    //mach number bulk  = ub/aw  (aw is speed of sound at wall)
+    Real Re_b    = 3.0e3;     //bulk Re = rho_b ub h/mu_w
+    Real Ma_b    = 1.5_rt; //originally 1.5    //mach number bulk  = ub/aw  (aw is speed of sound at wall)
     Real u_tau = 35.0_rt; // (m/s)
-    Real Tw   = 500.0_rt; // wall temperature (K)
-    Real Mt0  = 0.10;           // initial turbulent mach number
+    Real Tw    = 500.0_rt; // wall temperature (K)
+    Real Mt0   = 0.10;           // initial turbulent mach number
 
 
     Real Rgas = 287_rt;// specific gas constant (J/kgK)
@@ -39,15 +30,8 @@ struct ProbParm
     Real rho_b = Re_b*muw/(ub*h);
     Real Tb = (Pw/Rgas*rho_b);
 
-
-
-
-
-
-
-
-
-
+    // body force in x
+    Real fx =  rho_w*u_tau*u_tau/(h*rho_b);
 
 
 
