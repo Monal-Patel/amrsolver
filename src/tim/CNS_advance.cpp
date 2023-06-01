@@ -1,6 +1,7 @@
 #include <CNS.H>
 #include <AMReX_FluxRegister.H>
 #include <CNS_hydro_K.H>
+#include <cns_prob.H>
 #ifdef AMREX_USE_GPIBM
 #include <IBM.H>
 #endif
@@ -21,6 +22,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     MultiFab& S1 = get_old_data(State_Type);
     MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
     MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+    dSdt=0.0;
 
     FluxRegister* fr_as_crse = nullptr;
     if (do_reflux && level < parent->finestLevel()) {
@@ -91,6 +93,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   const auto dx     = geom.CellSizeArray();
   const auto dxinv  = geom.InvCellSizeArray();
   Parm const& lparm = *d_parm; // parameters (thermodynamic) -- TODO:add thermo namespace
+  ProbParm const& lprobparm = *d_prob_parm;
 
   // numerical flux multifab array
   Array<MultiFab,AMREX_SPACEDIM> numflxmf; 
@@ -144,7 +147,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         const Box& bxnodal = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
         auto const& statefab = statemf.array(mfi);
-        // auto const& dsdtfab = dSdt.array(mfi);
         AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
                      auto const& nfabfy = numflxmf[1].array(mfi);,
                      auto const& nfabfz = numflxmf[2].array(mfi););
@@ -283,7 +285,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         const Box& bx = mfi.tilebox();
 
         auto const& sfab = statemf.array(mfi);
-        // auto const& dsdtfab = dSdt.array(mfi);
         AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
                      auto const& nfabfy = numflxmf[1].array(mfi);,
                      auto const& nfabfz = numflxmf[2].array(mfi););
@@ -368,8 +369,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
         const Box& bxpflx  = mfi.growntilebox(1);
         const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
-        // auto const& statefab = statemf.array(mfi);
-        // auto const& dsdtfab  = dSdt.array(mfi);
         auto const& prims    = primsmf.array(mfi);
 
         AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
@@ -421,7 +420,15 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   // Add source term ///////////////////////////////////////////////////////////
   if (rhs_source) {
-    amrex::Abort("RHS source not ready yet");
+    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
+        const Box& bx   = mfi.tilebox();
+        auto const& dsdtfab = dSdt.array(mfi);
+        auto const& statefab = statemf.array(mfi);
+
+        amrex::ParallelFor(bx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        { user_source(i,j,k,statefab,dsdtfab,lprobparm); });
+    }
   }
   //////////////////////////////////////////////////////////////////////////////
 
@@ -438,7 +445,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       amrex::ParallelFor(bx, NCONS,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
       {
-      dsdtfab(i,j,k,n) = dxinv[0]*(nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
+      dsdtfab(i,j,k,n) += dxinv[0]*(nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
       +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
       +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
       });

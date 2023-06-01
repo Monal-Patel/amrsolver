@@ -6,7 +6,6 @@
 #include <limits>
 #include <cmath>
 
-#include "cns_prob.H"
 #include "CNS_parm.H"
 
 AMREX_GPU_HOST_DEVICE 

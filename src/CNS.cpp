@@ -141,7 +141,7 @@ void CNS::initData()
   amrex::ParallelFor(S_new,
                      [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
                      {
-                       cns_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
+                       user_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
                      });
 
   // Compute the initial temperature (will override what was set in initdata)
@@ -355,9 +355,9 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 #ifdef AMREX_USE_GPIBM
   // call function from cns_prob
   IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
-  tagging(tags, sdata, level, ibdata);
+  user_tagging(tags, sdata, level, ibdata);
 #else
-  tagging(tags, sdata, level);
+  user_tagging(tags, sdata, level);
 #endif
 
 }
