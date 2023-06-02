@@ -9,7 +9,7 @@
 #include <AMReX_ParmParse.H>
 
 AMREX_GPU_DEVICE inline
-void cns_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm) {
+void user_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm) {
   using amrex::Real;
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
@@ -36,7 +36,8 @@ void cns_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state,
   // state(i,j,k,UTEMP) = Real(0.0);
 }
 
-void tagging(amrex::TagBoxArray& tags, amrex::MultiFab &sdata, int level) {
+inline
+void user_tagging(amrex::TagBoxArray& tags, amrex::MultiFab &sdata, int level) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
@@ -78,4 +79,9 @@ void tagging(amrex::TagBoxArray& tags, amrex::MultiFab &sdata, int level) {
 #endif
   }
 
+AMREX_GPU_DEVICE inline
+void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm) {
+
+
+}
 #endif

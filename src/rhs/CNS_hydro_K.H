@@ -151,9 +151,9 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
 // Discontinuity sensor
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 Real disconSensor(Real pp, Real pl, Real pr) {
-    Real pjst = pr + 2.0*pp  + pl;
+    Real pjst = pr + 2.0_rt*pp  + pl;
     Real ptvd = std::abs(pr-pp) + std::abs(pp -pl);
-    return std::abs(2.0* (pr -2.0*pp + pl)/(pjst + ptvd + Real(1.0e-40)));
+    return std::abs(2.0_rt* (pr -2.0_rt*pp + pl)/(pjst + ptvd + Real(1.0e-40)));
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
@@ -178,9 +178,12 @@ void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lam
   Real uy = prims(i,j,k,QV);
   Real uz = prims(i,j,k,QW);
   Real cs = pow(parm.eos_gamma*prims(i,j,k,QPRES)/prims(i,j,k,QRHO),Real(0.5)); 
-  lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux)); 
-  lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy)); 
-  lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
+  lambda(i,j,k,0) = std::abs(ux)+cs; //max(std::abs(ux+cs),std::abs(ux-cs)); 
+  lambda(i,j,k,1) = std::abs(ux)+cs;//max(std::abs(uy+cs),std::abs(uy-cs)); 
+  lambda(i,j,k,2) = std::abs(ux)+cs;//max(std::abs(uz+cs),std::abs(uz-cs)); 
+  // lambda(i,j,k,0) = max(std::abs(ux+cs),std::abs(ux-cs)); 
+  // lambda(i,j,k,1) = max(std::abs(uy+cs),std::abs(uy-cs)); 
+  // lambda(i,j,k,2) = max(std::abs(uz+cs),std::abs(uz-cs)); 
 
 }
 
@@ -229,7 +232,6 @@ Real fghCubic(Real f,Real fl, Real g, Real gl,Real h, Real hl) {
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
 
-  GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0_rt;};
   int i1, i2, j1, j2, k1, k2;
   Real rho1, ux1, uy1, uz1, ie1, p1;
   Real rho2, ux2, uy2, uz2, ie2, p2;
@@ -257,18 +259,16 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
       massflx = fgQuad(rho1,rho2,ux1,ux2);
       ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
 
-      flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
-      flx[UMX]  = flx[UMX]  + coeffs[l-1]*(fghCubic(rho1,rho2,ux1,ux2,ux1,ux2) +fDiv(p1,p2));
-      flx[UMY]  = flx[UMY]  + coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uy1,uy2);
-      flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uz1,uz2);
-      flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,ux1,ux2,ie1,ie2) + fgDiv(p1,p2,ux1,ux2));
+      nfabfx(i,j,k,URHO) += coeffs[l-1]*massflx;
+      nfabfx(i,j,k,UMX ) += coeffs[l-1]*(fghCubic(rho1,rho2,ux1,ux2,ux1,ux2) +fDiv(p1,p2));
+      nfabfx(i,j,k,UMY ) += coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uy1,uy2);
+      nfabfx(i,j,k,UMZ ) += coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uz1,uz2);
+      nfabfx(i,j,k,UET ) += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,ux1,ux2,ie1,ie2) + fgDiv(p1,p2,ux1,ux2));
       // printf("%d %d %d %d \n",m,l,i1,i2);
     }
   }
-  for (int n=0; n<NCONS; n++) {nfabfx(i,j,k,n) = flx[n];}
   
   // flux at j-1/2
-  for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
   for (int l=1; l<=halfsten; l++) {
     for (int m=0; m<=l-1; m++) {
       j1 = j + m;
@@ -289,18 +289,15 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
 
       massflx = fgQuad(rho1,rho2,uy1,uy2);
       ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
-      flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
-      flx[UMX]  = flx[UMX]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
-      flx[UMY]  = flx[UMY]  + coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2) + fDiv(p1,p2));
-      flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
-      flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
-      // printf("%d %d %d %d \n",m,l,i1,i2);
+      nfabfy(i,j,k,URHO) += coeffs[l-1]*massflx;
+      nfabfy(i,j,k,UMX ) += coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
+      nfabfy(i,j,k,UMY ) += coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2)+ fDiv(p1,p2));
+      nfabfy(i,j,k,UMZ ) += coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
+      nfabfy(i,j,k,UET ) += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
     }
   }
-  for (int n=0; n<NCONS; n++) {nfabfy(i,j,k,n) = flx[n];}
 
   // flux at k-1/2
-  for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
   for (int l=1; l<=halfsten; l++) {
     for (int m=0; m<=l-1; m++) {
       k1 = k + m;
@@ -321,15 +318,13 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
 
       massflx = fgQuad(rho1,rho2,uz1,uz2);
       ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
-      flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
-      flx[UMX]  = flx[UMX]  + coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,ux1,ux2);
-      flx[UMY]  = flx[UMY]  + coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,uy1,uy2);
-      flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*(fghCubic(rho1,rho2,uz1,uz2,uz1,uz2) + fDiv(p1,p2));
-      flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uz1,uz2,ie1,ie2)+ fgDiv(p1,p2,uz1,uz2));
-      // printf("%d %d %d %d \n",m,l,i1,i2);
+      nfabfz(i,j,k,URHO) += coeffs[l-1]*massflx;
+      nfabfz(i,j,k,UMX)  += coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,ux1,ux2);
+      nfabfz(i,j,k,UMY)  += coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,uy1,uy2);
+      nfabfz(i,j,k,UMZ)  += coeffs[l-1]*(fghCubic(rho1,rho2,uz1,uz2,uz1,uz2) + fDiv(p1,p2));
+      nfabfz(i,j,k,UET)  += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uz1,uz2,ie1,ie2)+ fgDiv(p1,p2,uz1,uz2));
     }
   }
-  for (int n=0; n<NCONS; n++) {nfabfz(i,j,k,n) = flx[n];}
 }
 ///////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 

@@ -17,7 +17,7 @@ void derpres (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
-        Real rhoinv = 1.0 / dat(i, j, k, URHO);
+        Real rhoinv = 1.0_rt / dat(i, j, k, URHO);
         Real mx = dat(i, j, k, UMX);
         Real my = dat(i, j, k, UMY);
         Real mz = dat(i, j, k, UMZ);
@@ -38,7 +38,7 @@ void dertemp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
-        Real rhoinv = 1.0 / dat(i, j, k, URHO);
+        Real rhoinv = 1.0_rt / dat(i, j, k, URHO);
         Real mx = dat(i, j, k, UMX);
         Real my = dat(i, j, k, UMY);
         Real mz = dat(i, j, k, UMZ);
