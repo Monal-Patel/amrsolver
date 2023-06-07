@@ -10,7 +10,7 @@
 using namespace amrex;
 
 AMREX_GPU_DEVICE inline
-void user_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm) {
+void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm) {
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
@@ -19,9 +19,11 @@ void user_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
   if (y > prob_parm.h) {y = 2*prob_parm.h-y;}
 
   // Laminar velocity and constant temperature
-  // Real ux = 1.5*prob_parm.ub*(1 - (1/std::pow(prob_parm.h,2))*std::pow((y-prob_parm.h),2));
-  Real ux = prob_parm.ub;
-  Real T = prob_parm.Tw;
+  Real ux = 1.5*prob_parm.ub*(1 - (1/std::pow(prob_parm.h,2))*std::pow((y-prob_parm.h),2));
+  // Real ux = 0.0_rt;
+
+  Real T = prob_parm.Tw+0.5*prob_parm.Tw*(1 - (1/std::pow(prob_parm.h,2))*std::pow((y-prob_parm.h),2));
+  // Real T = prob_parm.Tw;
 
   // Turbulent profiles
   // Real T = 677.04110513 + 255.46817*pow(y,0.5) - 176.38967315*exp(-3081.95957181*y);

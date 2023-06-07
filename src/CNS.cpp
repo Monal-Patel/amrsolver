@@ -139,7 +139,7 @@ void CNS::initData()
   amrex::ParallelFor(S_new,
                      [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
                      {
-                       user_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
+                       prob_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
                      });
 
   // Compute the initial temperature (will override what was set in initdata)

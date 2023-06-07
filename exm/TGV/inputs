@@ -12,15 +12,15 @@ cfl = 0.5
 geometry.is_periodic = 1 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0     0.0     0.0
-geometry.prob_hi     = 3.14159     3.14159     3.14159
+geometry.prob_hi     = 6.28318     6.28318     6.28318
 
 # BC FLAGS
 #-1 = N/A (Incase of periodic); 0 = Interior; 1 = Inflow; 2 = Outflow; 3 = Symmetry; 4 = SlipWall; 5 = NoSlipWall; 6 = user defined.
-cns.lo_bc      = 1  1  1
-cns.hi_bc      = 1  1  1
-cns.order_rk   = 3 # 2 or 3 
+cns.lo_bc      = -1  -1  -1
+cns.hi_bc      = -1  -1  -1
+cns.order_rk   = 2 # 2 or 3 
 cns.rhs_euler  = 1 # 0=false, 1=true
-cns.rhs_visc   = 0 # 0=false, 1=true
+cns.rhs_visc   = 1 # 0=false, 1=true
 cns.rhs_source = 0 # 0=false, 1=true
 cns.flux_euler = 0 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
 cns.order_keep = 4 # Order of accuracy=2, 4 or 6
@@ -32,7 +32,7 @@ amr.n_cell          = 32 32 32
 amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 2 2 2 2 # how often to regrid
-amr.blocking_factor = 16      # blocking factor
+amr.blocking_factor = 32      # blocking factor
 amr.max_grid_size   = 32      # maximum size of any grid
 amr.n_error_buf     = 0 0 0 0 # number of buffer cells in error est
 amr.grid_eff        = 0.70    # what constitutes an efficient grid
@@ -51,10 +51,3 @@ amr.plot_int          = 1         # number of timesteps between plotfiles
 amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
 amr.screen_output     = 5
 
-# problem specific parameter
-prob.p_l   = 1.0 
-prob.p_r   = 0.1
-prob.rho_l = 1.0
-prob.rho_r = 0.125
-prob.u_l   = 0.0
-prob.u_r   = 0.0
