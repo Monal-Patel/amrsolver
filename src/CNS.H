@@ -115,8 +115,6 @@ public:
 
     void avgDown ();
 
-    void ghostboxes(int nghost, const Box& bx,Array<Box,AMREX_SPACEDIM*2>& dom_edge_boxes);
-
     void printTotal () const;
 
     void writePlotFile (const std::string& dir,

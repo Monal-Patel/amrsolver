@@ -200,18 +200,13 @@ CNS::variableCleanUp ()
 {
     delete h_parm;
     delete h_prob_parm;
+    delete h_phys_bc;
 
 #ifdef AMREX_USE_GPU
     The_Arena()->free(d_parm);
     The_Arena()->free(d_prob_parm);
-// #else
-//     delete d_parm;
-//     delete d_prob_parm;
+    The_Arena()->free(d_phys_bc);
 #endif
     desc_lst.clear();
     derive_lst.clear();
-
-// #ifdef AMREX_USE_GPU
-//     The_Arena()->free(dp_refine_boxes);
-// #endif
 }
