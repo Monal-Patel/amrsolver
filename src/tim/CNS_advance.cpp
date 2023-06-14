@@ -20,8 +20,8 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 
     MultiFab& S2 = get_new_data(State_Type);
     MultiFab& S1 = get_old_data(State_Type);
-    MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
-    MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+    // MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
+    // MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
     dSdt=0.0_rt;
     Sborder=0.0_rt;
 
@@ -46,6 +46,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   // from pg 84 STRONG STABILITY PRESERVING RUNGE–KUTTA AND MULTISTEP TIME DISCRETIZATIONS
   // Copy S2 from S1
   MultiFab::Copy(S2,S1,0,0,NCONS,0);
+  // first to m-1 stages
   for (int i=1; i<=m-1; i++) {
     FillPatch(*this, Sborder, NGHOST, time + dt*(i-1)/(m-1) , State_Type, 0, NCONS);
     compute_rhs(Sborder, dSdt, dt/(m-1), fr_as_crse, fr_as_fine);
@@ -103,10 +104,9 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       numflxmf[idim] = 0.0_rt;}
 
   // primitive variables multifab
-  MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
+  // MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
   primsmf= 0.0_rt;
 
-  Array<Box,AMREX_SPACEDIM*2> ghost_boxes;
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
       auto const& statefab = statemf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
@@ -115,15 +115,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { cons2prim(i, j, k, statefab, prims, lparm);});
-
-      // for each ghost box
-      // ghostboxes(NGHOST,bx,ghost_boxes);
-      // for (const Box& tempbx : ghost_boxes) {
-      //   ParallelFor(tempbx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      //   {
-      //     cons2prim(i, j, k, statefab, prims, lparm);});
-      // }
-
   }
   // ensure primitive variables mf computed before starting mfiter
   Gpu::streamSynchronize();

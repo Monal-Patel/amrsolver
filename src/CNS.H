@@ -146,6 +146,10 @@ public:
     static bool rhs_visc;
     static bool rhs_source;
 
+    static MultiFab dSdt;
+    static MultiFab Sborder;
+    static MultiFab primsmf;
+
 public:
     static Parm* h_parm;
     static Parm* d_parm;

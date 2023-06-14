@@ -209,4 +209,8 @@ CNS::variableCleanUp ()
 #endif
     desc_lst.clear();
     derive_lst.clear();
+
+    dSdt.clear();
+    Sborder.clear();
+    primsmf.clear();
 }

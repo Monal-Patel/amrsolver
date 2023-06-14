@@ -27,6 +27,9 @@ int  CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
 // Real CNS::refine_dengrad = 1.0e10;
+MultiFab CNS::dSdt;
+MultiFab CNS::Sborder;
+MultiFab CNS::primsmf;
 
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented)
 
@@ -171,6 +174,14 @@ void CNS::post_init(Real)
   if (verbose) {
   printTotal();
   }
+
+  // allocate multifabs
+  // time advancing helper multifabs
+  dSdt.define(grids,dmap,NCONS,0,MFInfo(),Factory());
+  Sborder.define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+  // primitive variables multifabs
+  primsmf.define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+
 }
 // -----------------------------------------------------------------------------
 
@@ -338,6 +349,9 @@ void CNS::post_regrid(int lbase, int new_finest)
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
 #endif
+
+// Destroy and re-allocate multifabs
+
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
