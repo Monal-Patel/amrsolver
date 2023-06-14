@@ -98,14 +98,14 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   ProbParm const& lprobparm = *d_prob_parm;
 
   // numerical flux multifab array
-  Array<MultiFab,AMREX_SPACEDIM> numflxmf; 
-  for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      numflxmf[idim].define(amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)),statemf.DistributionMap(), NCONS, NGHOST);
-      numflxmf[idim] = 0.0_rt;}
+  // Array<MultiFab,AMREX_SPACEDIM> numflxmf; 
+  // for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //     // numflxmf[idim].define(amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)),statemf.DistributionMap(), NCONS, NGHOST);
+  //     numflxmf[idim] = 0.0_rt;}
 
   // primitive variables multifab
   // MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
-  primsmf= 0.0_rt;
+  // primsmf= 0.0_rt;
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
       auto const& statefab = statemf.array(mfi);
@@ -350,10 +350,9 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   // Although conservative FD (finite difference) derivatives of viscous fluxes are not requried in the boundary layer, standard FD are likely sufficient. However, considering grid and flow discontinuities (coarse-interface flux-refluxing and viscous derivatives near shocks), conservative FD derivatives are preferred.
   if (rhs_visc) {
     // Make multifab for derivatives of primitive variables and viscous fluxes
-    FArrayBox temp1;
-    Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntvflxmf[idim].define(statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntvflxmf[idim] = 0.0_rt;}
+    // Array<MultiFab,AMREX_SPACEDIM> pntvflxmf;
+    // for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+    //   pntvflxmf[idim].define(statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntvflxmf[idim] = 0.0_rt;}
 
     // loop over all fabs
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)

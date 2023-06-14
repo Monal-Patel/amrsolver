@@ -30,6 +30,7 @@ Real CNS::dt_constant = 0.0_rt;
 MultiFab CNS::dSdt;
 MultiFab CNS::Sborder;
 MultiFab CNS::primsmf;
+Array<MultiFab,AMREX_SPACEDIM> CNS::numflxmf,CNS::pntvflxmf; 
 
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented)
 
@@ -181,6 +182,10 @@ void CNS::post_init(Real)
   Sborder.define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
   // primitive variables multifabs
   primsmf.define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+  for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+    numflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+    pntvflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+  }
 
 }
 // -----------------------------------------------------------------------------

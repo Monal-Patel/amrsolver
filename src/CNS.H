@@ -149,6 +149,7 @@ public:
     static MultiFab dSdt;
     static MultiFab Sborder;
     static MultiFab primsmf;
+    static Array<MultiFab,AMREX_SPACEDIM> numflxmf,pntvflxmf; 
 
 public:
     static Parm* h_parm;

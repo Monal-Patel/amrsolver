@@ -237,6 +237,14 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
   Real rho2, ux2, uy2, uz2, ie2, p2;
   Real massflx,ke;
 
+  // For computational efficiency here, prims(i,j,k,:) could be simplified to prims(:) to avoid accessing the large array repeatedly. Same principle could be applied to nfabfx, nfabfy and nfabfz.
+
+  for (int n=1;n<NCONS;n++) {
+    nfabfx(i,j,k,n) = 0.0_rt;
+    nfabfy(i,j,k,n) = 0.0_rt;
+    nfabfz(i,j,k,n) = 0.0_rt;
+  }
+
   // flux at i-1/2
   for (int l=1; l<=halfsten; l++) {
     for (int m=0; m<=l-1; m++) {

@@ -213,4 +213,8 @@ CNS::variableCleanUp ()
     dSdt.clear();
     Sborder.clear();
     primsmf.clear();
+    for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+        numflxmf[i].clear();
+        pntvflxmf[i].clear();
+    }
 }
