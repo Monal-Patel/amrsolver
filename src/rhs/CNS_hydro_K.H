@@ -142,7 +142,7 @@ void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx
   fz(i,j,k,UMZ)   = momz*uz + P;
   fz(i,j,k,UET)   = (rhoet + P)*uz;
 
-  Real cs=pow(parm.eos_gamma*P*rhoinv,Real(0.5)); 
+  Real cs=sqrt(parm.eos_gamma*P*rhoinv); 
   lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux)); 
   lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy)); 
   lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
@@ -177,7 +177,7 @@ void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lam
   Real ux = prims(i,j,k,QU); 
   Real uy = prims(i,j,k,QV);
   Real uz = prims(i,j,k,QW);
-  Real cs = pow(parm.eos_gamma*prims(i,j,k,QPRES)/prims(i,j,k,QRHO),Real(0.5)); 
+  Real cs = sqrt(parm.eos_gamma*prims(i,j,k,QPRES)/prims(i,j,k,QRHO)); 
   lambda(i,j,k,0) = std::abs(ux)+cs; //max(std::abs(ux+cs),std::abs(ux-cs)); 
   lambda(i,j,k,1) = std::abs(ux)+cs;//max(std::abs(uy+cs),std::abs(uy-cs)); 
   lambda(i,j,k,2) = std::abs(ux)+cs;//max(std::abs(uz+cs),std::abs(uz-cs)); 
@@ -389,6 +389,7 @@ Real weno5js(const GpuArray<Real,NCONS>& s)
   Real beta[3];
   Real alpha[3];
 
+  // TODO: REMOVE POW() for speed-up!
   beta[2] = (13.0_rt / 12.0_rt) * pow(s[0] - 2.0_rt * s[1] + s[2], 2) +
             0.25 * pow(s[0] - 4.0_rt * s[1] + 3.0_rt * s[2], 2);
   beta[1] = (13.0_rt / 12.0_rt) * pow(s[1] - 2.0_rt * s[2] + s[3], 2) +
@@ -553,7 +554,7 @@ cns_slope_x (int i, int j, int k,
              Array4<Real const> const& q, Parm const& parm) noexcept
 {
     
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
+    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
     Real drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
     Real d0 = limiter(dlft, drgt);
@@ -590,7 +591,7 @@ cns_slope_y (int i, int j, int k,
              Array4<Real const> const& q, Parm const& parm) noexcept
 {
 
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
+    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
     Real drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
     Real d0 = limiter(dlft, drgt);
@@ -625,7 +626,7 @@ void cns_slope_z (int i, int j, int k,
              Array4<Real const> const& q, Parm const& parm) noexcept
 {
     
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
+    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
     Real drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
     Real d0 = limiter(dlft, drgt);
@@ -796,7 +797,7 @@ cns_riemann_x (int i, int j, int k,
 {
     
 
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i-1,j,k,QT),0.5) + 1.e-40;
+    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i-1,j,k,QT)) + 1.e-40;
     Real rl = q(i-1,j,k,QRHO) + Real(0.5) * ( (dq(i-1,j,k,0)+dq(i-1,j,k,2))/cspeed + dq(i-1,j,k,1));
     rl = max(rl, parm.smallr);
     Real ul = q(i-1,j,k,QU) + Real(0.5) * ( (dq(i-1,j,k,2)-dq(i-1,j,k,0))/q(i-1,j,k,QRHO));
@@ -805,7 +806,7 @@ cns_riemann_x (int i, int j, int k,
     Real ut1l = q(i-1,j,k,QV) + Real(0.5) * dq(i-1,j,k,3);
     Real ut2l = q(i-1,j,k,QW) + Real(0.5) * dq(i-1,j,k,4);
 
-    cspeed =  pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
+    cspeed =  sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
     rr = max(rr, parm.smallr);
     Real ur = q(i,j,k,QU) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
@@ -828,7 +829,7 @@ void cns_riemann_y (int i, int j, int k,
 {
     
 
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j-1,k,QT),0.5) + 1.e-40;
+    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j-1,k,QT)) + 1.e-40;
     Real rl = q(i,j-1,k,QRHO) + Real(0.5) * ( (dq(i,j-1,k,0)+dq(i,j-1,k,2))/cspeed + dq(i,j-1,k,1));
     rl = max(rl, parm.smallr);
     Real ul = q(i,j-1,k,QV) + Real(0.5) * ( (dq(i,j-1,k,2)-dq(i,j-1,k,0))/q(i,j-1,k,QRHO));
@@ -837,7 +838,7 @@ void cns_riemann_y (int i, int j, int k,
     Real ut1l = q(i,j-1,k,QU) + Real(0.5) * dq(i,j-1,k,3);
     Real ut2l = q(i,j-1,k,QW) + Real(0.5) * dq(i,j-1,k,4);
 
-    cspeed =  pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
+    cspeed =  sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
     rr = max(rr, parm.smallr);
     Real ur = q(i,j,k,QV) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
@@ -858,7 +859,7 @@ void cns_riemann_z (int i, int j, int k,
                Array4<Real const> const& q,
                Parm const& parm) noexcept
 {
-    Real cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k+1,QT),0.5) + 1.e-40;
+    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k+1,QT)) + 1.e-40;
     Real rl = q(i,j,k-1,QRHO) + Real(0.5) * ( (dq(i,j,k-1,0)+dq(i,j,k-1,2))/cspeed + dq(i,j,k-1,1));
     rl = max(rl, parm.smallr);
     Real ul = q(i,j,k-1,QW) + Real(0.5) * ( (dq(i,j,k-1,2)-dq(i,j,k-1,0))/q(i,j,k-1,QRHO));
@@ -867,7 +868,7 @@ void cns_riemann_z (int i, int j, int k,
     Real ut1l = q(i,j,k-1,QU) + Real(0.5) * dq(i,j,k-1,3);
     Real ut2l = q(i,j,k-1,QV) + Real(0.5) * dq(i,j,k-1,4);
 
-    cspeed = pow(parm.eos_gamma*parm.Rspec*q(i,j,k,QT),0.5) + 1.e-40;
+    cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
     rr = max(rr, parm.smallr);
     Real ur = q(i,j,k,QW) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));

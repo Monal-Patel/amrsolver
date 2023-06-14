@@ -26,9 +26,9 @@ struct Parm
 
     public: 
     // AMREX_GPU_DEVICE inline const amrex::Real visc(amrex::Real& T,mu) { 
-    AMREX_GPU_DEVICE inline amrex::Real visc(amrex::Real& T) const { return visc_ref*pow(T,amrex::Real(1.5))/(Tvisc_ref + T);}
+    AMREX_GPU_DEVICE inline amrex::Real visc(amrex::Real& T) const { return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}
 
-    AMREX_GPU_DEVICE inline amrex::Real cond(amrex::Real& T) const { return cond_ref*pow(T,amrex::Real(1.5))/(Tcond_ref + T);}
+    AMREX_GPU_DEVICE inline amrex::Real cond(amrex::Real& T) const { return cond_ref*T*sqrt(T)/(Tcond_ref + T);}
 };
 
 #endif
