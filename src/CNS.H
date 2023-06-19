@@ -142,6 +142,7 @@ public:
     static int flux_euler;
     static int order_keep;
     static int order_rk;
+    static int stages_rk;
     static bool rhs_euler;
     static bool rhs_visc;
     static bool rhs_source;

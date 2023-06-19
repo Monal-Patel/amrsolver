@@ -18,12 +18,8 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
         state[i].swapTimeLevels(dt);
     }
 
-    MultiFab& S2 = get_new_data(State_Type);
     MultiFab& S1 = get_old_data(State_Type);
-    // MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
-    // MultiFab Sborder(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
-    dSdt=0.0_rt;
-    Sborder=0.0_rt;
+    MultiFab& S2 = get_new_data(State_Type);
 
     FluxRegister* fr_as_crse = nullptr;
     if (do_reflux && level < parent->finestLevel()) {
@@ -42,21 +38,23 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 
   if (order_rk==2) {
   // Low storage SSPRK2 with m stages - (Ceff=1-1/m) 
-  int m = 2;
+  int m = stages_rk;
   // from pg 84 STRONG STABILITY PRESERVING RUNGE–KUTTA AND MULTISTEP TIME DISCRETIZATIONS
   // Copy S2 from S1
   MultiFab::Copy(S2,S1,0,0,NCONS,0);
   // first to m-1 stages
   for (int i=1; i<=m-1; i++) {
-    FillPatch(*this, Sborder, NGHOST, time + dt*(i-1)/(m-1) , State_Type, 0, NCONS);
-    compute_rhs(Sborder, dSdt, dt/(m-1), fr_as_crse, fr_as_fine);
-    MultiFab::Saxpy(S2, dt/(m-1), dSdt, 0, 0, NCONS, 0);
+    FillPatch(*this, Sborder, NGHOST, time + dt*Real(i-1)/(m-1) , State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt/Real(m-1), fr_as_crse, fr_as_fine);
+    MultiFab::Saxpy(S2, dt/Real(m-1), dSdt, 0, 0, NCONS, 0);
+    state[State_Type].setNewTimeLevel(time + dt*Real(i)/(m-1)); // important to do this for correct fillpatch interpolations
   }
   // final stage
   FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
-  compute_rhs(Sborder, dSdt, dt/(m-1), fr_as_crse, fr_as_fine);
+  compute_rhs(Sborder, dSdt, dt/Real(m-1), fr_as_crse, fr_as_fine);
   MultiFab::LinComb(S2, Real(m-1), S2, 0, dt, dSdt, 0, 0, NCONS, 0);
   MultiFab::LinComb(S2, Real(1.0)/m, S1, 0, Real(1.0)/m, S2, 0, 0, NCONS, 0);
+  // state[0].setOldTimeLevel(time); // important to do this for correct fillpatch
   }
 
   else if (order_rk==3) {
@@ -79,9 +77,14 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
   MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
 
-  // Generally SSPRK(n^2,3) where n>2 - Ceff=1-1/n
+  // TODO Generally SSPRK(n^2,3) where n>2 - Ceff=1-1/n
   }
+
+  else if (order_rk==4) {
+  Print() << "RK4 not implemented yet" << std::endl;
+  exit(0);
   // TODO: SSPRK(10,4) C=6, Ceff=0.6
+  }
   return dt;
 }
 
@@ -94,18 +97,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   //Aux Variables //////////////////////////////////////////////////////////////
   const auto dx     = geom.CellSizeArray();
   const auto dxinv  = geom.InvCellSizeArray();
-  Parm const& lparm = *d_parm; // parameters (thermodynamic) -- TODO:add thermo namespace
+  Parm const& lparm = *d_parm; // parameters (thermodynamic)
   ProbParm const& lprobparm = *d_prob_parm;
-
-  // numerical flux multifab array
-  // Array<MultiFab,AMREX_SPACEDIM> numflxmf; 
-  // for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-  //     // numflxmf[idim].define(amrex::convert(statemf.boxArray(),IntVect::TheDimensionVector(idim)),statemf.DistributionMap(), NCONS, NGHOST);
-  //     numflxmf[idim] = 0.0_rt;}
-
-  // primitive variables multifab
-  // MultiFab primsmf; primsmf.define(statemf.boxArray(), statemf.DistributionMap(), NPRIM, NGHOST);
-  // primsmf= 0.0_rt;
 
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
       auto const& statefab = statemf.array(mfi);
@@ -116,10 +109,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { cons2prim(i, j, k, statefab, prims, lparm);});
   }
-  // ensure primitive variables mf computed before starting mfiter
-  Gpu::streamSynchronize();
   //////////////////////////////////////////////////////////////////////////////
-
+  Gpu::streamSynchronize(); // ensure primitive variables mf computed before starting mfiter
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
   // IMPROVEMENT: Can have pointer function (dynamic casting?) (main euler_flux function) which can be pointed to different flux schemes in the initialisation. The function can pass a parameter struct to include any scheme specfic parameters.
@@ -206,52 +197,6 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       {
         KEEP(i,j,k,halfsten,coeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
       });
-
-
-      // // Order reduction at ymin wall boundary
-      // if (geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
-      //   int jbndry = bxnodal.smallEnd(1);
-      //   IntVect small,big;
-      //   small.setVal(0,bxnodal.smallEnd(0));
-      //   small.setVal(1,jbndry);
-      //   small.setVal(2,bxnodal.smallEnd(2));
-
-      //   big.setVal(0,bxnodal.bigEnd(0));
-      //   big.setVal(1,jbndry);
-      //   big.setVal(2,bxnodal.bigEnd(2));
-      //   Box bxboundary(small,big);
-
-      //   amrex::ParallelFor(bxboundary, 
-      //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      //   {
-      //     // printf("6th ord %f \n",nfabfy(i,j,k,2));
-      //     KEEPy(i,j,k,1,coeffs,prims,nfabfy,lparm);
-      //     // printf("2nd ord %f \n",nfabfy(i,j,k,2));
-      //     // KEEPy(i,j,k,2,coeffs4,prims,nfabfy,lparm);
-      //     // printf("4th ord %f \n \n",nfabfy(i,j,k,2));
-      //   });
-      // }
-
-      // // Order reduction at ymax wall boundary
-      // if (geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
-      //   int jbndry = bxnodal.bigEnd(1);
-      //   IntVect small,big;
-      //   small.setVal(0,bxnodal.smallEnd(0));
-      //   small.setVal(1,jbndry);
-      //   small.setVal(2,bxnodal.smallEnd(2));
-
-      //   big.setVal(0,bxnodal.bigEnd(0));
-      //   big.setVal(1,jbndry);
-      //   big.setVal(2,bxnodal.bigEnd(2));
-      //   Box bxboundary(small,big);
-
-      //   amrex::ParallelFor(bxboundary, 
-      //   [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      //   {
-      //     KEEPy(i,j,k,1,coeffs,prims,nfabfy,lparm);
-      //   });
-      // }
-
 
       // JST artificial dissipation shock capturing
      amrex::ParallelFor(bx,
@@ -409,6 +354,26 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
   //////////////////////////////////////////////////////////////////////////////
 
+  // Assemble RHS //////////////////////////////////////////////////////////////
+  Gpu::streamSynchronize(); // ensure all fluxes computed before assembly
+  for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
+      const Box& bx   = mfi.tilebox();
+      auto const& dsdtfab = dSdt.array(mfi);
+      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                   auto const& nfabfy = numflxmf[1].array(mfi);,
+                   auto const& nfabfz = numflxmf[2].array(mfi););
+
+      // add euler and viscous derivatives to rhs
+      amrex::ParallelFor(bx, NCONS,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+      {
+      dsdtfab(i,j,k,n) = dxinv[0]*(nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
+      +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
+      +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
+      });
+  }
+  //////////////////////////////////////////////////////////////////////////////
+
   // Add source term ///////////////////////////////////////////////////////////
   if (rhs_source) {
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
@@ -423,23 +388,4 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
   //////////////////////////////////////////////////////////////////////////////
 
-  // Assemble RHS //////////////////////////////////////////////////////////////
-  Gpu::streamSynchronize(); // ensure all rhs terms computed before assembly
-  for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
-      const Box& bx   = mfi.tilebox();
-      auto const& dsdtfab = dSdt.array(mfi);
-      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                   auto const& nfabfy = numflxmf[1].array(mfi);,
-                   auto const& nfabfz = numflxmf[2].array(mfi););
-
-      // add euler and viscous derivatives to rhs
-      amrex::ParallelFor(bx, NCONS,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-      {
-      dsdtfab(i,j,k,n) += dxinv[0]*(nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
-      +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
-      +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
-      });
-  }
-  //////////////////////////////////////////////////////////////////////////////
 }

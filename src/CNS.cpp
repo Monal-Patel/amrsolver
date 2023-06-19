@@ -22,6 +22,7 @@ int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
 int  CNS::order_keep=2;
 int  CNS::order_rk=2;
+int  CNS::stages_rk=2;
 int  CNS::do_reflux = 1;
 int  CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
@@ -88,6 +89,18 @@ void CNS::read_params()
 
   if (!pp.query("order_rk",order_rk)) {
     amrex::Abort("Need to specify SSPRK scheme order of accuracy (2 or 3)");
+  }
+
+  if (!pp.query("stages_rk",stages_rk)) {
+    amrex::Abort("Need to specify SSPRK number of stages");
+  }
+  else {
+    if ( order_rk==2 && stages_rk < order_rk) {
+      amrex::Abort("SSPRK number of stages must equal or greater than order of accuracy");
+    }
+    if ( order_rk==3 && stages_rk!=3) {
+      amrex::Abort("SSPRK number of stages must 3");
+    }
   }
 
   // pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
@@ -239,13 +252,15 @@ void CNS::computeInitialDt(int finest_level,
         dt0 = std::min(dt0,nfactor*dt_level[i]); }
   }
 
-  // dt at all levels
+  // set dt at all levels
   nfactor = 1;
   for (int i = 0; i <= finest_level; i++)
     {
         nfactor *= n_cycle[i];
         dt_level[i] = dt0/nfactor;
     }
+
+  Print() << "[computeInitialDt] Level 0 dt = " << dt0 << std::endl;
 
 }
 
@@ -288,24 +303,27 @@ void CNS::computeNewDt(int finest_level,
   }
 
   // Find the minimum over all levels
-  Real dt_0 = std::numeric_limits<Real>::max();
+  Real dt0 = std::numeric_limits<Real>::max();
   int nfactor = 1;
   for (int i = 0; i <= finest_level; i++) {
     nfactor *= n_cycle[i];
-    dt_0 = std::min(dt_0,nfactor*dt_min[i]);}
+    dt0 = std::min(dt0,nfactor*dt_min[i]);}
 
-  // Limit dt's by the value of stop_time.
-  const Real eps = 0.001_rt*dt_0;
+  // Limit dt0 by the value of stop_time.
+  const Real eps = 0.001_rt*dt0;
   Real cur_time  = state[State_Type].curTime();
   if (stop_time >= 0.0_rt) {
-    if ((cur_time + dt_0) > (stop_time - eps)) {
-        dt_0 = stop_time - cur_time;}
+    if ((cur_time + dt0) > (stop_time - eps)) {
+        dt0 = stop_time - cur_time;}
   }
 
+  // Set dt at all levels
   nfactor = 1;
   for (int i = 0; i <= finest_level; i++) {
     nfactor *= n_cycle[i];
-    dt_level[i] = dt_0/nfactor;}
+    dt_level[i] = dt0/nfactor;}
+
+  Print() << "[computeNewDt] Level 0 dt = " << dt0 << std::endl;
 }
 
 
