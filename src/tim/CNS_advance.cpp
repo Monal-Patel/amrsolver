@@ -37,9 +37,8 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     }
 
   if (order_rk==2) {
-  // Low storage SSPRK2 with m stages - (Ceff=1-1/m) 
+  // Low storage SSPRKm2 with m stages (C = m-1, Ceff=1-1/m). Where C is the SSPRK coefficient, it also represents the max CFL over the whole integration step (including m stages). From pg 84 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
   int m = stages_rk;
-  // from pg 84 STRONG STABILITY PRESERVING RUNGE–KUTTA AND MULTISTEP TIME DISCRETIZATIONS
   // Copy S2 from S1
   MultiFab::Copy(S2,S1,0,0,NCONS,0);
   // first to m-1 stages
@@ -47,41 +46,43 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     FillPatch(*this, Sborder, NGHOST, time + dt*Real(i-1)/(m-1) , State_Type, 0, NCONS);
     compute_rhs(Sborder, dSdt, dt/Real(m-1), fr_as_crse, fr_as_fine);
     MultiFab::Saxpy(S2, dt/Real(m-1), dSdt, 0, 0, NCONS, 0);
-    state[State_Type].setNewTimeLevel(time + dt*Real(i)/(m-1)); // important to do this for correct fillpatch interpolations
+    state[State_Type].setNewTimeLevel(time + dt*Real(i)/(m-1)); // important to do this for correct fillpatch interpolations for the proceeding stages
   }
   // final stage
   FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
   compute_rhs(Sborder, dSdt, dt/Real(m-1), fr_as_crse, fr_as_fine);
   MultiFab::LinComb(S2, Real(m-1), S2, 0, dt, dSdt, 0, 0, NCONS, 0);
   MultiFab::LinComb(S2, Real(1.0)/m, S1, 0, Real(1.0)/m, S2, 0, 0, NCONS, 0);
-  // state[0].setOldTimeLevel(time); // important to do this for correct fillpatch
+  state[State_Type].setNewTimeLevel(time + dt); // important to do this for correct fillpatch interpolations for the proceeding stages
   }
 
   else if (order_rk==3) {
-  // Low storage SSPRK3 with 4 stages (C=2, Ceff=0.5)
-  // from pg 85 STRONG STABILITY PRESERVING RUNGE–KUTTA AND MULTISTEP TIME DISCRETIZATIONS
-  FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
-  compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
-  MultiFab::LinComb(S2, Real(1.0), S1, 0, dt/2, dSdt, 0, 0, NCONS, 0);
+  // Low storage SSPRKm3 with m=n^2, n>=2 stages (C=2, Ceff=0.5). From pg 85 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
+  // FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
+  // compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
+  // MultiFab::LinComb(S2, Real(1.0), S1, 0, dt/2, dSdt, 0, 0, NCONS, 0);
 
-  FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
-  compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
-  MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
+  // FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
+  // compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
+  // MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
 
-  FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
-  compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
-  MultiFab::LinComb(S2, Real(2.0)/3, S1, 0, Real(1.0)/3, S2, 0, 0, NCONS, 0);
-  MultiFab::Saxpy(S2, dt/6, dSdt, 0, 0, NCONS, 0);
+  // FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
+  // compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
+  // MultiFab::LinComb(S2, Real(2.0)/3, S1, 0, Real(1.0)/3, S2, 0, 0, NCONS, 0);
+  // MultiFab::Saxpy(S2, dt/6, dSdt, 0, 0, NCONS, 0);
 
-  FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
-  compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
-  MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
+  // FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
+  // compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
+  // MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
 
   // TODO Generally SSPRK(n^2,3) where n>2 - Ceff=1-1/n
+  Print() << "SSPRK3 not implemented yet" << std::endl;
+  exit(0);
+
   }
 
   else if (order_rk==4) {
-  Print() << "RK4 not implemented yet" << std::endl;
+  Print() << "SSPRK4 not implemented yet" << std::endl;
   exit(0);
   // TODO: SSPRK(10,4) C=6, Ceff=0.6
   }

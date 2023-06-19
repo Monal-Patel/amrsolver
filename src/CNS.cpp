@@ -99,7 +99,7 @@ void CNS::read_params()
       amrex::Abort("SSPRK number of stages must equal or greater than order of accuracy");
     }
     if ( order_rk==3 && stages_rk!=3) {
-      amrex::Abort("SSPRK number of stages must 3");
+      amrex::Abort("SSPRK number of stages must equal 3");
     }
   }
 
