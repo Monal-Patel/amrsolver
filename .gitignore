@@ -39,6 +39,7 @@ EB_CNS/Exec/Sod/tmp_build_dir
 **/*.ex
 **/Backtrace*
 **/plt*
+**/.ipynb_checkpoints/
 
 /wrk/
 
