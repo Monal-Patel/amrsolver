@@ -339,20 +339,23 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   // Re-fluxing ////////////////////////////////////////////////////////////////
   // Must be done before adding source terms.
-  if (fr_as_crse) {
-      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-          const Real scale = -dt*dA;
-          fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
-      }
-  }
-  if (fr_as_fine) {
-      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-          const Real scale = dt*dA;
-          fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
-      }
-  }
+  // if (fr_as_crse) {
+  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+  //         const Real scale = -dt*dA;
+  //         fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
+  //     }
+  // }
+  // if (fr_as_fine) {
+  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+  //         const Real scale = dt*dA;
+  //         fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
+  //     }
+  // }
+  //
+  // TO FIX BUG (20/06/2023): flux register boxArray.ixType() =/= numflxmf boxArray.ixType()
+  // 
   //////////////////////////////////////////////////////////////////////////////
 
   // Assemble RHS //////////////////////////////////////////////////////////////

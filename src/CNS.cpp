@@ -374,7 +374,40 @@ void CNS::post_regrid(int lbase, int new_finest)
 #endif
 
 // Destroy and re-allocate multifabs
+    dSdt.clear();
+    Sborder.clear();
+    primsmf.clear();
+    for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+        numflxmf[i].clear();
+        pntvflxmf[i].clear();
+    }
 
+  //  for (int i = 0; i < num_state_data_types; ++i) {
+  //       state[i].allocOldData();
+  //   }
+
+    // if (state[0].hasOldData()) {
+    //   MultiFab& S1 = get_old_data(State_Type);
+
+    //   dSdt.define(S1.boxArray(),S1.DistributionMap(),NCONS,0,MFInfo(),Factory());
+    //   Sborder.define(S1.boxArray(),dmap,NCONS,NGHOST,MFInfo(),Factory());
+    //   primsmf.define(S1.boxArray(), dmap, NPRIM, NGHOST,MFInfo(),Factory());
+    //   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+    //     numflxmf[idim].define(S1.boxArray(), dmap, NCONS, NGHOST,MFInfo(),Factory());
+    //     pntvflxmf[idim].define(S1.boxArray(), dmap, NCONS, NGHOST,MFInfo(),Factory());
+    //   }
+    // }
+    // else {
+    //   grids.ixType().clear();
+      // Print() << grids.ixType().is_null() << std::endl;
+      dSdt.define(grids,dmap,NCONS,0,MFInfo(),Factory());
+      Sborder.define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+      primsmf.define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        numflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+        pntvflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+      }
+    // }
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
