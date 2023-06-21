@@ -195,8 +195,7 @@ CNS::variableSetUp ()
     ////////////////////////////////////////////////////////////////////////////
 }
 
-void
-CNS::variableCleanUp ()
+void CNS::variableCleanUp ()
 {
     delete h_parm;
     delete h_prob_parm;
@@ -210,11 +209,9 @@ CNS::variableCleanUp ()
     desc_lst.clear();
     derive_lst.clear();
 
-    dSdt.clear();
-    Sborder.clear();
-    primsmf.clear();
-    for (int i = 0; i < AMREX_SPACEDIM; ++i) {
-        numflxmf[i].clear();
-        pntvflxmf[i].clear();
-    }
+    VdSdt.clear();
+    VSborder.clear();
+    Vprimsmf.clear();
+    Vnumflxmf.clear();
+    Vpntvflxmf.clear();
 }

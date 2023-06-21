@@ -27,11 +27,11 @@ int  CNS::do_reflux = 1;
 int  CNS::refine_max_dengrad_lev = -1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
-// Real CNS::refine_dengrad = 1.0e10;
-MultiFab CNS::dSdt;
-MultiFab CNS::Sborder;
-MultiFab CNS::primsmf;
-Array<MultiFab,AMREX_SPACEDIM> CNS::numflxmf,CNS::pntvflxmf; 
+Real CNS::refine_dengrad = 1.0e10;
+Vector<MultiFab> CNS::VdSdt;
+Vector<MultiFab> CNS::VSborder;
+Vector<MultiFab> CNS::Vprimsmf;
+Vector<Array<MultiFab,AMREX_SPACEDIM>> CNS::Vnumflxmf,CNS::Vpntvflxmf; 
 
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented)
 
@@ -49,6 +49,11 @@ CNS::CNS(Amr &papa,
   {
     flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level, NCONS));
   }
+
+  // Resize MultiFab vectors based on the number of levels
+  int nlevs = parent->finestLevel() + 1;
+  VdSdt.resize(nlevs); VSborder.resize(nlevs); Vprimsmf.resize(nlevs);
+  Vnumflxmf.resize(nlevs); Vpntvflxmf.resize(nlevs);
 
   buildMetrics();
 }
@@ -191,13 +196,12 @@ void CNS::post_init(Real)
 
   // allocate multifabs
   // time advancing helper multifabs
-  dSdt.define(grids,dmap,NCONS,0,MFInfo(),Factory());
-  Sborder.define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
-  // primitive variables multifabs
-  primsmf.define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+  VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
+  VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+  Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    numflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-    pntvflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+    Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+    Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
   }
 
 }
@@ -373,41 +377,22 @@ void CNS::post_regrid(int lbase, int new_finest)
   IBM::ib.initialiseGPs(level);
 #endif
 
-// Destroy and re-allocate multifabs
-    dSdt.clear();
-    Sborder.clear();
-    primsmf.clear();
+    // Destroy and re-allocate multifabs
+    VdSdt[level].clear();
+    VSborder[level].clear();
+    Vprimsmf[level].clear();
     for (int i = 0; i < AMREX_SPACEDIM; ++i) {
-        numflxmf[i].clear();
-        pntvflxmf[i].clear();
+        Vnumflxmf[level][i].clear();
+        Vpntvflxmf[level][i].clear();
     }
 
-  //  for (int i = 0; i < num_state_data_types; ++i) {
-  //       state[i].allocOldData();
-  //   }
-
-    // if (state[0].hasOldData()) {
-    //   MultiFab& S1 = get_old_data(State_Type);
-
-    //   dSdt.define(S1.boxArray(),S1.DistributionMap(),NCONS,0,MFInfo(),Factory());
-    //   Sborder.define(S1.boxArray(),dmap,NCONS,NGHOST,MFInfo(),Factory());
-    //   primsmf.define(S1.boxArray(), dmap, NPRIM, NGHOST,MFInfo(),Factory());
-    //   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    //     numflxmf[idim].define(S1.boxArray(), dmap, NCONS, NGHOST,MFInfo(),Factory());
-    //     pntvflxmf[idim].define(S1.boxArray(), dmap, NCONS, NGHOST,MFInfo(),Factory());
-    //   }
-    // }
-    // else {
-    //   grids.ixType().clear();
-      // Print() << grids.ixType().is_null() << std::endl;
-      dSdt.define(grids,dmap,NCONS,0,MFInfo(),Factory());
-      Sborder.define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
-      primsmf.define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+    VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
+    VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+    Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
       for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        numflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-        pntvflxmf[idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+        Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+        Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
       }
-    // }
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,

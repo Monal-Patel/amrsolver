@@ -147,10 +147,10 @@ public:
     static bool rhs_visc;
     static bool rhs_source;
 
-    static MultiFab dSdt;
-    static MultiFab Sborder;
-    static MultiFab primsmf;
-    static Array<MultiFab,AMREX_SPACEDIM> numflxmf,pntvflxmf; 
+    static Vector<MultiFab> VdSdt;
+    static Vector<MultiFab> VSborder;
+    static Vector<MultiFab> Vprimsmf;
+    static Vector<Array<MultiFab,AMREX_SPACEDIM>> Vnumflxmf,Vpntvflxmf; 
 
 public:
     static Parm* h_parm;
