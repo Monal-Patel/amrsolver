@@ -13,6 +13,12 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 {
     BL_PROFILE("CNS::advance()");
 
+    // Print() << "-------- advance start -------" << std::endl;
+    // Print() << "time = " << time << std::endl;
+    // Print() << "dt = " << dt << std::endl;
+    // state[0].printTimeInterval(std::cout);
+    // Print() << "---------------------------------" << std::endl;
+
     for (int i = 0; i < num_state_data_types; ++i) {
         state[i].allocOldData();
         state[i].swapTimeLevels(dt);
@@ -39,12 +45,20 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
         fr_as_crse->setVal(Real(0.0));
     }
 
+  state[0].setOldTimeLevel (time);
+  state[0].setNewTimeLevel (time);
+
   if (order_rk==2) {
   // Low storage SSPRKm2 with m stages (C = m-1, Ceff=1-1/m). Where C is the SSPRK coefficient, it also represents the max CFL over the whole integration step (including m stages). From pg 84 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
   int m = stages_rk;
   // Copy S2 from S1
   MultiFab::Copy(S2,S1,0,0,NCONS,0);
   // first to m-1 stages
+  // Print() << "-------- before RK stages -------" << std::endl;
+  // Print() << "time = " << time << std::endl;
+  // Print() << "dt = " << dt << std::endl;
+  // state[0].printTimeInterval(std::cout);
+  // Print() << "---------------------------------" << std::endl;
   for (int i=1; i<=m-1; i++) {
     FillPatch(*this, Sborder, NGHOST, time + dt*Real(i-1)/(m-1) , State_Type, 0, NCONS);
     compute_rhs(Sborder, dSdt, dt/Real(m-1), fr_as_crse, fr_as_fine);
@@ -56,7 +70,15 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   compute_rhs(Sborder, dSdt, dt/Real(m-1), fr_as_crse, fr_as_fine);
   MultiFab::LinComb(S2, Real(m-1), S2, 0, dt, dSdt, 0, 0, NCONS, 0);
   MultiFab::LinComb(S2, Real(1.0)/m, S1, 0, Real(1.0)/m, S2, 0, 0, NCONS, 0);
+
   state[State_Type].setNewTimeLevel(time + dt); // important to do this for correct fillpatch interpolations for the proceeding stages
+
+
+  // Print() << "--------- after RK stages --------" << std::endl;
+  // Print() << "time = " << time << std::endl;
+  // Print() << "dt = " << dt << std::endl;
+  // state[0].printTimeInterval(std::cout);
+  // Print() << "----------------------------------" << std::endl;
   }
 
   else if (order_rk==3) {
