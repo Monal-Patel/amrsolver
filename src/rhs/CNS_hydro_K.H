@@ -239,7 +239,7 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
 
   // For computational efficiency here, prims(i,j,k,:) could be simplified to prims(:) to avoid accessing the large array repeatedly. Same principle could be applied to nfabfx, nfabfy and nfabfz.
 
-  for (int n=1;n<NCONS;n++) {
+  for (int n=0;n<NCONS;n++) {
     nfabfx(i,j,k,n) = 0.0_rt;
     nfabfy(i,j,k,n) = 0.0_rt;
     nfabfz(i,j,k,n) = 0.0_rt;
