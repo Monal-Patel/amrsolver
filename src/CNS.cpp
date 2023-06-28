@@ -200,7 +200,8 @@ void CNS::post_init(Real)
   VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
   Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+    // Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+    Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory()); // see Vnumflxmf definition in post_regrid() for explanation
     Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
   }
 
@@ -389,10 +390,14 @@ void CNS::post_regrid(int lbase, int new_finest)
     VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
     VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
     Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
-      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-        Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-      }
+
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+      Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory());
+      // convert() function converts the Vnumflxmf to edge based type (node)
+      // Defining like this necessary for compatibility with flux register, otherwise boxArray.ixType() =/= numflxmf boxArray.ixType() error appears.
+
+      Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+    }
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,

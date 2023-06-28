@@ -45,14 +45,33 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
         fr_as_crse->setVal(Real(0.0));
     }
 
-  state[0].setOldTimeLevel (time);
-  state[0].setNewTimeLevel (time);
 
-  if (order_rk==2) {
+  if (order_rk==-2) {
+    // Original time integration ///////////////////////////////////////////////
+    // RK2 stage 1
+    FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
+    // U^* = U^n + dt*dUdt^n
+    MultiFab::LinComb(S2, Real(1.0), Sborder, 0, dt, dSdt, 0, 0, NCONS, 0);
+
+    // RK2 stage 2
+    // After fillpatch Sborder = U^n+dt*dUdt^n
+    FillPatch(*this, Sborder, NGHOST, time+dt, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
+    // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
+    MultiFab::LinComb(S2, Real(0.5), Sborder, 0, Real(0.5), S1, 0, 0, NCONS, 0);
+    // S_new += 0.5*dt*dSdt
+    MultiFab::Saxpy(S2, Real(0.5)*dt, dSdt, 0, 0, NCONS, 0);
+    // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
+    ////////////////////////////////////////////////////////////////////////////
+  }
+  else if (order_rk==2) {
   // Low storage SSPRKm2 with m stages (C = m-1, Ceff=1-1/m). Where C is the SSPRK coefficient, it also represents the max CFL over the whole integration step (including m stages). From pg 84 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
   int m = stages_rk;
   // Copy S2 from S1
   MultiFab::Copy(S2,S1,0,0,NCONS,0);
+  state[0].setOldTimeLevel (time);
+  state[0].setNewTimeLevel (time);
   // first to m-1 stages
   // Print() << "-------- before RK stages -------" << std::endl;
   // Print() << "time = " << time << std::endl;
@@ -148,13 +167,15 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST); pntflxmf[idim] = 0.0_rt; }
+      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST);}
 
-    FArrayBox lambdafab; //store eigenvalues max(u+c,u,u-c) in all directions
+    //store eigenvalues max(u+c,u,u-c) in all directions
+    MultiFab lambdamf;
+    lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+
     // loop over all fabs
-    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
     {
-        // const Box& bx      = mfi.tilebox();
         const Box& bxg     = mfi.growntilebox(NGHOST);
         const Box& bxnodal = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
@@ -167,9 +188,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
                      auto const& pfabfy = pntflxmf[1].array(mfi);,
                      auto const& pfabfz = pntflxmf[2].array(mfi););
 
-        lambdafab.resize(bxg, 3);
-        Elixir lambdagpu   = lambdafab.elixir();
-        auto const& lambda = lambdafab.array();
+        auto const& lambda = lambdamf.array(mfi);
 
         ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
             cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,lparm);
@@ -361,24 +380,20 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   //////////////////////////////////////////////////////////////////////////////
 
   // Re-fluxing ////////////////////////////////////////////////////////////////
-  // Must be done before adding source terms.
-  // if (fr_as_crse) {
-  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-  //         const Real scale = -dt*dA;
-  //         fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
-  //     }
-  // }
-  // if (fr_as_fine) {
-  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-  //         const Real scale = dt*dA;
-  //         fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
-  //     }
-  // }
-  //
-  // TO FIX BUG (20/06/2023): flux register boxArray.ixType() =/= numflxmf boxArray.ixType()
-  // 
+  if (fr_as_crse) {
+      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+          const Real scale = -dt*dA;
+          fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
+      }
+  }
+  if (fr_as_fine) {
+      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+          const Real scale = dt*dA;
+          fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
+      }
+  }
   //////////////////////////////////////////////////////////////////////////////
 
   // Assemble RHS //////////////////////////////////////////////////////////////
