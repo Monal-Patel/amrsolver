@@ -179,8 +179,8 @@ void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lam
   Real uz = prims(i,j,k,QW);
   Real cs = sqrt(parm.eos_gamma*prims(i,j,k,QPRES)/prims(i,j,k,QRHO)); 
   lambda(i,j,k,0) = std::abs(ux)+cs; //max(std::abs(ux+cs),std::abs(ux-cs)); 
-  lambda(i,j,k,1) = std::abs(ux)+cs;//max(std::abs(uy+cs),std::abs(uy-cs)); 
-  lambda(i,j,k,2) = std::abs(ux)+cs;//max(std::abs(uz+cs),std::abs(uz-cs)); 
+  lambda(i,j,k,1) = std::abs(uy)+cs;//max(std::abs(uy+cs),std::abs(uy-cs)); 
+  lambda(i,j,k,2) = std::abs(uz)+cs;//max(std::abs(uz+cs),std::abs(uz-cs)); 
   // lambda(i,j,k,0) = max(std::abs(ux+cs),std::abs(ux-cs)); 
   // lambda(i,j,k,1) = max(std::abs(uy+cs),std::abs(uy-cs)); 
   // lambda(i,j,k,2) = max(std::abs(uz+cs),std::abs(uz-cs)); 
@@ -192,20 +192,30 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void JSTflux(int i, int j, int k, int n, const auto& lambda , const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz) {
 
   Real c2 = 1.0_rt;
-  Real dw;
+  Real c4 = 0.1_rt;
+  Real dw,sen,rr,fdamp;
   Real u_ijk = cons(i,j,k,n);
 
   // x-dir
-  dw = (u_ijk - cons(i-1,j,k,n));
-  nfabfx(i,j,k,n) -= c2*max(lambda(i,j,k,0),lambda(i-1,j,k,0))*max(sensor(i,j,k,0),sensor(i-1,j,k,0))*dw;
+  dw     = (u_ijk - cons(i-1,j,k,n));
+  sen    = c2*max(sensor(i-1,j,k,0),sensor(i,j,k,0));
+  rr     = max(lambda(i-1,j,k,0),lambda(i,j,k,0));
+  fdamp  = cons(i+1,j,k,n) - 3.0*cons(i,j,k,n) + 3.0*cons(i-1,j,k,n) - cons(i-2,j,k,n);
+  nfabfx(i,j,k,n) -= (sen*dw - max(0.0,c4 - sen)*fdamp)*rr;
 
   // y-dir
-  dw = (u_ijk - cons(i,j-1,k,n));
-  nfabfy(i,j,k,n) -= c2*max(lambda(i,j,k,1),lambda(i,j-1,k,1))*max(sensor(i,j,k,1),sensor(i,j-1,k,1))*dw;
+  dw     = (u_ijk - cons(i,j-1,k,n));
+  sen    = c2*max(sensor(i,j-1,k,0),sensor(i,j,k,0));
+  rr     = max(lambda(i,j-1,k,0),lambda(i,j,k,0));
+  fdamp  = cons(i,j+1,k,n) - 3.0*cons(i,j,k,n) + 3.0*cons(i,j-1,k,n) - cons(i,j-2,k,n);
+  nfabfy(i,j,k,n) -= (sen*dw - max(0.0,c4 - sen)*fdamp)*rr;
 
   // z-dir
-  dw = (u_ijk - cons(i,j,k-1,n));
-  nfabfz(i,j,k,n) -= c2*max(lambda(i,j,k,2),lambda(i,j,k-1,2))*max(sensor(i,j,k,2),sensor(i,j,k-1,2))*dw;
+  dw     = (u_ijk - cons(i,j,k-1,n));
+  sen    = c2*max(sensor(i,j,k-1,0),sensor(i,j,k,0));
+  rr     = max(lambda(i,j,k-1,0),lambda(i,j,k,0));
+  fdamp  = cons(i,j,k-1,n) - 3.0*cons(i,j,k,n) + 3.0*cons(i,j,k-1,n) - cons(i,j,k-1,n);
+  nfabfz(i,j,k,n) -= (sen*dw - max(0.0,c4 - sen)*fdamp)*rr;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
