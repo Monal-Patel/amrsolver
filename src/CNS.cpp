@@ -93,18 +93,22 @@ void CNS::read_params()
   }
 
   if (!pp.query("order_rk",order_rk)) {
-    amrex::Abort("Need to specify SSPRK scheme order of accuracy (2 or 3)");
+    amrex::Abort("Need to specify SSPRK scheme order of accuracy (-2, 1, 2 or 3)");
   }
 
   if (!pp.query("stages_rk",stages_rk)) {
     amrex::Abort("Need to specify SSPRK number of stages");
   }
   else {
-    if ( order_rk==2 && stages_rk < order_rk) {
-      amrex::Abort("SSPRK number of stages must equal or greater than order of accuracy");
+    if ( order_rk==1 && stages_rk != 1) {
+      amrex::Abort("Forward Euler number of stages must be 1");
     }
-    if ( order_rk==3 && stages_rk!=3) {
-      amrex::Abort("SSPRK number of stages must equal 3");
+
+    if ( order_rk==2 && stages_rk < order_rk) {
+      amrex::Abort("SSPRK2 number of stages must equal or greater than order of accuracy");
+    }
+    if ( order_rk==3 && !(stages_rk==4 || stages_rk==3)) {
+      amrex::Abort("SSPRK3 number of stages must equal 3 or 4");
     }
   }
 

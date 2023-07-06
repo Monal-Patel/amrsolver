@@ -56,6 +56,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 
     // RK2 stage 2
     // After fillpatch Sborder = U^n+dt*dUdt^n
+    state[0].setNewTimeLevel (time+dt);
     FillPatch(*this, Sborder, NGHOST, time+dt, State_Type, 0, NCONS);
     compute_rhs(Sborder, dSdt, Real(0.5)*dt, fr_as_crse, fr_as_fine);
     // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
@@ -64,6 +65,11 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     MultiFab::Saxpy(S2, Real(0.5)*dt, dSdt, 0, 0, NCONS, 0);
     // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
     ////////////////////////////////////////////////////////////////////////////
+  }
+  else if (order_rk==1) {
+    FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS); // filled at t_n to evalulate f(t_n,y_n).
+    compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
+    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, dSdt, 0, 0, NCONS, 0);
   }
   else if (order_rk==2) {
   // Low storage SSPRKm2 with m stages (C = m-1, Ceff=1-1/m). Where C is the SSPRK coefficient, it also represents the max CFL over the whole integration step (including m stages). From pg 84 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
@@ -101,34 +107,70 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
   }
 
   else if (order_rk==3) {
-  // Low storage SSPRKm3 with m=n^2, n>=2 stages (C=2, Ceff=0.5). From pg 85 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
-  // FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
-  // compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
-  // MultiFab::LinComb(S2, Real(1.0), S1, 0, dt/2, dSdt, 0, 0, NCONS, 0);
 
-  // FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
-  // compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
-  // MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
+  if (stages_rk==3) {
+    state[0].setOldTimeLevel (time);
+    // http://ketch.github.io/numipedia/methods/SSPRK33.html
+    // state[0].setOldTimeLevel (time);
+    FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS); // filled at t_n to evalulate f(t_n,y_n).
+    compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
+    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, dSdt, 0, 0, NCONS, 0);
 
-  // FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
-  // compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
-  // MultiFab::LinComb(S2, Real(2.0)/3, S1, 0, Real(1.0)/3, S2, 0, 0, NCONS, 0);
-  // MultiFab::Saxpy(S2, dt/6, dSdt, 0, 0, NCONS, 0);
+    state[0].setNewTimeLevel (time+dt); // same time as upcoming FillPatch ensures we copy S2 to Sborder, without time interpolation
+    FillPatch(*this, Sborder, NGHOST, time+dt, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt/4, fr_as_crse, fr_as_fine);
+    MultiFab::Xpay(dSdt, dt, S2, 0, 0, NCONS, 0);
+    MultiFab::LinComb(S2, Real(3.0)/4, S1, 0, Real(1.0)/4, dSdt, 0, 0, NCONS, 0);
 
-  // FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
-  // compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
-  // MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
+    state[0].setNewTimeLevel (time+dt/2);// same time as upcoming FillPatch ensures we copy S2 to Sborder, without time interpolation
+    FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt*Real(2.0)/3, fr_as_crse, fr_as_fine);
+    MultiFab::Xpay(dSdt, dt, S2, 0, 0, NCONS, 0);
+    MultiFab::LinComb(S2, Real(1.0)/3, S1, 0, Real(2.0)/3, dSdt, 0, 0, NCONS, 0);
 
-  // TODO Generally SSPRK(n^2,3) where n>2 - Ceff=1-1/n
-  Print() << "SSPRK3 not implemented yet" << std::endl;
-  exit(0);
+    state[State_Type].setNewTimeLevel(time + dt); // important to do this for correct fillpatch interpolations for the proceeding stages
+  }
+
+  else if (stages_rk==4) {
+    // http://ketch.github.io/numipedia/methods/SSPRK43.html and From pg 85 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
+
+    state[0].setOldTimeLevel (time);
+    FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
+    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt/2, dSdt, 0, 0, NCONS, 0);
+
+    state[0].setNewTimeLevel (time+dt/2); // same time as upcoming FillPatch ensures we copy S2 to Sborder, without time interpolation
+    FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
+    MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
+
+    state[0].setNewTimeLevel (time+dt); // same time as upcoming FillPatch ensures we copy S2 to Sborder, without time interpolation
+    FillPatch(*this, Sborder, NGHOST, time + dt, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt/6, fr_as_crse, fr_as_fine);
+    MultiFab::LinComb(S2, Real(2.0)/3, S1, 0, Real(1.0)/3, S2, 0, 0, NCONS, 0);
+    MultiFab::Saxpy(S2, dt/6, dSdt, 0, 0, NCONS, 0);
+
+    state[0].setNewTimeLevel (time+dt/2); // same time as upcoming FillPatch ensures we copy S2 to Sborder, without time interpolation
+    FillPatch(*this, Sborder, NGHOST, time + dt/2, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt/2, fr_as_crse, fr_as_fine);
+    MultiFab::Saxpy(S2, dt/2, dSdt, 0, 0, NCONS, 0);
+
+    state[State_Type].setNewTimeLevel(time + dt); // important to do this for correct fillpatch interpolations for the proceeding stages
+  }
+
+  else {
+    // Low storage SSPRKm3 with m=n^2, n>=3 stages (C=2, Ceff=0.5). From pg 85 Strong Stability Preserving Runge–kutta And Multistep Time Discretizations
+    // TODO Generally SSPRK(n^2,3) where n>2 - Ceff=1-1/n
+    Print() << "SSPRK(m^2)3 not implemented yet" << std::endl;
+    exit(0);
+  }
 
   }
 
   else if (order_rk==4) {
-  Print() << "SSPRK4 not implemented yet" << std::endl;
-  exit(0);
-  // TODO: SSPRK(10,4) C=6, Ceff=0.6
+    Print() << "SSPRK4 not implemented yet" << std::endl;
+    exit(0);
+    // TODO: SSPRK(10,4) C=6, Ceff=0.6
   }
   return dt;
 }
