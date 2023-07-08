@@ -66,6 +66,11 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
     // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
     ////////////////////////////////////////////////////////////////////////////
   }
+  else if (order_rk==0) { // returns rhs
+    FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS);
+    compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
+    MultiFab::Copy(S2,dSdt,0,0,NCONS,0);
+  }
   else if (order_rk==1) {
     FillPatch(*this, Sborder, NGHOST, time, State_Type, 0, NCONS); // filled at t_n to evalulate f(t_n,y_n).
     compute_rhs(Sborder, dSdt, dt, fr_as_crse, fr_as_fine);
@@ -467,7 +472,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
 
         amrex::ParallelFor(bx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        { user_source(i,j,k,statefab,dsdtfab,lprobparm); });
+        { user_source(i,j,k,statefab,dsdtfab,lprobparm,lparm,dx); });
     }
   }
   //////////////////////////////////////////////////////////////////////////////

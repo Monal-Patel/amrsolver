@@ -201,12 +201,17 @@ void CNS::post_init(Real)
   // allocate multifabs
   // time advancing helper multifabs
   VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
+  VdSdt[level].setVal(0.0);
   VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+  VSborder[level].setVal(0.0);
   Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+  Vprimsmf[level].setVal(0.0);
   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
     // Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
     Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory()); // see Vnumflxmf definition in post_regrid() for explanation
     Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+    Vnumflxmf[level][idim].setVal(0.0);
+    Vpntvflxmf[level][idim].setVal(0.0);
   }
 
 }
@@ -392,8 +397,11 @@ void CNS::post_regrid(int lbase, int new_finest)
     }
 
     VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
+    VdSdt[level].setVal(0.0);
     VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+    VSborder[level].setVal(0.0);
     Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+    Vprimsmf[level].setVal(0.0);
 
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
       Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory());
@@ -401,6 +409,8 @@ void CNS::post_regrid(int lbase, int new_finest)
       // Defining like this necessary for compatibility with flux register, otherwise boxArray.ixType() =/= numflxmf boxArray.ixType() error appears.
 
       Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+      Vnumflxmf[level][idim].setVal(0.0);
+      Vpntvflxmf[level][idim].setVal(0.0);
     }
 }
 

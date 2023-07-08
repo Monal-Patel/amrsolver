@@ -51,6 +51,7 @@ struct CnsFillExtDir
           const Real dy = geom.CellSize(dir);
           Real rho,rhoinv,ux,uy,uz,rhoke,rhoei,p,T;
 
+          // we compute all ghost points in y direction when this function is called at the first ghost point
           // y=0 boundary/plane
           if (iv[dir]==geom.Domain().smallEnd(dir)-1) {
             jstart = -nghost;
