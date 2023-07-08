@@ -69,7 +69,7 @@ inline void user_tagging(TagBoxArray& tags, MultiFab &sdata, int level) {
 
 
 AMREX_GPU_DEVICE inline
-void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm) {
+void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm,Parm const& parms, auto const dx) {
 
   rhs(i,j,k,UMX) +=  state(i,j,k,URHO)*lprobparm.fx;
   rhs(i,j,k,UET) +=  state(i,j,k,UMX )*lprobparm.fx;

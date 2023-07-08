@@ -67,7 +67,7 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
   // rhs(i,j,k,URHO) =rhs(i,j,k,URHO) + rho*(pparm.dudx(x,y,z) + pparm.dvdy(x,y,z) + pparm.dwdz(x,y,z));
 
   Real error = rhs(i,j,k,URHO) + rho*(pparm.dudx(x,y,z) + pparm.dvdy(x,y,z) + pparm.dwdz(x,y,z));
-  rhs(i,j,k,URHO) = std::abs(error);
+  rhs(i,j,k,URHO) = error;
 
   // rho (duu/dx + duv/dy + duw/dz) assuming rho=constant
   // rhs(i,j,k,UMX) = rhs(i,j,k,UMX) + rho*( 2*pparm.fu(x,y,z)*pparm.dudx(x,y,z) 
@@ -79,7 +79,7 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
                  + pparm.fv(x,y,z)*pparm.dudy(x,y,z) + pparm.fu(x,y,z)*pparm.dvdy(x,y,z)
                  + pparm.fw(x,y,z)*pparm.dudz(x,y,z) + pparm.fu(x,y,z)*pparm.dwdz(x,y,z)) 
                  + pparm.dpdx(x,y,z);
-  rhs(i,j,k,UMX) = std::abs(error);
+  rhs(i,j,k,UMX) = error;
 
   // rho (dvu/dx + dvv/dy + dvw/dz) assuming rho=constant
   // rhs(i,j,k,UMY) = rhs(i,j,k,UMY) + rho*( pparm.fu(x,y,z)*pparm.dvdx(x,y,z) + pparm.fv(x,y,z)*pparm.dudx(x,y,z) 
@@ -91,7 +91,7 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
                  + 2*pparm.fv(x,y,z)*pparm.dvdy(x,y,z) 
                  + pparm.fw(x,y,z)*pparm.dvdz(x,y,z) + pparm.fv(x,y,z)*pparm.dwdz(x,y,z)) 
                  + pparm.dpdy(x,y,z);
-  rhs(i,j,k,UMY) = std::abs(error);
+  rhs(i,j,k,UMY) = error;
 
   // rho (dwu/dx + dwv/dy + dww/dz) assuming rho=constant
   // rhs(i,j,k,UMZ) = rhs(i,j,k,UMZ) + rho*( pparm.fu(x,y,z)*pparm.dwdx(x,y,z) + pparm.fw(x,y,z)*pparm.dudx(x,y,z) 
@@ -103,7 +103,7 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
         + pparm.fv(x,y,z)*pparm.dwdy(x,y,z) + pparm.fw(x,y,z)*pparm.dvdy(x,y,z)
         + 2*pparm.fw(x,y,z)*pparm.dwdz(x,y,z))
         + pparm.dpdz(x,y,z);
-  rhs(i,j,k,UMZ) = std::abs(error);
+  rhs(i,j,k,UMZ) = error;
 
   // d (rho u ht) = d(rho u (et + p/rho)) = d(rho u et + Pu) = rho d(u et + Pu/rho) = rho [ d(u et) + 1/rho d(Pu) ] = rho [ et d(u) + u d(et) + (1/rho) ( u d(P) + P d(u) )]
 
@@ -124,7 +124,7 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
 
   error = error + rhs(i,j,k,UET);
 
-  rhs(i,j,k,UET) = std::abs(error);//*error;
+  rhs(i,j,k,UET) = error;//*error;
 
 
 }
