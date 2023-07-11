@@ -225,7 +225,7 @@ Real fDiv(Real f,Real fl) {
 // divergence split
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 Real fgDiv(Real f,Real fl, Real g, Real gl) {
-  return 0.5_rt*(f*g + fl*gl);}
+  return 0.5_rt*(f*gl + fl*g);}
 
 //Quadratic split
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
@@ -275,14 +275,13 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
       p2   = prims(i2,j,k,QPRES);
 
       massflx = fgQuad(rho1,rho2,ux1,ux2);
-      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+      ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
 
       nfabfx(i,j,k,URHO) += coeffs[l-1]*massflx;
       nfabfx(i,j,k,UMX ) += coeffs[l-1]*(fghCubic(rho1,rho2,ux1,ux2,ux1,ux2) +fDiv(p1,p2));
       nfabfx(i,j,k,UMY ) += coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uy1,uy2);
       nfabfx(i,j,k,UMZ ) += coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uz1,uz2);
       nfabfx(i,j,k,UET ) += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,ux1,ux2,ie1,ie2) + fgDiv(p1,p2,ux1,ux2));
-      // printf("%d %d %d %d \n",m,l,i1,i2);
     }
   }
   
@@ -306,7 +305,7 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
       p2   = prims(i,j2,k,QPRES);
 
       massflx = fgQuad(rho1,rho2,uy1,uy2);
-      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+      ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
       nfabfy(i,j,k,URHO) += coeffs[l-1]*massflx;
       nfabfy(i,j,k,UMX ) += coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
       nfabfy(i,j,k,UMY ) += coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2)+ fDiv(p1,p2));
@@ -335,7 +334,7 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
       p2   = prims(i,j,k2,QPRES);
 
       massflx = fgQuad(rho1,rho2,uz1,uz2);
-      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+      ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
       nfabfz(i,j,k,URHO) += coeffs[l-1]*massflx;
       nfabfz(i,j,k,UMX)  += coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,ux1,ux2);
       nfabfz(i,j,k,UMY)  += coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,uy1,uy2);
@@ -343,6 +342,7 @@ void KEEP(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pri
       nfabfz(i,j,k,UET)  += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uz1,uz2,ie1,ie2)+ fgDiv(p1,p2,uz1,uz2));
     }
   }
+
 }
 ///////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
@@ -374,13 +374,12 @@ void KEEPy(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& pr
       p2   = prims(i,j2,k,QPRES);
 
       massflx = fgQuad(rho1,rho2,uy1,uy2);
-      ke      = ux1*ux2 + uy1*uy2 + uz1*uz2;
+      ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
       flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
       flx[UMX]  = flx[UMX]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
       flx[UMY]  = flx[UMY]  + coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2) + fDiv(p1,p2));
       flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
       flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
-      // printf("%d %d %d %d \n",m,l,j1,j2);
     }
   }
   for (int n=0; n<NCONS; n++) {nfabfy(i,j,k,n) = flx[n];}
