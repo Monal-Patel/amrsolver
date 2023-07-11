@@ -148,7 +148,7 @@ CNS::variableSetUp ()
 #endif
     cnt++; 
     set_scalar_bc(bcs[cnt],h_phys_bc);
-    name[cnt] = "rho_et";
+    name[cnt] = "energy";
 
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
     bndryfunc.setRunOnGPU(true);

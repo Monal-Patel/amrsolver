@@ -46,6 +46,7 @@ void user_tagging(amrex::TagBoxArray& tags, amrex::MultiFab &sdata, int level) {
     auto const& tagfab = tags.array(mfi);
     auto const& sdf = sdata.array(mfi); // state data fab (sdf)
     int idx = 0; // density index
+    Real dengrad_threshold = 0.5;
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept 
     {
@@ -58,7 +59,20 @@ void user_tagging(amrex::TagBoxArray& tags, amrex::MultiFab &sdata, int level) {
       // if (amrex::max(ax,ay,az) >= dengrad_threshold) {
       //     tagfab(i,j,k) = true;}
       amrex::Real drhox = amrex::Math::abs(sdf(i+1,j,k,idx) - sdf(i-1,j,k,idx))/sdf(i,j,k,idx);
-      tagfab(i,j,k) = drhox > 0.5f;
+      if (drhox > dengrad_threshold) {
+        tagfab(i,j,k) = true;
+        // if (!(bx.bigEnd(0) == i)) {
+          tagfab(i+1,j,k) = true;
+        // }
+
+        // if (!(bx.bigEnd(0) == i+1)) {
+          tagfab(i+2,j,k) = true;
+        // }
+
+        // if (!(bx.bigEnd(0) == i+2)) {
+          tagfab(i+3,j,k) = true;
+        // }
+      }
     });
   }
 }

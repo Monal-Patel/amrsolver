@@ -58,9 +58,9 @@ AMREX_GPU_DEVICE inline
 void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& pparm,Parm const& parms, auto const dx) {
 
 
-  const Real x = (i + 0.5) * dx[0];
-  const Real y = (j + 0.5) * dx[1];
-  const Real z = (k + 0.5) * dx[2];
+  const Real x = (i + 0.5_rt) * dx[0];
+  const Real y = (j + 0.5_rt) * dx[1];
+  const Real z = (k + 0.5_rt) * dx[2];
 
   Real rho = 1/parms.Rspec;
 
@@ -70,11 +70,6 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
   rhs(i,j,k,URHO) = error;
 
   // rho (duu/dx + duv/dy + duw/dz) assuming rho=constant
-  // rhs(i,j,k,UMX) = rhs(i,j,k,UMX) + rho*( 2*pparm.fu(x,y,z)*pparm.dudx(x,y,z) 
-  //                + pparm.fv(x,y,z)*pparm.dudy(x,y,z) + pparm.fu(x,y,z)*pparm.dvdy(x,y,z)
-  //                + pparm.fw(x,y,z)*pparm.dudz(x,y,z) + pparm.fu(x,y,z)*pparm.dwdz(x,y,z)) 
-  //                + pparm.dpdx(x,y,z);
-
   error = rhs(i,j,k,UMX) + rho*( 2*pparm.fu(x,y,z)*pparm.dudx(x,y,z) 
                  + pparm.fv(x,y,z)*pparm.dudy(x,y,z) + pparm.fu(x,y,z)*pparm.dvdy(x,y,z)
                  + pparm.fw(x,y,z)*pparm.dudz(x,y,z) + pparm.fu(x,y,z)*pparm.dwdz(x,y,z)) 
@@ -82,11 +77,6 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
   rhs(i,j,k,UMX) = error;
 
   // rho (dvu/dx + dvv/dy + dvw/dz) assuming rho=constant
-  // rhs(i,j,k,UMY) = rhs(i,j,k,UMY) + rho*( pparm.fu(x,y,z)*pparm.dvdx(x,y,z) + pparm.fv(x,y,z)*pparm.dudx(x,y,z) 
-  //                + 2*pparm.fv(x,y,z)*pparm.dvdy(x,y,z) 
-  //                + pparm.fw(x,y,z)*pparm.dvdz(x,y,z) + pparm.fv(x,y,z)*pparm.dwdz(x,y,z)) 
-  //                + pparm.dpdy(x,y,z);
-                 
   error = rhs(i,j,k,UMY) + rho*( pparm.fu(x,y,z)*pparm.dvdx(x,y,z) + pparm.fv(x,y,z)*pparm.dudx(x,y,z) 
                  + 2*pparm.fv(x,y,z)*pparm.dvdy(x,y,z) 
                  + pparm.fw(x,y,z)*pparm.dvdz(x,y,z) + pparm.fv(x,y,z)*pparm.dwdz(x,y,z)) 
@@ -94,11 +84,6 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
   rhs(i,j,k,UMY) = error;
 
   // rho (dwu/dx + dwv/dy + dww/dz) assuming rho=constant
-  // rhs(i,j,k,UMZ) = rhs(i,j,k,UMZ) + rho*( pparm.fu(x,y,z)*pparm.dwdx(x,y,z) + pparm.fw(x,y,z)*pparm.dudx(x,y,z) 
-  //                + pparm.fv(x,y,z)*pparm.dwdy(x,y,z) + pparm.fw(x,y,z)*pparm.dvdy(x,y,z)) 
-  //                + 2*pparm.fw(x,y,z)*pparm.dwdz(x,y,z) 
-  //                + pparm.dpdz(x,y,z);
-
   error = rhs(i,j,k,UMZ) + rho*(pparm.fu(x,y,z)*pparm.dwdx(x,y,z) + pparm.fw(x,y,z)*pparm.dudx(x,y,z) 
         + pparm.fv(x,y,z)*pparm.dwdy(x,y,z) + pparm.fw(x,y,z)*pparm.dvdy(x,y,z)
         + 2*pparm.fw(x,y,z)*pparm.dwdz(x,y,z))
@@ -110,16 +95,20 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
   // et = e + 1/2 (u^2 + v^2 + w^2) = cv T + 1/2 (u^2 + v^2 + w^2)
   Real et = parms.cv*pparm.ft(x,y,z) + 0.5_rt*(pparm.fu(x,y,z)*pparm.fu(x,y,z) + pparm.fv(x,y,z)*pparm.fv(x,y,z) + pparm.fw(x,y,z)*pparm.fw(x,y,z));
 
-  // d(et) = cv dT + 2*0.5(udu + vdv + wdw)
-  Real det = parms.cv*pparm.dTdx(x,y,z) + (pparm.fu(x,y,z)*pparm.dudx(x,y,z) + pparm.fv(x,y,z)*pparm.dvdy(x,y,z) + pparm.fw(x,y,z)*pparm.dwdz(x,y,z));
+  // x-direction: rho [ et d(u)/dx + u d(et)/dx + (1/rho) ( u d(P)dx + P d(u)dx )]
+  // d(et)/dx = cv dT/dx + 2*0.5(udu/dx + vdv/dx + wdw/dx)
+  Real det = parms.cv*pparm.dTdx(x,y,z) + (pparm.fu(x,y,z)*pparm.dudx(x,y,z) + pparm.fv(x,y,z)*pparm.dvdx(x,y,z) + pparm.fw(x,y,z)*pparm.dwdx(x,y,z));
 
-  // x-direction: rho [ et d(u) + u d(et) + (1/rho) ( u d(P) + P d(u) )]
   error = rho*( et*pparm.dudx(x,y,z) +  pparm.fu(x,y,z)*det + (1/rho)*(pparm.fu(x,y,z)*pparm.dpdx(x,y,z) + pparm.fp(x,y,z)*pparm.dudx(x,y,z)) );
 
   // y-direction: rho [ et d(v) + v d(et) + (1/rho) ( v d(P) + P d(v) )]
+  det = parms.cv*pparm.dTdy(x,y,z) + (pparm.fu(x,y,z)*pparm.dudy(x,y,z) + pparm.fv(x,y,z)*pparm.dvdy(x,y,z) + pparm.fw(x,y,z)*pparm.dwdy(x,y,z));
+
   error += rho*( et*pparm.dvdy(x,y,z) +  pparm.fv(x,y,z)*det + (1/rho)*(pparm.fv(x,y,z)*pparm.dpdy(x,y,z) + pparm.fp(x,y,z)*pparm.dvdy(x,y,z)) );
 
   // z-direction: rho [ et d(w) + w d(et) + (1/rho) ( w d(P) + P d(w) )]
+  det = parms.cv*pparm.dTdz(x,y,z) + (pparm.fu(x,y,z)*pparm.dudz(x,y,z) + pparm.fv(x,y,z)*pparm.dvdz(x,y,z) + pparm.fw(x,y,z)*pparm.dwdz(x,y,z));
+
   error += rho*( et*pparm.dwdz(x,y,z) +  pparm.fw(x,y,z)*det + (1/rho)*(pparm.fw(x,y,z)*pparm.dpdz(x,y,z) + pparm.fp(x,y,z)*pparm.dwdz(x,y,z)) );
 
   error = error + rhs(i,j,k,UET);
