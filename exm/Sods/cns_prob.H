@@ -92,7 +92,8 @@ void user_tagging(amrex::TagBoxArray& tags, amrex::MultiFab &sdata, int level) {
   }
 
 AMREX_GPU_DEVICE inline
-void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm) {
+void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm, Parm const& parms, auto const dx) {
+
 
 
 }

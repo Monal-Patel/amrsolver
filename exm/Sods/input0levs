@@ -6,7 +6,7 @@ max_step  = 200
 stop_time = 2.0
 #time_step = 0.02 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
-cfl = 1.6
+cfl = 0.8
 
 # computational domain 
 geometry.is_periodic = 0 1 1
@@ -24,18 +24,18 @@ geometry.prob_hi     = 10.0    10.0    10.0
 cns.lo_bc      = 2  -1   -1
 cns.hi_bc      = 2  -1   -1
 cns.order_rk   = 2 # -2, 1, 2 or 3 
-cns.stages_rk  = 4   
+cns.stages_rk  = 2   
 cns.rhs_euler  = 1 # 0=false, 1=true
 cns.rhs_visc   = 0 # 0=false, 1=true
 cns.rhs_source = 0 # 0=false, 1=true
-cns.flux_euler = 0 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
+cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
 cns.order_keep = 4 # Order of accuracy=2, 4 or 6
 cns.nghost     = 2 
 cns.verbose    = 1 # 0=quiet, 1=verbose
 
 # REFINEMENT / REGRIDDING 
 amr.n_cell          = 64 16 16
-amr.max_level       = 1       # maximum level number allowed
+amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 2 2 2 2 # how often to regrid
 amr.blocking_factor = 8
@@ -54,7 +54,7 @@ amr.check_int               = 100    # number of timesteps between checkpoints
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 1         # number of timesteps between plotfiles
+amr.plot_int          = 2         # number of timesteps between plotfiles
 amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
 amr.screen_output     = 100
 

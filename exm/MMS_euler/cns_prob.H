@@ -37,8 +37,8 @@ prob_initdata (
   u[0] = pparm.fu(x,y,z);
   u[1] = pparm.fv(x,y,z);
   u[2] = pparm.fw(x,y,z);
-  p = 4.0_rt + pparm.fp(x,y,z);
-  T = 4.0_rt + pparm.ft(x,y,z);
+  p = pparm.fp(x,y,z);
+  T = pparm.ft(x,y,z);
   rho  = p/(parm.Rspec*T); 
   eint = parm.cv*T;
 
@@ -111,10 +111,12 @@ void user_source(int i, int j, int k, const auto& state, const auto& rhs, const 
 
   error += rho*( et*pparm.dwdz(x,y,z) +  pparm.fw(x,y,z)*det + (1/rho)*(pparm.fw(x,y,z)*pparm.dpdz(x,y,z) + pparm.fp(x,y,z)*pparm.dwdz(x,y,z)) );
 
+  // Print() << x << " " << y << " " << z << " " << rhs(i,j,k,UET)/2 << " " << error << std::endl;
+  // exit(0);
+
   error = error + rhs(i,j,k,UET);
 
-  rhs(i,j,k,UET) = error;//*error;
-
+  rhs(i,j,k,UET) = error;
 
 }
 
