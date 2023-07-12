@@ -21,6 +21,7 @@ bool CNS::dt_dynamic=false;
 int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
 int  CNS::order_keep=2;
+int  CNS::art_diss=0; 
 int  CNS::order_rk=2;
 int  CNS::stages_rk=2;
 int  CNS::do_reflux = 1;
@@ -90,6 +91,9 @@ void CNS::read_params()
     if (!pp.query("order_keep",order_keep)) {
       amrex::Abort("Need to specify KEEP scheme order of accuracy (2, 4 or 6)");
     }
+
+    if (!pp.query("art_diss",art_diss)) {
+      amrex::Abort("Need to specify artificial dissipation (1=on 0=off)");}
   }
 
   if (!pp.query("order_rk",order_rk)) {

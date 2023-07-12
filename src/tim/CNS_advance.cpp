@@ -293,19 +293,19 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       });
 
       // JST artificial dissipation shock capturing
-     amrex::ParallelFor(bx,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      {
-        ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
-      });
+      if (art_diss==1) {
+        amrex::ParallelFor(bx,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+            ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
+          });
 
-      amrex::ParallelFor(bxnodal, NCONS,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-      {
-        JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz);
-      });
-
-
+          amrex::ParallelFor(bxnodal, NCONS,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+          {
+            JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,lparm);
+          }); 
+        }
       }
     }
 

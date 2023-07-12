@@ -24,6 +24,10 @@ struct Parm
     amrex::Real cp = eos_gamma * Ru / (eos_mu * (eos_gamma-amrex::Real(1.0)));
     amrex::Real Rspec = Ru/eos_mu;
 
+
+    amrex:: Real Cshock = 0.0;
+    amrex:: Real Cdamp = 0.0;
+
     public: 
     // AMREX_GPU_DEVICE inline const amrex::Real visc(amrex::Real& T,mu) { 
     AMREX_GPU_DEVICE inline amrex::Real visc(amrex::Real& T) const { return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}

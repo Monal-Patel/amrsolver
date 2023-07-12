@@ -41,6 +41,8 @@ struct CnsFillExtDir
         {
 
         // IMPROVEMENT TODO: Avoid if statement by having different options for user defined BCs in cns_bcfill
+        // Print() << "CNSFillExtDir called " << l_phys_bc->lo(1) << " " << l_phys_bc->hi(1) << " " << geom.Domain().bigEnd(1)+1 << " " << geom.Domain().smallEnd(1)-1 << std::endl;
+
         if (l_phys_bc->lo(1)==6 || l_phys_bc->hi(1)==6) {
           Array2D<Real,0,NPRIM-1,0,5> prims;
 

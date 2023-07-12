@@ -16,6 +16,8 @@ using namespace amrex;
 AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const Real>& u, Array4<Real> const& q, const Parm& parm) noexcept
 {
     Real rho = u(i,j,k,URHO);
+    // Print() << "cons2prim"<< i << j << k << rho << std::endl;
+    // rho = max(1e-40,rho);
     Real rhoinv = Real(1.0)/rho;
     Real ux = u(i,j,k,UMX)*rhoinv;
     Real uy = u(i,j,k,UMY)*rhoinv;
@@ -84,7 +86,7 @@ void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto 
 //     else               { QUN = QW;  QUT = QU;  QUTT = QV; }
     
 //     if (sys == 0) { // speed of sound system
-//         // Real rmpoc2 = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
+//         // Real rmpoCshock = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
 //         w(i,j,k,WRHO) = q(i,j,k,QRHO) - q(i,j,k,QPRES)/q(i,j,k,QC)/q(i,j,k,QC); //rho minus p over c^2
 //         w(i,j,k,WACO)   = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) + q(i,j,k,QRHO)*q(i,j,k,QUN));
 //         w(i,j,k,WACO+1) = 0.5 * (q(i,j,k,QPRES)/q(i,j,k,QC) - q(i,j,k,QRHO)*q(i,j,k,QUN));
@@ -189,33 +191,31 @@ void ComputeSensorLambda(int i, int j, int k, const auto& prims, const auto& lam
 
 // calculates dissipative flux at i-1/2, j-1/2 and k-1/2
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void JSTflux(int i, int j, int k, int n, const auto& lambda , const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz) {
+void JSTflux(int i, int j, int k, int n, const auto& lambda , const auto& sensor, const auto& cons,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
 
-  Real c2 = 1.0_rt;
-  Real c4 = 0.1_rt;
   Real dw,sen,rr,fdamp;
   Real u_ijk = cons(i,j,k,n);
 
   // x-dir
   dw     = (u_ijk - cons(i-1,j,k,n));
-  sen    = c2*max(sensor(i-1,j,k,0),sensor(i,j,k,0));
+  sen    = parm.Cshock*max(sensor(i-1,j,k,0),sensor(i,j,k,0));
   rr     = max(lambda(i-1,j,k,0),lambda(i,j,k,0));
   fdamp  = cons(i+1,j,k,n) - 3.0*cons(i,j,k,n) + 3.0*cons(i-1,j,k,n) - cons(i-2,j,k,n);
-  nfabfx(i,j,k,n) -= (sen*dw - max(0.0,c4 - sen)*fdamp)*rr;
+  nfabfx(i,j,k,n) -= (sen*dw - max(0.0,parm.Cdamp - sen)*fdamp)*rr;
 
   // y-dir
   dw     = (u_ijk - cons(i,j-1,k,n));
-  sen    = c2*max(sensor(i,j-1,k,0),sensor(i,j,k,0));
+  sen    = parm.Cshock*max(sensor(i,j-1,k,0),sensor(i,j,k,0));
   rr     = max(lambda(i,j-1,k,0),lambda(i,j,k,0));
   fdamp  = cons(i,j+1,k,n) - 3.0*cons(i,j,k,n) + 3.0*cons(i,j-1,k,n) - cons(i,j-2,k,n);
-  nfabfy(i,j,k,n) -= (sen*dw - max(0.0,c4 - sen)*fdamp)*rr;
+  nfabfy(i,j,k,n) -= (sen*dw - max(0.0,parm.Cdamp - sen)*fdamp)*rr;
 
   // z-dir
   dw     = (u_ijk - cons(i,j,k-1,n));
-  sen    = c2*max(sensor(i,j,k-1,0),sensor(i,j,k,0));
+  sen    = parm.Cshock*max(sensor(i,j,k-1,0),sensor(i,j,k,0));
   rr     = max(lambda(i,j,k-1,0),lambda(i,j,k,0));
   fdamp  = cons(i,j,k-1,n) - 3.0*cons(i,j,k,n) + 3.0*cons(i,j,k-1,n) - cons(i,j,k-1,n);
-  nfabfz(i,j,k,n) -= (sen*dw - max(0.0,c4 - sen)*fdamp)*rr;
+  nfabfz(i,j,k,n) -= (sen*dw - max(0.0,parm.Cdamp - sen)*fdamp)*rr;
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
