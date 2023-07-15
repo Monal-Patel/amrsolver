@@ -10,7 +10,7 @@ extern "C" {
   {
 
     CNS::h_parm->Cshock = 0.0_rt;
-    CNS::h_parm->Cdamp  = 0.0001_rt;
+    CNS::h_parm->Cdamp  = 0.0016_rt;
 
     CNS::d_parm->Cshock = CNS::h_parm->Cshock;
     CNS::d_parm->Cdamp  = CNS::h_parm->Cdamp;

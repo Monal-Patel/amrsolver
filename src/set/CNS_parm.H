@@ -11,7 +11,7 @@ struct Parm
 
     //amrex::Real Pr  = 0.72;     // Prandtl number
     //Sutherland's fit from Computational Fluid Mechanics and Heat Transfer 
-    amrex::Real visc_ref  = 1.458e-5; // Viscosity reference value
+    amrex::Real visc_ref  = 1.458e-6; // Viscosity reference value
     amrex::Real Tvisc_ref = 110.4;    // Viscosity reference temperature
     amrex::Real cond_ref  = 2.495e-3; // Conductivity reference value
     amrex::Real Tcond_ref = 194.0;    // Conductivity reference temperature
