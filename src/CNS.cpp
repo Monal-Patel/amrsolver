@@ -437,6 +437,8 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 #endif
 
 }
+
+// TODO: Add restarts
 // -----------------------------------------------------------------------------
 
 
@@ -480,23 +482,60 @@ void CNS::printTotal() const
 #endif
   ParallelDescriptor::ReduceRealSum(tot.data(), NCONS, ParallelDescriptor::IOProcessorNumber());
 
-  ParallelDescriptor::ReduceRealMax(prims_max.data(), ParallelDescriptor::IOProcessorNumber());
+  ParallelDescriptor::ReduceRealMax(prims_max.data(),NPRIM, ParallelDescriptor::IOProcessorNumber());
 
-  ParallelDescriptor::ReduceRealMin(prims_min.data(), ParallelDescriptor::IOProcessorNumber());
+  ParallelDescriptor::ReduceRealMin(prims_min.data(),NPRIM, ParallelDescriptor::IOProcessorNumber());
 
-  // cfl = S_new.max
-  // compute CFL
-  // CFL = 
-  
+  // compute convective CFL
+  const auto dx = geom.CellSizeArray();
+  const Real dt =  parent->dtLevel(level);
+  const MultiFab& primsmf = Vprimsmf[level];
+  Parm const& lparm = *d_parm;
+
+  Vector<Array<Real,3>>* cfl_arr;
+  cfl_arr = new Vector<Array<Real,3>>;
+  cfl_arr->resize(AMREX_SPACEDIM);
+
+  for (int idir=0; idir<AMREX_SPACEDIM; idir++){
+    cfl_arr->at(idir)[0] = 0.0_rt;
+    cfl_arr->at(idir)[1] = 0.0_rt;
+    cfl_arr->at(idir)[2] = 0.0_rt;
+  }
+
+  // We cannot modify variables defined outside of the lambda function in the lambda function. AMReX does not allow mutable keyword. This is why we need to call functions.
+
+  for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    auto const& prims    = primsmf.array(mfi);
+    // auto const& lambda   = lambdamf.array(mfi);
+    const Box& bx        = mfi.tilebox();
+
+    amrex::ParallelFor(bx,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    { 
+      pointCFL(i, j, k, *cfl_arr, prims, lparm, dx, dt);
+    });
+  };
+
+  for (int idir=0; idir<AMREX_SPACEDIM; idir++){
+    ParallelDescriptor::ReduceRealMax((cfl_arr->at(idir)).data(),3, ParallelDescriptor::IOProcessorNumber());
+  }
 
   amrex::Print().SetPrecision(17) 
   <<"\n[CNS level "<< level << "]\n" 
-  <<"   Rho min, max = " << prims_min[0] << " , " << prims_max[0] << "\n"
-  <<"   Ux  min, max = " << prims_min[1] << " , " << prims_max[1] << "\n"
-  <<"   Uy  min, max = " << prims_min[2] << " , " << prims_max[2] << "\n"
-  <<"   Uz  min, max = " << prims_min[3] << " , " << prims_max[3] << "\n"
-  <<"   P   min, max = " << prims_min[5] << " , " << prims_max[5] << "\n"
-  <<"   T   min, max = " << prims_min[4] << " , " << prims_max[4] << "\n \n";
+  <<"   Rho  min, max = " << prims_min[0] << " , " << prims_max[0] << "\n"
+  <<"   Ux   min, max = " << prims_min[1] << " , " << prims_max[1] << "\n"
+  <<"   Uy   min, max = " << prims_min[2] << " , " << prims_max[2] << "\n"
+  <<"   Uz   min, max = " << prims_min[3] << " , " << prims_max[3] << "\n"
+  <<"   P    min, max = " << prims_min[5] << " , " << prims_max[5] << "\n"
+  <<"   T    min, max = " << prims_min[4] << " , " << prims_max[4] << "\n";
+
+  amrex::Print().SetPrecision(17) 
+  <<"   Vax  min, max = " << cfl_arr->at(0)[0] << " , " << cfl_arr->at(0)[1] <<  "\n"
+  <<"   Vay  min, max = " << cfl_arr->at(1)[0] << " , " << cfl_arr->at(1)[1] <<  "\n"
+  <<"   Vaz  min, max = " << cfl_arr->at(2)[0] << " , " << cfl_arr->at(2)[1] <<  "\n"
+  <<"   CFLx         = " << cfl_arr->at(0)[2]<< "\n"
+  <<"   CFLy         = " << cfl_arr->at(1)[2]<< "\n"
+  <<"   CFLz         = " << cfl_arr->at(2)[2]<< "\n \n";
 
   amrex::Print().SetPrecision(17) 
   <<"   Total mass   = " << tot[0] << "\n"
@@ -505,6 +544,7 @@ void CNS::printTotal() const
   <<"   Total z-mom  = " << tot[3] << "\n"
   <<"   Total energy = " << tot[4] << "\n";
 
+  cfl_arr->clear();
 #ifdef BL_LAZY
                        });
 #endif
