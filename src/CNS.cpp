@@ -462,18 +462,43 @@ void CNS::avgDown()
 void CNS::printTotal() const
 {
   const MultiFab &S_new = get_new_data(State_Type);
-  std::array<Real, 5> tot;
-  for (int comp = 0; comp < 5; ++comp)
+  std::array<Real, NCONS> tot;
+  std::array<Real, NPRIM> prims_max,prims_min;
+
+  for (int comp = 0; comp < NCONS; ++comp)
   {
     tot[comp] = S_new.sum(comp, true) * geom.ProbSize();
   }
+
+  for (int comp = 0; comp < NPRIM; ++comp) {
+    prims_max[comp] = Vprimsmf[level].max(comp, 0, true);
+    prims_min[comp] = Vprimsmf[level].min(comp, 0, true);
+  }
+
 #ifdef BL_LAZY
   Lazy::QueueReduction([=]() mutable {
 #endif
-  ParallelDescriptor::ReduceRealSum(tot.data(), 5, ParallelDescriptor::IOProcessorNumber());
+  ParallelDescriptor::ReduceRealSum(tot.data(), NCONS, ParallelDescriptor::IOProcessorNumber());
+
+  ParallelDescriptor::ReduceRealMax(prims_max.data(), ParallelDescriptor::IOProcessorNumber());
+
+  ParallelDescriptor::ReduceRealMin(prims_min.data(), ParallelDescriptor::IOProcessorNumber());
+
+  // cfl = S_new.max
+  // compute CFL
+  // CFL = 
+  
 
   amrex::Print().SetPrecision(17) 
   <<"\n[CNS level "<< level << "]\n" 
+  <<"   Rho min, max = " << prims_min[0] << " , " << prims_max[0] << "\n"
+  <<"   Ux  min, max = " << prims_min[1] << " , " << prims_max[1] << "\n"
+  <<"   Uy  min, max = " << prims_min[2] << " , " << prims_max[2] << "\n"
+  <<"   Uz  min, max = " << prims_min[3] << " , " << prims_max[3] << "\n"
+  <<"   P   min, max = " << prims_min[5] << " , " << prims_max[5] << "\n"
+  <<"   T   min, max = " << prims_min[4] << " , " << prims_max[4] << "\n \n";
+
+  amrex::Print().SetPrecision(17) 
   <<"   Total mass   = " << tot[0] << "\n"
   <<"   Total x-mom  = " << tot[1] << "\n"
   <<"   Total y-mom  = " << tot[2] << "\n"
