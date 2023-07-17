@@ -207,7 +207,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   Gpu::streamSynchronize(); // ensure primitive variables mf computed before starting mfiter
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
-  // IMPROVEMENT: Can have pointer function (dynamic casting?) (main euler_flux function) which can be pointed to different flux schemes in the initialisation. The function can pass a parameter struct to include any scheme specfic parameters.
+  // TODO: Can have pointer function (dynamic casting?) (main euler_flux function) which can be pointed to different flux schemes in the initialisation. The function can pass a parameter struct to include any scheme specfic parameters.
   if(rhs_euler) {
   // weno5js fvs
   if (flux_euler==2) {
@@ -261,6 +261,7 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     int halfsten = order_keep/2;
 
     //2 * standard finite difference coefficients
+    // TODO declare these coefficients only once
     GpuArray<Real,3> coeffs; coeffs[0]=0.0_rt;coeffs[1]=0.0_rt;coeffs[2]=0.0_rt;
     if (order_keep==4) {
       coeffs[0]=Real(4.0)/3 ,coeffs[1]=Real(-2.0)/12;
@@ -379,6 +380,14 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
     }
   }
   } 
+
+  // Euler flux corrections near boundaries ////////////////////////////////////
+  // Physical boundary order reduction
+
+
+  // 
+
+
   //////////////////////////////////////////////////////////////////////////////
 
 
