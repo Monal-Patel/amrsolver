@@ -15,6 +15,9 @@ extern "C" {
     CNS::d_parm->Cshock = CNS::h_parm->Cshock;
     CNS::d_parm->Cdamp  = CNS::h_parm->Cdamp;
 
+
+    // print lv_w , dy^+, dx^+, dz^+
+
   }
 
 }
