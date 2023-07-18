@@ -1,33 +1,3 @@
-# data in Exec of CNS
-EB_CNS/Exec/Combustor/*.ex*
-EB_CNS/Exec/Combustor/plt*
-EB_CNS/Exec/Combustor/tmp_build_dir
-EB_CNS/Exec/Pulse/*.ex*
-EB_CNS/Exec/Pulse/plt*
-EB_CNS/Exec/Pulse/tmp_build_dir
-EB_CNS/Exec/ShockRef/*.ex*
-EB_CNS/Exec/ShockRef/plt*
-EB_CNS/Exec/ShockRef/tmp_build_dir
-EB_CNS/Exec/Sod/*.ex*
-EB_CNS/Exec/Sod/plt*
-EB_CNS/Exec/Sod/tmp_build_dir
-
-# data in Exec of CNS  hybrid
-EB_CNS/Exec/Combustor/*.EX*
-EB_CNS/Exec/Combustor/plt*
-EB_CNS/Exec/Combustor/tmp_build_dir
-EB_CNS/Exec/Pulse/*.EX*
-EB_CNS/Exec/Pulse/plt*
-EB_CNS/Exec/Pulse/tmp_build_dir
-EB_CNS/Exec/ShockRef/*.EX*
-EB_CNS/Exec/ShockRef/plt*
-EB_CNS/Exec/ShockRef/tmp_build_dir
-EB_CNS/Exec/Sod/*.EX*
-EB_CNS/Exec/Sod/plt*
-EB_CNS/Exec/Sod/tmp_build_dir
-
-
-
 #vscode data
 .vscode/configurationCache.log
 .vscode/dryrun.log
@@ -43,15 +13,10 @@ EB_CNS/Exec/Sod/tmp_build_dir
 
 /wrk/
 
-/lib/cgal/build
-/lib/install
-
-/lib/boost/install
-/lib/boost/doc
-/lib/boost/bin.v2
-/lib/boost/project-config.jam
-/lib/boost/tools
+/lib/cgal/build/*
+/lib/boost/*
 /lib/boost/b2
+/lib/install/*
 
 /tst/AMReX_regtests/output/AMReX-benchmarks/*
 /tst/AMReX_regtests/output/AMReX-tests/*

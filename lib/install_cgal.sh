@@ -14,3 +14,6 @@ mkdir build
 cd ./build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$dir/lib/install/cgal ..
 make install
+
+# gnu multiple precision arithmetic library also needed
+#sudo apt-get install libgmp3-dev

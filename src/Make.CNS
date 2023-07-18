@@ -31,7 +31,7 @@ include $(AMR_SOLVER)/src/cls/Make.package
 INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/cls/
 VPATH_LOCATIONS   += $(AMR_SOLVER)/src/cls/
 
-ifeq ($(USE_IBM),TRUE)
+ifeq ($(USE_GPIBM),TRUE)
   include $(AMR_SOLVER)/src/ibm/Make.package
   INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/ibm/
   VPATH_LOCATIONS   += $(AMR_SOLVER)/src/ibm/

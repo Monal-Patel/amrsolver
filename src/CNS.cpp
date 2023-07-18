@@ -172,11 +172,7 @@ void CNS::initData()
                        prob_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
                      });
 
-  // Compute the initial temperature (will override what was set in initdata)
-  // computeTemp(S_new, 0);
-
-  // MultiFab& C_new = get_new_data(Cost_Type);
-  // C_new.setVal(1.0);
+  // TODO: Could compute primitive variables here
 }
 
 void CNS::buildMetrics()

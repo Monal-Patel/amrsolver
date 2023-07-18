@@ -28,8 +28,8 @@ int main (int argc, char* argv[]) {
     int  max_step = -1;
     Real start_time = Real( 0.0);
     Real stop_time = Real(-1.0);
+    ParmParse pp;
     {
-      ParmParse pp;
       pp.query("amr.screen_output",CNS::nstep_screen_output);
       pp.query("amr.max_level",max_level);
       pp.query("max_step",max_step);

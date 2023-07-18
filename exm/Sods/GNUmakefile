@@ -11,4 +11,4 @@ COMP     = gcc
 USE_GPIBM=FALSE
 
 include ./Make.package
-include $(AMREX_HOME)/../../src/Make.CNS
+include $(AMR_SOLVER)/src/Make.CNS
