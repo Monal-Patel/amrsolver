@@ -53,4 +53,4 @@ amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
 amr.plot_int          = 100         # number of timesteps between plotfiles
 amr.derive_plot_vars  = temperature pressure
-amr.screen_output     = 1000
+cns.screen_output     = 1000

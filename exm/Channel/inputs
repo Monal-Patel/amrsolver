@@ -59,4 +59,4 @@ amr.plot_files_output = 1
 amr.plot_file         = plot/plt     # root name of plotfile
 amr.plot_int          = 550      # approximately 1 tau flow
 amr.derive_plot_vars  = pressure temperature x_velocity y_velocity z_velocity
-amr.screen_output     = 50 
+cns.screen_output     = 50 

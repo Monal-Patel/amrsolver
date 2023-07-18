@@ -32,6 +32,7 @@ cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
 cns.order_keep = 4 # Order of accuracy=2, 4 or 6
 cns.nghost     = 2 
 cns.verbose    = 1 # 0=quiet, 1=verbose
+cns.screen_output = 1
 
 # REFINEMENT / REGRIDDING 
 amr.n_cell          = 64 16 16
@@ -56,7 +57,6 @@ amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
 amr.plot_int          = 2         # number of timesteps between plotfiles
 amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
-amr.screen_output     = 100
 
 # problem specific parameter
 prob.p_l   = 1.0 

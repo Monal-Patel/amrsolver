@@ -55,7 +55,7 @@ amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
 amr.plot_int          = 2         # number of timesteps between plotfiles
 amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
-amr.screen_output     = 100
+cns.screen_output     = 100
 
 # problem specific parameter
 prob.p_l   = 1.0 
