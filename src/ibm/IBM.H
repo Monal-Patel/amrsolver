@@ -111,6 +111,10 @@ namespace IBM {
 
       int max_level=0; // need to save this as Amr protects this
 
+      const int nvar_ib = 2; // number of variables in IBMultiFab
+
+      int nghost_ib = 0; // number of ghost points in IBMultiFab -- set during ib.init(...)
+
       // pointer to Amr class instance
       Amr*pamr;
 
@@ -145,16 +149,16 @@ namespace IBM {
       // methods //
       void setMaxLevel(int max_lev);
 
-      void initialise (Amr* pointer_amr, const int nvar, const int nghost);
+      void init (Amr* pointer_amr, const int nghost);
 
       // void closestElem(Point& query);
       void static compute_plane_equations( Polyhedron::Facet& f);
 
-      void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost);
+      void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev);
 
       void destroyIBMultiFab (int lev);
 
-      void readGeom(const std::string filename);
+      void readGeom();
 
       void computeMarkers (int lev);
 

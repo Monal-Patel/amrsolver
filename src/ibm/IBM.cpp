@@ -1,5 +1,6 @@
 #include <IBM.H>
 #include <CGAL/Side_of_triangle_mesh.h>
+#include <AMReX_ParmParse.H>
 
 using namespace amrex;
 using namespace IBM;
@@ -50,18 +51,21 @@ IB::IB (){}
 IB::~IB () { delete treePtr;}
 
 void IB::setMaxLevel(int max_lev) {
-  IB::max_level = max_lev;
-  IB::mfa.resize(max_lev + 1);
+  // parent->finestLevel()
+
 };
 
 // initialise IB
-void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
+void IB::init(Amr* pointer_amr, const int nghost) {
 
+
+  IB::nghost_ib = nghost;
   IB::pamr = pointer_amr ; // store pointer to main Amr class object's instance
   IB::ref_ratio = pamr->refRatio();
   IB::max_level = pamr->maxLevel();
-  // pamr->max_level() is a protected member of AmrInfo
+  IB::mfa.resize(max_level + 1);
 
+  // TODO make the next 15 lines simpler
   IB::cellSizes.resize(IB::max_level+1);
   IB::dimp.resize(IB::max_level+1);
   cellSizes[0] = pamr->Geom(0).CellSizeArray();
@@ -71,14 +75,18 @@ void IB::initialise(Amr* pointer_amr, const int nvar, const int nghost) {
     }
   }
 
+  // TODO make distance ip a parameter
   for (int i=0;i<=IB::max_level;i++) {
     IB::dimp[i] = 0.6_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
     + cellSizes[i][1]*cellSizes[i][1] + cellSizes[i][2]*cellSizes[i][2]);
   }
+
+  // read geometry
+  readGeom();
 }
 // create IBMultiFabs at a level and store pointers to it
-void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev ,int nvar,int nghost) {
-  mfa.at(lev) = new IBMultiFab(bxa,dm,nvar,nghost);
+void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev) {
+  mfa.at(lev) = new IBMultiFab(bxa,dm,nvar_ib,nghost_ib);
 }
 
 void IB::destroyIBMultiFab (int lev) {
@@ -277,7 +285,11 @@ void IB::compute_plane_equations( Polyhedron::Facet& f) {
 		       h->next()->vertex()->point());
 };
 
-void IB::readGeom(const std::string filename) {
+void IB::readGeom() {
+
+  ParmParse pp;
+  std::string filename;
+  pp.get("ib.filename",filename);
 
   namespace PMP = CGAL::Polygon_mesh_processing;
 

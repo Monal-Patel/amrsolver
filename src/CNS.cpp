@@ -68,6 +68,7 @@ void CNS::read_params()
 {
   ParmParse pp("cns");
 
+  pp.query("screen_output",nstep_screen_output);
   pp.query("verbose", verbose);
 
   Vector<int> lo_bc(AMREX_SPACEDIM), hi_bc(AMREX_SPACEDIM);
@@ -382,7 +383,7 @@ void CNS::post_regrid(int lbase, int new_finest)
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.destroyIBMultiFab(level);
-  IBM::ib.buildIBMultiFab(this->boxArray(), this->DistributionMap(), level, 2, 2);
+  IBM::ib.buildIBMultiFab(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
 #endif
