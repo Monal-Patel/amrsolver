@@ -227,11 +227,11 @@ void IB::initialiseGPs (int lev) {
       // TODO assert that ip point within fab domain
 
       // temporary
-      Print() << "disGP, disIM (from IB) " << fab.gpArray[ii].disGP << " " << IB::disIM[lev] << std::endl;
-      for (int jj=0; jj<NUM_IMPS; jj++) {
-        Print() << "imp" << jj+1 << " "<< fab.gpArray[ii].imps[jj] << std::endl;
-        Print() << "impCell" << jj+1 << " "<< fab.gpArray[ii].impscell[jj] << std::endl;
-      }
+      // Print() << "disGP, disIM (from IB) " << fab.gpArray[ii].disGP << " " << IB::disIM[lev] << std::endl;
+      // for (int jj=0; jj<NUM_IMPS; jj++) {
+      //   Print() << "imp" << jj+1 << " "<< fab.gpArray[ii].imps[jj] << std::endl;
+      //   Print() << "impCell" << jj+1 << " "<< fab.gpArray[ii].impscell[jj] << std::endl;
+      // }
       
       // Interpolation points' (ips) weights for each image point
       Vector<Array<Real,8>>& ipweights = fab.gpArray[ii].ipweights; 
@@ -239,13 +239,13 @@ void IB::initialiseGPs (int lev) {
 
       for (int jj=0; jj<NUM_IMPS; jj++) {
         ipweights[jj] = computeIPweights(imps[jj], impscell[jj], cellSizes[lev]);
-        Real sum = 0.0;
-        Print() << "ipweights initGP" << jj+1 << std::endl;
-        for (int kk=0; kk<8; kk++) {
-          sum += ipweights[jj][kk];
-          Print() << kk+1 << " " << ipweights[jj][kk] << std::endl;
-        }
-        Print() << "sum " << sum << std::endl;
+        // Real sum = 0.0;
+        // Print() << "ipweights initGP" << jj+1 << std::endl;
+        // for (int kk=0; kk<8; kk++) {
+        //   sum += ipweights[jj][kk];
+        //   Print() << kk+1 << " " << ipweights[jj][kk] << std::endl;
+        // }
+        // Print() << "sum " << sum << std::endl;
       }
     }
   }
@@ -325,12 +325,20 @@ void IB::computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const P
         }
 
         Vector<Array<Real,8>>& weightsIP = ibFab.gpArray[ii].ipweights;
-        for (int kk=0; kk<NPRIM; kk++) {
-          itemp = indexIM[0] + IB::indexCube[kk][0];
-          jtemp = indexIM[1] + IB::indexCube[kk][1];
-          ktemp = indexIM[2] + IB::indexCube[kk][2];// ensure same order as weights!
-          stateIMs[jj][kk] += primFab(itemp,jtemp,ktemp,kk)*weightsIP[jj][kk];
+        // for each IP point
+        for (int ll=0; ll<8; ll++) {
+          itemp = indexIM[0] + IB::indexCube[ll][0];
+          jtemp = indexIM[1] + IB::indexCube[ll][1];
+          ktemp = indexIM[2] + IB::indexCube[ll][2];
+          // for each primitive variable
+          for (int kk=0; kk<NPRIM; kk++) {
+            stateIMs[jj][kk] += primFab(itemp,jtemp,ktemp,kk)*weightsIP[jj][ll];
+            // Print() << kk <<   << " " << primFab(itemp,jtemp,ktemp,kk)  << std::endl;
+          }
         }
+          // for (int kk=0; kk<NPRIM; kk++) {
+          //   Print() << kk << " " << stateIMs[jj][kk] << std::endl ;
+          // }
       }
 
 

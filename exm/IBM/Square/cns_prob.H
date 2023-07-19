@@ -19,7 +19,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 
   Real x = prob_lo[0] + (i+Real(0.5))*dx[0];
   Real Pt, rhot, uxt;
-  if (x < prob_hi[0]/2) {
+  if (x < prob_hi[0]/10) {
       Pt = prob_parm.p_l;
       rhot = prob_parm.rho_l;
       uxt = prob_parm.u_l;
