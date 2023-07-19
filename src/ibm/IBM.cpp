@@ -1,6 +1,7 @@
 #include <IBM.H>
 #include <CGAL/Side_of_triangle_mesh.h>
 #include <AMReX_ParmParse.H>
+#include <CNS_index_macros.H>
 
 using namespace amrex;
 using namespace IBM;
@@ -50,34 +51,34 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
 IB::IB (){}
 IB::~IB () { delete treePtr;}
 
-void IB::setMaxLevel(int max_lev) {
-  // parent->finestLevel()
+// void IB::setMaxLevel(int max_lev) {
+//   // parent->finestLevel()
 
-};
+// };
 
 // initialise IB
 void IB::init(Amr* pointer_amr, const int nghost) {
 
 
-  IB::nghost_ib = nghost;
+  IB::NGHOST_IB = nghost;
   IB::pamr = pointer_amr ; // store pointer to main Amr class object's instance
   IB::ref_ratio = pamr->refRatio();
-  IB::max_level = pamr->maxLevel();
-  IB::mfa.resize(max_level + 1);
+  IB::MAX_LEVEL = pamr->maxLevel();
+  IB::mfa.resize(MAX_LEVEL + 1);
 
   // TODO make the next 15 lines simpler
-  IB::cellSizes.resize(IB::max_level+1);
-  IB::dimp.resize(IB::max_level+1);
+  IB::cellSizes.resize(IB::MAX_LEVEL+1);
+  IB::disIM.resize(IB::MAX_LEVEL+1);
   cellSizes[0] = pamr->Geom(0).CellSizeArray();
-  for (int i=1;i<=IB::max_level;i++) {
+  for (int i=1;i<=IB::MAX_LEVEL;i++) {
     for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
       cellSizes[i][j] = cellSizes[i-1][j]/ref_ratio[i-1][j];
     }
   }
 
   // TODO make distance ip a parameter
-  for (int i=0;i<=IB::max_level;i++) {
-    IB::dimp[i] = 0.6_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
+  for (int i=0;i<=IB::MAX_LEVEL;i++) {
+    IB::disIM[i] = 0.6_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
     + cellSizes[i][1]*cellSizes[i][1] + cellSizes[i][2]*cellSizes[i][2]);
   }
 
@@ -86,7 +87,7 @@ void IB::init(Amr* pointer_amr, const int nghost) {
 }
 // create IBMultiFabs at a level and store pointers to it
 void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev) {
-  mfa.at(lev) = new IBMultiFab(bxa,dm,nvar_ib,nghost_ib);
+  mfa.at(lev) = new IBMultiFab(bxa,dm,NVAR_IB,NGHOST_IB);
 }
 
 void IB::destroyIBMultiFab (int lev) {
@@ -182,8 +183,10 @@ void IB::initialiseGPs (int lev) {
       // closest surface point and face --------------------------
       fab.gpArray[ii].closest = treePtr->closest_point_and_primitive(gp);
 
+      // This closest point is between the face plane and the gp
       Point cp = fab.gpArray[ii].closest.first;
       Polyhedron::Face_handle face = fab.gpArray[ii].closest.second; // closest primitive id
+
       // Print() << "closest surface point: " << cp << std::endl;
       // Print() << "closest triangle: ( "
       //           << face->halfedge()->vertex()->point() << " , "
@@ -198,81 +201,178 @@ void IB::initialiseGPs (int lev) {
 
       // IB point -------------------------------------------
       Vector_CGAL imp_gp(gp,cp);
-      Real dibp = sqrt(imp_gp.squared_length());
+      fab.gpArray[ii].disGP = sqrt(imp_gp.squared_length());
+       
 
       // IM point -------------------------------------------
-      Vector<Array<Real,AMREX_SPACEDIM>>& imps = fab.gpArray[ii].imps; 
-      Vector<Array<Real,AMREX_SPACEDIM>>& impscell = fab.gpArray[ii].impscell; 
+      Vector<Array<Real,AMREX_SPACEDIM>>& imps    = fab.gpArray[ii].imps; 
+      Vector<Array<int,AMREX_SPACEDIM>>& impscell = fab.gpArray[ii].impscell; 
       imps.resize(NUM_IMPS);
       impscell.resize(NUM_IMPS);
-      impscell.resize(NUM_IMPS);
 
+      // find image point and the bottom left point closest to the image point
+      //  In 2D, same idea in 3D.
+      //     i,j+1 (2) ---------------------     i+1,j+1 (3)
+      //     |                                  |
+      //     |         P                        |
+      //     |                                  |
+      //     |                                  |
+      //     i,j  (1) ----------------------      i+1,j  (4)
       for (int jj=0; jj<NUM_IMPS; jj++) {
         for (int kk=0; kk<AMREX_SPACEDIM; kk++) {
-          imps[jj][kk] = cp[kk] + (jj+1)*IB::dimp[lev]*fnormals[face][kk];
+          imps[jj][kk] = cp[kk] + (jj+1)*IB::disIM[lev]*fnormals[face][kk];
           impscell[jj][kk] = floor(imps[jj][kk]/cellSizes[lev][kk] - 0.5_rt);
         }
       }
+      // TODO assert that ip point within fab domain
 
-      Print() << "dibp, dimp (from gp) " << dibp << " " << IB::dimp[lev] << std::endl;
+      // temporary
+      Print() << "disGP, disIM (from IB) " << fab.gpArray[ii].disGP << " " << IB::disIM[lev] << std::endl;
       for (int jj=0; jj<NUM_IMPS; jj++) {
         Print() << "imp" << jj+1 << " "<< fab.gpArray[ii].imps[jj] << std::endl;
         Print() << "impCell" << jj+1 << " "<< fab.gpArray[ii].impscell[jj] << std::endl;
       }
       
-      // Interpolation points' weights
+      // Interpolation points' (ips) weights for each image point
       Vector<Array<Real,8>>& ipweights = fab.gpArray[ii].ipweights; 
+      ipweights.resize(NUM_IMPS);
 
       for (int jj=0; jj<NUM_IMPS; jj++) {
-        ipweights[jj] = computeIPweights();
+        ipweights[jj] = computeIPweights(imps[jj], impscell[jj], cellSizes[lev]);
+        Real sum = 0.0;
+        Print() << "ipweights initGP" << jj+1 << std::endl;
+        for (int kk=0; kk<8; kk++) {
+          sum += ipweights[jj][kk];
+          Print() << kk+1 << " " << ipweights[jj][kk] << std::endl;
+        }
+        Print() << "sum " << sum << std::endl;
       }
-
-      exit(0);
     }
   }
 }
 
-Array<Real,8> IB::computeIPweights() {
-  // ! tri-linear interpolation
-  // xd =  (p1(1) - xl )/(xr-xl)
-  // yd =  (p1(2) - yl )/(yr-yl)
-  // zd =  (p1(3) - zl )/(zr-zl)
+Array<Real,8> IB::computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMREX_SPACEDIM>& impcell, GpuArray<Real,AMREX_SPACEDIM>& dxyz) {
+
+  Array<Real,8> weights;
+
+  // tri-linear interpolation
+  Real xl = (Real(impcell[0])+0.5_rt) * dxyz[0];  // bottom left corner of cell
+  Real xr = xl + dxyz[0];
+  Real yl = (Real(impcell[1])+0.5_rt) * dxyz[1];
+  Real yr = yl + dxyz[1];
+  Real zl = (Real(impcell[2])+0.5_rt) * dxyz[2];
+  Real zr = zl + dxyz[2];
+
+
+  Real xd =  (imp[0] - xl )/(xr-xl);
+  Real yd =  (imp[1] - yl )/(yr-yl);
+  Real zd =  (imp[2] - zl )/(zr-zl);
 
   // zd = 0
-  // eta(1) = (1.0_wp - xd) *(1.0_wp - yd)*(1.0_wp-zd)
-  // eta(2) = (1.0_wp - xd) *yd*(1.0_wp-zd)
-  // eta(3) = xd*yd*(1.0_wp-zd)
-  // eta(4) = xd*(1.0_wp - yd)*(1.0_wp-zd)
+  weights[0] = (1.0_rt - xd) *(1.0_rt - yd)*(1.0_rt-zd);
+  weights[1] = (1.0_rt - xd) *yd*(1.0_rt-zd);
+  weights[2] = xd*yd*(1.0_rt-zd);
+  weights[3] = xd*(1.0_rt - yd)*(1.0_rt-zd);
 
   // zd = 2
-  // eta(5) = (1.0_wp - xd) *(1.0_wp - yd)*zd
-  // eta(6) = (1.0_wp - xd) *yd*zd
-  // eta(7) = xd*yd*zd
-  // eta(8) = xd*(1.0_wp - yd)*zd
-  Array<Real,8> weights;
+  weights[4] = (1.0_rt - xd) *(1.0_rt - yd)*zd;
+  weights[5] = (1.0_rt - xd) *yd*zd;
+  weights[6] = xd*yd*zd;
+  weights[7] = xd*(1.0_rt - yd)*zd;
+
+  // TODO report if any of the weights are sld points
+
+  // Real sum = 0.0;
+  // Print() << "computeIPweights" << std::endl;
+  // for (int kk=0; kk<8; kk++) {
+  //   sum += weights[kk];
+  //   Print() << kk+1 << " " << weights[kk] << std::endl;
+  // }
+  // Print() << "sum " << sum << std::endl;
+
   return weights;
 }
 
 
-void IB::computeGPs( int lev, MultiFab& S_new) {
+void IB::computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const Parm& lparm) {
 
   IBMultiFab *mfab = mfa[lev];
-  int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
+  Vector<Array<Real,NPRIM>> stateIMs;
+  Array<Real,NPRIM> stateIB,stateGP;
+  stateIMs.resize(NUM_IMPS);
+  int itemp, jtemp, ktemp;
 
+  // for each fab in multifab (at a given level)
   for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
-    IBM::IBFab &fab = mfab->get(mfi);
-    for (int ii=0;ii<fab.ngps;ii++) {
-      IntArray& idx = fab.gpArray[ii].idx;
 
-    // interpolate IM
+    // prims and cons fab
+    auto const &conFab  = consmf.array(mfi); // this is a const becuase .array() returns a const but we can still modify conFab as consmf input argument is not const
+    auto const &primFab = primsmf.array(mfi);
 
-
-
-    // interpolate IB
+    IBM::IBFab& ibFab = mfab->get(mfi);
 
 
-    // extrapolate
+    // for each ghost point
+    for (int ii=0;ii<ibFab.ngps;ii++) {
+      IntArray& indexGP = ibFab.gpArray[ii].idx;
+
+      // interpolate IM
+      // for each image point
+      for (int jj=0; jj<NUM_IMPS; jj++) {
+        Array<int,AMREX_SPACEDIM>& indexIM = ibFab.gpArray[ii].impscell[jj]; 
+        for (int kk=0; kk<NPRIM; kk++) {
+          stateIMs[jj][kk] = 0.0_rt; // reset to 0
+        }
+
+        Vector<Array<Real,8>>& weightsIP = ibFab.gpArray[ii].ipweights;
+        for (int kk=0; kk<NPRIM; kk++) {
+          itemp = indexIM[0] + IB::indexCube[kk][0];
+          jtemp = indexIM[1] + IB::indexCube[kk][1];
+          ktemp = indexIM[2] + IB::indexCube[kk][2];// ensure same order as weights!
+          stateIMs[jj][kk] += primFab(itemp,jtemp,ktemp,kk)*weightsIP[jj][kk];
+        }
+      }
+
+
+      // interpolate IB (enforcing BCs) -- TODO:generalise to IBM BCs and make user defined
+      // no-slip velocity
+      stateIB[QU] = 0.0_rt;
+      stateIB[QV] = 0.0_rt;
+      stateIB[QW] = 0.0_rt;
+      // zerograd temperature and pressure
+      stateIB[QPRES] = stateIMs[0][QPRES];
+      stateIB[QT]    = stateIMs[0][QT];
+      // ensure thermodynamic consistency
+      stateIB[QRHO]  = stateIMs[0][QPRES]/(stateIMs[0][QT]*lparm.Rspec); 
+
+
+      // extrapolate
+      // linear extrapolation
+      extrapolateGP( stateGP, stateIB, stateIMs,  ibFab.gpArray[ii].disGP, disIM[lev]);
+      // thermodynamic consistency
+      stateGP[QRHO]  = stateGP[QPRES]/(stateGP[QT]*lparm.Rspec);
+
+      // insert conservative ghost state into consFab
+      itemp = indexGP[0];
+      jtemp = indexGP[1];
+      ktemp = indexGP[2];
+      conFab(itemp,jtemp,ktemp,URHO) = stateGP[QRHO];
+      conFab(itemp,jtemp,ktemp,UMX) = stateGP[QRHO]*stateGP[QU];
+      conFab(itemp,jtemp,ktemp,UMY) = stateGP[QRHO]*stateGP[QV];
+      conFab(itemp,jtemp,ktemp,UMZ) = stateGP[QRHO]*stateGP[QW];
+      Real ek   = 0.5_rt*(stateGP[QU]*stateGP[QU] + stateGP[QV]*stateGP[QV] + stateGP[QW]*stateGP[QW]);
+      conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(lparm.eos_gamma-1.0_rt) + stateGP[QRHO]*ek;
+
+      // insert Primitive ghost state into primFab --> this will happen in compute_rhs.
     }
+  }
+}
+
+// linear extrapolation
+void IB::extrapolateGP(Array<Real,6>& stateGP, Array<Real,6>& stateIB, Vector<Array<Real,6>>& stateIMs, Real dgp, Real dim) {
+
+  for (int kk=0; kk<NPRIM; kk++) {
+    stateGP[kk] = stateIB[kk] - (dgp/dim)*(stateIMs[0][kk] - stateIB[kk]);
   }
 
 }

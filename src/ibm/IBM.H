@@ -7,6 +7,7 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_Derive.H>
 #include <AMReX_StateDescriptor.H>
+#include <CNS_parm.H>
 
 // basic CGAL headers
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -30,7 +31,6 @@
 using namespace amrex;
 
 namespace IBM {
-  static constexpr int NUM_IMPS = 2;
 
   // CGAL types -------------------------------------------
   typedef CGAL::Simple_cartesian<Real> K2;
@@ -54,8 +54,9 @@ namespace IBM {
       // attributes
       Array<int , AMREX_SPACEDIM> idx={0};
       Point_and_primitive_id closest; // closest surface point (ib point) and face
+      Real disGP; 
       Vector<Array<Real,AMREX_SPACEDIM>> imps; 
-      Vector<Array<Real,AMREX_SPACEDIM>> impscell; 
+      Vector<Array<int,AMREX_SPACEDIM>> impscell; 
       Vector<Array<Real,8>> ipweights; 
       // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1)],
       //  ... ]
@@ -107,13 +108,16 @@ namespace IBM {
   class IB {
     public:
       // attributes //
-      Vector<Real> dimp; //image point distance
+      Vector<Real> disIM; //image point distance per level
 
-      int max_level=0; // need to save this as Amr protects this
+      int MAX_LEVEL = 0;   // need to save this as Amr protects this -- set in ib.init(...)
+      int NGHOST_IB = 0; // number of ghost points in IBMultiFab -- set in ib.init(...)
+      const int NVAR_IB  = 2; // number of variables in IBMultiFab
+      const int NUM_IMPS = 2; // number of image points per ghost point
 
-      const int nvar_ib = 2; // number of variables in IBMultiFab
+      Vector<amrex::Array<int,AMREX_SPACEDIM>> indexCube = { {0,0,0}, {0,1,0}, {1,1,0}, {1,0,0}, {0,0,1}, {0,1,1}, {1,1,1}, {1,0,1}}; // index cube for image point interpolation
+      // Anti-clockwise order k=0 plane first, then k=1 plane.
 
-      int nghost_ib = 0; // number of ghost points in IBMultiFab -- set during ib.init(...)
 
       // pointer to Amr class instance
       Amr*pamr;
@@ -147,7 +151,7 @@ namespace IBM {
       
 
       // methods //
-      void setMaxLevel(int max_lev);
+      // void setMaxLevel(int max_lev);
 
       void init (Amr* pointer_amr, const int nghost);
 
@@ -164,10 +168,12 @@ namespace IBM {
 
       void initialiseGPs(int lev);
 
-      void computeGPs( int lev, MultiFab& S_new);
+      void computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const Parm& parms);
 
     private:
-      Array<Real,8> computeIPweights();
+      Array<Real,8> computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMREX_SPACEDIM>& impscell, GpuArray<Real,AMREX_SPACEDIM>& cellsize);
+
+      void extrapolateGP(Array<Real,6>& stateGP, Array<Real,6>& stateIB, Vector<Array<Real,6>>& stateIMs, Real dgp, Real dim);
 
   };
 

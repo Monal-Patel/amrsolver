@@ -181,7 +181,7 @@ CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 }
 
 
-void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
+void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
                    FluxRegister* fr_as_crse, FluxRegister* fr_as_fine)
 {
   BL_PROFILE("CNS::compute_rhs()");
@@ -205,6 +205,13 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
   //////////////////////////////////////////////////////////////////////////////
   Gpu::streamSynchronize(); // ensure primitive variables mf computed before starting mfiter
+  
+  // Immersed boundaries ///////////////////////////////////////////////////////
+  // Compute on CPU always
+#ifdef AMREX_USE_GPIBM
+  IBM::ib.computeGPs(level, statemf, primsmf, lparm);
+#endif
+  //////////////////////////////////////////////////////////////////////////////
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
   // TODO: Can have pointer function (dynamic casting?) (main euler_flux function) which can be pointed to different flux schemes in the initialisation. The function can pass a parameter struct to include any scheme specfic parameters.
@@ -469,6 +476,8 @@ void CNS::compute_rhs (const MultiFab& statemf, MultiFab& dSdt, Real dt,
       +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
       +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
       });
+
+      // TODO: set solid point rhs to 0
   }
   //////////////////////////////////////////////////////////////////////////////
 
