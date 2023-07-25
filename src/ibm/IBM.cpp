@@ -294,7 +294,7 @@ Array<Real,8> IB::computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMR
 }
 
 
-void IB::computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const Parm& lparm) {
+void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& lparm) {
 
   IBMultiFab *mfab = mfa[lev];
   Vector<Array<Real,NPRIM>> stateIMs;
@@ -342,6 +342,8 @@ void IB::computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const P
       }
 
 
+      // coordinate transformation for slip BCs --> need normals here!
+
       // interpolate IB (enforcing BCs) -- TODO:generalise to IBM BCs and make user defined
       // no-slip velocity
       stateIB[QU] = 0.0_rt;
@@ -360,10 +362,17 @@ void IB::computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const P
       // thermodynamic consistency
       stateGP[QRHO]  = stateGP[QPRES]/(stateGP[QT]*lparm.Rspec);
 
-      // insert conservative ghost state into consFab
+      // transfer GP to consfab and primfab
       itemp = indexGP[0];
       jtemp = indexGP[1];
       ktemp = indexGP[2];
+      // insert Primitive ghost state into primFab 
+      for (int n = 0; n < NPRIM; n++)
+      {
+        primFab(indexGP[0],indexGP[1],indexGP[2],n) = stateGP[n];
+      }
+
+      // insert conservative ghost state into consFab
       conFab(itemp,jtemp,ktemp,URHO) = stateGP[QRHO];
       conFab(itemp,jtemp,ktemp,UMX) = stateGP[QRHO]*stateGP[QU];
       conFab(itemp,jtemp,ktemp,UMY) = stateGP[QRHO]*stateGP[QV];
@@ -371,7 +380,6 @@ void IB::computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const P
       Real ek   = 0.5_rt*(stateGP[QU]*stateGP[QU] + stateGP[QV]*stateGP[QV] + stateGP[QW]*stateGP[QW]);
       conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(lparm.eos_gamma-1.0_rt) + stateGP[QRHO]*ek;
 
-      // insert Primitive ghost state into primFab --> this will happen in compute_rhs.
     }
   }
 }

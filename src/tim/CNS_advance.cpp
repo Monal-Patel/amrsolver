@@ -439,6 +439,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
             visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
         });
       }
+      // TODO :: IBM GP visc flux correction
   }
   //////////////////////////////////////////////////////////////////////////////
 
@@ -476,9 +477,9 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
       +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
       +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
       });
-
-      // TODO: set solid point rhs to 0
   }
+
+
   //////////////////////////////////////////////////////////////////////////////
 
   // Add source term ///////////////////////////////////////////////////////////
@@ -493,6 +494,23 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
         { user_source(i,j,k,statefab,dsdtfab,lprobparm,lparm,dx); });
     }
   }
+  //////////////////////////////////////////////////////////////////////////////
+
+  // Set solid point rhs to 0 //////////////////////////////////////////////////
+#if AMREX_USE_GPIBM
+      IBM::IBMultiFab *mfab = IBM::ib.mfa.at(level);
+    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
+      const Box& bx   = mfi.tilebox();
+      auto const& dsdtfab = dSdt.array(mfi);
+      IBM::IBFab &fab = mfab->get(mfi);
+      Array4<bool> ibMarkers = fab.array();
+      amrex::ParallelFor(bx, NCONS,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+      {
+      dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1.0_rt - ibMarkers(i,j,k,0));
+      });
+    }
+#endif
   //////////////////////////////////////////////////////////////////////////////
 
 }

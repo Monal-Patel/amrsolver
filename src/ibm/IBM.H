@@ -168,7 +168,7 @@ namespace IBM {
 
       void initialiseGPs(int lev);
 
-      void computeGPs( int lev, MultiFab& consmf, const MultiFab& primsmf, const Parm& parms);
+      void computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& parms);
 
     private:
       Array<Real,8> computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMREX_SPACEDIM>& impscell, GpuArray<Real,AMREX_SPACEDIM>& cellsize);

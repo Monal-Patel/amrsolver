@@ -21,13 +21,15 @@ geometry.prob_hi     = 6.28318     6.28318     6.28318
 cns.lo_bc      = 1  1  1
 cns.hi_bc      = 1  1  1
 cns.order_rk   = 3 # 2 or 3 
+cns.stages_rk  = 3  
 cns.rhs_euler  = 1 # 0=false, 1=true
 cns.rhs_visc   = 1 # 0=false, 1=true
 cns.rhs_source = 0 # 0=false, 1=true
-cns.flux_euler = 0 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
-cns.order_keep = 4 # Order of accuracy=2, 4 or 6
-cns.nghost     = 2 # number of ghost cells 
+cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
+cns.order_keep = 6 # Order of accuracy=2, 4 or 6
+cns.nghost     = 3 # number of ghost cells 
 cns.verbose    = 1 # 0=quiet, 1=verbose
+cns.art_diss   = 0 
 
 # REFINEMENT / REGRIDDING 
 amr.n_cell          = 128 128 128

@@ -86,23 +86,23 @@ void CNS::read_params()
   pp.query("do_reflux", do_reflux);
 
   if (!pp.query("flux_euler",flux_euler)) {
-    amrex::Abort("Need to specify Euler flux type.");}
+    amrex::Abort("Need to specify Euler flux type,flux_euler");}
   
   if (flux_euler==1) {
     if (!pp.query("order_keep",order_keep)) {
-      amrex::Abort("Need to specify KEEP scheme order of accuracy (2, 4 or 6)");
+      amrex::Abort("Need to specify KEEP scheme order of accuracy, order_keep = {2, 4 or 6}");
     }
 
     if (!pp.query("art_diss",art_diss)) {
-      amrex::Abort("Need to specify artificial dissipation (1=on 0=off)");}
+      amrex::Abort("Need to specify artificial dissipation, art_diss = {1=on 0=off}");}
   }
 
   if (!pp.query("order_rk",order_rk)) {
-    amrex::Abort("Need to specify SSPRK scheme order of accuracy (-2, 1, 2 or 3)");
+    amrex::Abort("Need to specify SSPRK scheme order of accuracy, order_rk={-2, 1, 2, 3}");
   }
 
   if (!pp.query("stages_rk",stages_rk)) {
-    amrex::Abort("Need to specify SSPRK number of stages");
+    amrex::Abort("Need to specify SSPRK number of stages, stages_rk");
   }
   else {
     if ( order_rk==1 && stages_rk != 1) {
