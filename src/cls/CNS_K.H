@@ -48,14 +48,14 @@ inline amrex::Real cns_estdt (amrex::Box const& bx, amrex::Array4<Real const>   
     return dt;
 }
 
-AMREX_GPU_DEVICE inline void pointCFL (int i, int j, int k, Vector<Array<Real,3>>& array, const Array4<const Real>& prims, const Parm& parm,const auto dx, Real dt) noexcept
+AMREX_GPU_DEVICE inline void pointCFL (int i, int j, int k, Array2D<Real,0,2,0,2>& array, const Array4<const Real>& prims, const Parm& parm,const auto dx, Real dt) noexcept
 {
   Real sos = std::sqrt(parm.eos_gamma*parm.Rspec*prims(i,j,k,QT));
   //
   for (int idir=0; idir<AMREX_SPACEDIM; idir++){
-    array[idir][0] = max(array[idir][0], std::abs(prims(i,j,k,QU+idir) + sos)); // max(|ui + c|) in +ith direction
-    array[idir][1] = max(array[idir][1],std::abs(prims(i,j,k,QU+idir) - sos)); // max(|ui - c|) in -ith direction
-    array[idir][2] = max(array[idir][0],array[idir][1])*dt/dx[idir]; // CFL max in ith direction
+    array(idir,0) = max(array(idir,0), std::abs(prims(i,j,k,QU+idir) + sos)); // max(|ui + c|) in +ith direction
+    array(idir,1) = max(array(idir,1),std::abs(prims(i,j,k,QU+idir) - sos)); // max(|ui - c|) in -ith direction
+    array(idir,2) = max(array(idir,0),array(idir,1))*dt/dx[idir]; // CFL max in ith direction
     // Print() << "inside " << cfl_array(idir,0) << " " << cfl_array(idir,1) << " " << cfl_array(idir,2) << std::endl; 
   }
 }

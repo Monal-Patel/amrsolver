@@ -464,6 +464,7 @@ void CNS::printTotal() const
   std::array<Real, NCONS> tot;
   std::array<Real, NPRIM> prims_max,prims_min;
 
+  // NEED to put these lines in GPU launch region?
   for (int comp = 0; comp < NCONS; ++comp)
   {
     tot[comp] = S_new.sum(comp, true) * geom.ProbSize();
@@ -488,36 +489,33 @@ void CNS::printTotal() const
   const Real dt =  parent->dtLevel(level);
   const MultiFab& primsmf = Vprimsmf[level];
   Parm const& lparm = *d_parm;
+  Array2D<Real,0,2,0,2>* arrayCFL;
 
-  Vector<Array<Real,3>>* cfl_arr;
-  cfl_arr = new Vector<Array<Real,3>>;
-  cfl_arr->resize(AMREX_SPACEDIM);
-
-  for (int idir=0; idir<AMREX_SPACEDIM; idir++){
-    cfl_arr->at(idir)[0] = 0.0_rt;
-    cfl_arr->at(idir)[1] = 0.0_rt;
-    cfl_arr->at(idir)[2] = 0.0_rt;
-  }
-
-  // We cannot modify variables defined outside of the lambda function in the lambda function. AMReX does not allow mutable keyword. This is why we need to call functions.
+#if AMREX_USE_GPU
+  arrayCFL = (Array2D<Real,0,2,0,2>*)The_Arena()->alloc(sizeof(Array2D<Real,0,2,0,2>));
+#else
+  arrayCFL = new Array2D<Real,0,2,0,2>{};
+#endif
+  // We cannot modify variables defined outside of the lambda function in the lambda function (not even reals and ints). AMReX does not allow mutable keyword. This is why we need to call functions.
 
   for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
     auto const& prims    = primsmf.array(mfi);
-    // auto const& lambda   = lambdamf.array(mfi);
     const Box& bx        = mfi.tilebox();
 
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     { 
-      pointCFL(i, j, k, *cfl_arr, prims, lparm, dx, dt);
+      pointCFL(i, j, k, *arrayCFL, prims, lparm, dx, dt);
     });
   };
 
   for (int idir=0; idir<AMREX_SPACEDIM; idir++){
-    ParallelDescriptor::ReduceRealMax((cfl_arr->at(idir)).data(),3, ParallelDescriptor::IOProcessorNumber());
+    for (int icomp=0; icomp<AMREX_SPACEDIM; icomp++){
+    ParallelDescriptor::ReduceRealMax((*arrayCFL)(idir,icomp), ParallelDescriptor::IOProcessorNumber());
+    }
   }
 
-  amrex::Print().SetPrecision(17) 
+  amrex::Print().SetPrecision(17)
   <<"\n[CNS level "<< level << "]\n" 
   <<"   Rho  min, max = " << prims_min[0] << " , " << prims_max[0] << "\n"
   <<"   Ux   min, max = " << prims_min[1] << " , " << prims_max[1] << "\n"
@@ -527,12 +525,12 @@ void CNS::printTotal() const
   <<"   T    min, max = " << prims_min[4] << " , " << prims_max[4] << "\n";
 
   amrex::Print().SetPrecision(17) 
-  <<"   Vax  min, max = " << cfl_arr->at(0)[0] << " , " << cfl_arr->at(0)[1] <<  "\n"
-  <<"   Vay  min, max = " << cfl_arr->at(1)[0] << " , " << cfl_arr->at(1)[1] <<  "\n"
-  <<"   Vaz  min, max = " << cfl_arr->at(2)[0] << " , " << cfl_arr->at(2)[1] <<  "\n"
-  <<"   CFLx         = " << cfl_arr->at(0)[2]<< "\n"
-  <<"   CFLy         = " << cfl_arr->at(1)[2]<< "\n"
-  <<"   CFLz         = " << cfl_arr->at(2)[2]<< "\n \n";
+  <<"   Vax  min, max = " << (*arrayCFL)(0,0) << " , " << (*arrayCFL)(0,1) <<  "\n"
+  <<"   Vay  min, max = " << (*arrayCFL)(1,0) << " , " << (*arrayCFL)(1,1) <<  "\n"
+  <<"   Vaz  min, max = " << (*arrayCFL)(2,0) << " , " << (*arrayCFL)(2,1) <<  "\n"
+  <<"   CFLx         = " << (*arrayCFL)(0,2)<< "\n"
+  <<"   CFLy         = " << (*arrayCFL)(1,2)<< "\n"
+  <<"   CFLz         = " << (*arrayCFL)(2,2)<< "\n \n";
 
   amrex::Print().SetPrecision(17) 
   <<"   Total mass   = " << tot[0] << "\n"
@@ -541,7 +539,11 @@ void CNS::printTotal() const
   <<"   Total z-mom  = " << tot[3] << "\n"
   <<"   Total energy = " << tot[4] << "\n";
 
-  cfl_arr->clear();
+#if AMREX_USE_GPU
+  The_Arena()->free(arrayCFL);
+#else
+  delete arrayCFL;
+#endif
 #ifdef BL_LAZY
                        });
 #endif
