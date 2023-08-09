@@ -8,15 +8,22 @@
       "name": "(gdb) Launch",
       "type": "cppdbg",
       "request": "launch",
+
+      "cwd": "${workspaceFolder}/exm/IBM/Square",
+      "program": "${workspaceFolder}/exm/IBM/Square/main3d.gnu.DEBUG.MPI.ex",
+      "args": [ "${workspaceFolder}/exm/IBM/Square/inputs" ],
+
       // "cwd": "${workspaceFolder}/exm/TGV",
       // "program": "${workspaceFolder}/exm/TGV/main3d.gnu.DEBUG.ex",
       // "args": [ "${workspaceFolder}/exm/TGV/inputs" ],
       // "cwd": "${workspaceFolder}/exm/Channel",
       // "program": "${workspaceFolder}/exm/Channel/main3d.gnu.DEBUG.ex",
       // "args": [ "${workspaceFolder}/exm/Channel/inputs" ],
-      "cwd": "${workspaceFolder}/exm/Sods",
-      "program": "${workspaceFolder}/exm/Sods/main3d.gnu.DEBUG.ex",
-      "args": [ "${workspaceFolder}/exm/Sods/input0levs" ],
+
+      // "cwd": "${workspaceFolder}/exm/Sods",
+      // "program": "${workspaceFolder}/exm/Sods/main3d.gnu.DEBUG.ex",
+      // "args": [ "${workspaceFolder}/exm/Sods/input0levs" ],
+
       // "cwd": "${workspaceFolder}/lib/amrex-tutorials/ExampleCodes/GPU/CNS/Exec/Sod/",
       // "program": "${workspaceFolder}/lib/amrex-tutorials/ExampleCodes/GPU/CNS/Exec/Sod/CNS3d.gnu.DEBUG.CUDA.ex",
       // "args": [ "${workspaceFolder}/lib/amrex-tutorials/ExampleCodes/GPU/CNS/Exec/Sod/inputs" ],

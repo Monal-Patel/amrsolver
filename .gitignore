@@ -14,8 +14,7 @@
 /wrk/
 
 /lib/cgal/build/*
-/lib/boost/*
-/lib/boost/b2
+/lib/boost
 /lib/install/*
 
 /tst/AMReX_regtests/output/AMReX-benchmarks/*

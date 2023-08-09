@@ -3,11 +3,11 @@
 #------------------------------------------------------------------------------#
 amrex.fpe_trap_invalid=1
 # start time is assumed to be 0, unless re-starting
-max_step  = 1
-stop_time = 2.0
+max_step  = 500
+stop_time = 10.0
 #time_step = 0.02 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
-cfl = 0.5
+cfl = 0.6
 
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
@@ -19,7 +19,7 @@ geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0     0.0     0.0
 geometry.prob_hi     =   2.0     2.0     2.0
-amr.n_cell           =    16      16      16
+amr.n_cell           =    32      32      32
 
 #------------- BOUNDARY CONDITIONS, PDE and NUMERICAL SCHEMES -----------------#
 # 0 = Interior           3 = Symmetry
@@ -37,7 +37,7 @@ cns.flux_euler = 0 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
 cns.order_keep = 4 # Order of accuracy=2, 4 or 6
 cns.nghost     = 2 
 cns.verbose    = 1 # 0=quiet, 1=verbose
-cns.screen_output = 1
+cns.screen_output = 5
 
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
@@ -52,7 +52,7 @@ amr.grid_eff        = 0.99     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 2         # number of timesteps between plotfiles
+amr.plot_int          = 10         # number of timesteps between plotfiles
 amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 
