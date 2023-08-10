@@ -8,6 +8,7 @@
 #include <AMReX_Derive.H>
 #include <AMReX_StateDescriptor.H>
 #include <CNS_parm.H>
+#include <CNS_index_macros.H>
 
 // basic CGAL headers
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -46,7 +47,16 @@ namespace IBM {
 
   typedef K2::Vector_3 Vector_CGAL;
   typedef boost::graph_traits<Polyhedron>::face_descriptor  face_descriptor;
+
+  // typedef Polyhedron::Vertex_iterator      vertexIter;
+  // typedef Polyhedron::Face_iterator        faceIter;
   // CGAL types -------------------------------------------
+
+  // surfdata holds the relevant surface data for each element.
+  struct surfdata {
+    Array<Real,NPRIM> state={0.0};
+    Array<Real,AMREX_SPACEDIM> displace = {0.0};
+  };
 
   // GP holds the relevant data for each ghost point.
   struct gp {
@@ -58,7 +68,7 @@ namespace IBM {
       Vector<Array<Real,AMREX_SPACEDIM>> imps; 
       Vector<Array<int,AMREX_SPACEDIM>> impscell; 
       Vector<Array<Real,8>> ipweights; 
-      // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1)],
+      // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1),
       //  ... ]
 
   };
@@ -131,16 +141,26 @@ namespace IBM {
       // IBMultiFab array
       Vector<IBMultiFab*> mfa; 
 
-
       // IB geometry
       Polyhedron geom;  
 
       // AABB tree
       Tree* treePtr;
 
-      // surface element normals
+
+    // Instead of std::map you may use std::unordered_map, boost::unordered_map
+    // or CGAL::Unique_hash_map
+    // CGAL::Unique_hash_map<face_descriptor,Vector> fnormals;
+    // boost::unordered_map<vertex_descriptor,Vector> vnormals;
+      // face element normals
       std::map<face_descriptor,Vector_CGAL> fnormals;
-      // can use this map to create surfdata
+      // face state data map
+      std::map<face_descriptor,surfdata> face2state;
+      // could also fit normals into this -- however might need to modify compute_normals routine
+
+      // face displacement map
+      // std::map<face_descriptor,Vector_CGAL> fdisplace;
+      // Vector or Real[3] don't work
 
       // constructors and destructors //
       // explicit IB ( const Vector<BoxArray>& bxs, 
@@ -169,6 +189,10 @@ namespace IBM {
       void initialiseGPs(int lev);
 
       void computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& parms);
+
+      void moveGeom();
+
+      void computeSurface();
 
     private:
       Array<Real,8> computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMREX_SPACEDIM>& impscell, GpuArray<Real,AMREX_SPACEDIM>& cellsize);

@@ -374,9 +374,9 @@ void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& l
 
       // insert conservative ghost state into consFab
       conFab(itemp,jtemp,ktemp,URHO) = stateGP[QRHO];
-      conFab(itemp,jtemp,ktemp,UMX) = stateGP[QRHO]*stateGP[QU];
-      conFab(itemp,jtemp,ktemp,UMY) = stateGP[QRHO]*stateGP[QV];
-      conFab(itemp,jtemp,ktemp,UMZ) = stateGP[QRHO]*stateGP[QW];
+      conFab(itemp,jtemp,ktemp,UMX)  = stateGP[QRHO]*stateGP[QU];
+      conFab(itemp,jtemp,ktemp,UMY)  = stateGP[QRHO]*stateGP[QV];
+      conFab(itemp,jtemp,ktemp,UMZ)  = stateGP[QRHO]*stateGP[QW];
       Real ek   = 0.5_rt*(stateGP[QU]*stateGP[QU] + stateGP[QV]*stateGP[QV] + stateGP[QW]*stateGP[QW]);
       conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(lparm.eos_gamma-1.0_rt) + stateGP[QRHO]*ek;
 
@@ -424,15 +424,82 @@ void IB::readGeom() {
   // data structure to accelerate distance queries
   treePtr = new Tree (faces(geom).first, faces(geom).second, geom);
   Print() << "AABB tree constructed" << std::endl;
-  // treePtr->rebuild(faces(geom).first,faces(geom).second,geom)
 
-  // Instead of std::map you may use std::unordered_map, boost::unordered_map
-  // or CGAL::Unique_hash_map
-  // CGAL::Unique_hash_map<face_descriptor,Vector> fnormals;
-  // boost::unordered_map<vertex_descriptor,Vector> vnormals;
   PMP::compute_face_normals(geom, boost::make_assoc_property_map(fnormals));
   Print() << "Face normals computed" << std::endl;
 
-  std::for_each( geom.facets_begin(), geom.facets_end(), compute_plane_equations);
   // plane class also computes orthogonal direction to the face. However, the orthogonal vector is not normalised.
+  std::for_each( geom.facets_begin(), geom.facets_end(), compute_plane_equations);
+  
+  // create face to displacement map //
+  // auto temp = boost::make_assoc_property_map(fdisplace);
+  // for(face_descriptor f : faces(geom))
+  // {
+  //   Vector_CGAL vec;
+  //   put(temp, f, vec);
+  //   // std::cout << "face plane " << f->plane() << "\n";
+  // }
+
+  // create face to surfdata map //
+  auto map = boost::make_assoc_property_map(face2state);
+  for(face_descriptor f : faces(geom))
+  {
+    surfdata data;
+    put(map, f, data);
+    // std::cout << "face plane" << f->plane() << "\n";
+  }
+}
+
+void IB::moveGeom() {
+  // Displace verticies //
+  // For each vertex its position p is translated by the displacement vector (di) for each ith face. Each vertex has nfaces, for a triangular closed mesh this equals the number of edges at a vertex. This is called degree of the vertex by CGGAL.
+  for (Polyhedron::Facet_handle fh : geom.facet_handles())
+  {
+    Print() << "New face" << " \n";
+    face_descriptor f = fh->halfedge()->face();
+    Polyhedron::Halfedge_handle start = fh->halfedge(), h = start;
+    do {
+      int nfaces = h->vertex()->degree();
+      CGAL::Point_3 p = h->vertex()->point();
+      // std::cout << "Vertex degree = " << nfaces  << "\n";
+      // std::cout << "Vertex before = " << p << "\n";
+      Array<Real,AMREX_SPACEDIM> dis = face2state[f].displace; 
+      
+      CGAL::Vector_3<K2> di(dis[0],dis[1],dis[2]);
+      CGAL::Aff_transformation_3<K2> translate(CGAL::TRANSLATION,di);
+      p = p.transform(translate);
+
+      // std::cout << "Vertex after = " << p << "\n";
+
+      h = h->next();
+    } while(h!=start);
+  }
+
+  // Misc geometry things //
+  // rebuild tree
+  treePtr->rebuild(faces(geom).first,faces(geom).second,geom);
+  Print() << "Tree rebuilt" << std::endl;
+
+  CGAL::Polygon_mesh_processing::compute_face_normals(geom, boost::make_assoc_property_map(fnormals));
+  Print() << "Face normals recomputed" << std::endl;
+
+  // plane class also computes orthogonal direction to the face. However, the orthogonal vector is not normalised.
+  std::for_each( geom.facets_begin(), geom.facets_end(),compute_plane_equations);
+  Print() << "Plane equations recomputed" << std::endl;
+
+  // Geometry fair?
+}
+
+void IB::computeSurface() {
+
+  // for each level 
+    // for each fab
+
+
+
+  // communicate
+
+
+  //
+
 }

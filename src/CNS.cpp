@@ -375,6 +375,21 @@ void CNS::post_timestep(int /* iteration*/)
   if (verbose && this->nStep()%nstep_screen_output == 0) {
     printTotal();}
 }
+
+void CNS::postCoarseTimeStep (Real time)
+{
+  if (true) {
+  // user_GeomDisplace(face2)
+
+    IBM::ib.moveGeom();
+    // reallocate variables?
+    // Print() << parent->finestLevel() << std::endl;
+    for (int lev=0; lev <= parent->finestLevel(); lev++) {
+    IBM::ib.computeMarkers(0);
+    // IBM::ib.initialiseGPs(0);
+    }
+  }
+}
 // -----------------------------------------------------------------------------
 
 // Gridding -------------------------------------------------------------------
@@ -781,4 +796,17 @@ void CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how
   }
 
   levelDirectoryCreated = false; // ---- now that the plotfile is finished
+}
+
+
+void CNS::writePlotFilePost (const std::string& dir,
+                                    std::ostream&      os) {
+
+// write geometry
+
+// plot surface data
+// if (mod(nt_surfdata_plot,nt)==0) then
+// if (ioproc=0) then
+
+
 }

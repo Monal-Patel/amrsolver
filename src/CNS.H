@@ -83,6 +83,8 @@ public:
     // Do work after timestep().
     virtual void post_timestep (int iteration) override;
 
+    virtual void postCoarseTimeStep (Real time) override;
+
     // -------------------------------------------------------------------------
 
     // Gridding ----------------------------------------------------------------
@@ -117,10 +119,12 @@ public:
 
     void printTotal () const;
 
-    void writePlotFile (const std::string& dir,
+    virtual void writePlotFile (const std::string& dir,
                         std::ostream&      os,
-                        VisMF::How         how = VisMF::NFiles);
+                        VisMF::How         how = VisMF::NFiles) override;
 
+    virtual void writePlotFilePost (const std::string& dir,
+                                    std::ostream&      os) override;
     // Parameters
     static int num_state_data_types;
     static int NGHOST;
