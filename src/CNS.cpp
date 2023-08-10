@@ -18,6 +18,7 @@ bool CNS::rhs_visc=false;
 bool CNS::rhs_source=false;
 bool CNS::verbose = true;
 bool CNS::dt_dynamic=false;
+bool CNS::ib_move=false;
 int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
 int  CNS::order_keep=2;
@@ -117,10 +118,12 @@ void CNS::read_params()
     }
   }
 
-  // pp.query("refine_max_dengrad_lev", refine_max_dengrad_lev);
-  // pp.query("refine_dengrad", refine_dengrad);
-
-  // pp.query("gravity", gravity);
+#if AMREX_USE_GPIBM
+  ParmParse ppib("ib");
+  if(!ppib.query("move",ib_move)) {
+    amrex::Abort("ib.move not specified (0=false, 1=true)");
+  }
+#endif
 
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
@@ -378,15 +381,13 @@ void CNS::post_timestep(int /* iteration*/)
 
 void CNS::postCoarseTimeStep (Real time)
 {
-  if (true) {
-  // user_GeomDisplace(face2)
-
+  if (ib_move) {
     IBM::ib.moveGeom();
     // reallocate variables?
     // Print() << parent->finestLevel() << std::endl;
     for (int lev=0; lev <= parent->finestLevel(); lev++) {
     IBM::ib.computeMarkers(0);
-    // IBM::ib.initialiseGPs(0);
+    IBM::ib.initialiseGPs(0);
     }
   }
 }

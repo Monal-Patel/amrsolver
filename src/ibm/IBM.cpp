@@ -455,17 +455,17 @@ void IB::moveGeom() {
   // For each vertex its position p is translated by the displacement vector (di) for each ith face. Each vertex has nfaces, for a triangular closed mesh this equals the number of edges at a vertex. This is called degree of the vertex by CGGAL.
   for (Polyhedron::Facet_handle fh : geom.facet_handles())
   {
-    Print() << "New face" << " \n";
-    face_descriptor f = fh->halfedge()->face();
+    // Print() << "New face" << " \n";
     Polyhedron::Halfedge_handle start = fh->halfedge(), h = start;
     do {
       int nfaces = h->vertex()->degree();
       CGAL::Point_3 p = h->vertex()->point();
       // std::cout << "Vertex degree = " << nfaces  << "\n";
       // std::cout << "Vertex before = " << p << "\n";
+      face_descriptor f = fh->halfedge()->face();
       Array<Real,AMREX_SPACEDIM> dis = face2state[f].displace; 
       
-      CGAL::Vector_3<K2> di(dis[0],dis[1],dis[2]);
+      CGAL::Vector_3<K2> di(dis[0]/nfaces,dis[1]/nfaces,dis[2]/nfaces);
       CGAL::Aff_transformation_3<K2> translate(CGAL::TRANSLATION,di);
       p = p.transform(translate);
 
@@ -474,6 +474,10 @@ void IB::moveGeom() {
       h = h->next();
     } while(h!=start);
   }
+
+  // apply boundary conditions //
+  // using a map of boundary nodes?
+  
 
   // Misc geometry things //
   // rebuild tree
@@ -499,7 +503,5 @@ void IB::computeSurface() {
 
   // communicate
 
-
-  //
 
 }

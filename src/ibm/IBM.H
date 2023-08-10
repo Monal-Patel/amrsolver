@@ -156,26 +156,20 @@ namespace IBM {
       std::map<face_descriptor,Vector_CGAL> fnormals;
       // face state data map
       std::map<face_descriptor,surfdata> face2state;
+      // std::map stores information in a binary tree, it has log(N) complexity for key-value pair insertion and value retrieval for a key.
       // could also fit normals into this -- however might need to modify compute_normals routine
 
       // face displacement map
       // std::map<face_descriptor,Vector_CGAL> fdisplace;
       // Vector or Real[3] don't work
 
-      // constructors and destructors //
-      // explicit IB ( const Vector<BoxArray>& bxs, 
-      //               const Vector<DistributionMapping>& dm, 
-      //               const int nvar, const int nghost, const int max_level);
       explicit IB ();
       ~IB ();
       
 
       // methods //
-      // void setMaxLevel(int max_lev);
-
       void init (Amr* pointer_amr, const int nghost);
 
-      // void closestElem(Point& query);
       void static compute_plane_equations( Polyhedron::Facet& f);
 
       void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev);
