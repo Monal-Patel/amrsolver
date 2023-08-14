@@ -2,6 +2,7 @@
 #include <AMReX_FluxRegister.H>
 #include <CNS_hydro_K.H>
 #include <cns_prob.H>
+#include <Central.H>
 #ifdef AMREX_USE_GPIBM
 #include <IBM.H>
 #endif
@@ -214,7 +215,6 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   //////////////////////////////////////////////////////////////////////////////
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
-  // TODO: Can have pointer function (dynamic casting?) (main euler_flux function) which can be pointed to different flux schemes in the initialisation. The function can pass a parameter struct to include any scheme specfic parameters.
   if(rhs_euler) {
   // weno5js fvs
   if (flux_euler==2) {
@@ -258,64 +258,10 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
     }
   }
   
-  // central-split KEEP + JST artificial dissipation
+  // central-split KEEP 
   else if (flux_euler==1) {
-  // make multifab for spectral radius and sensor for artificial dissipation
-    MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
-    MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
-    lambdamf = 0.0_rt;
-    sensormf = 0.0_rt;
-    int halfsten = order_keep/2;
-
-    //2 * standard finite difference coefficients
-    // TODO declare these coefficients only once
-    GpuArray<Real,3> coeffs; coeffs[0]=0.0_rt;coeffs[1]=0.0_rt;coeffs[2]=0.0_rt;
-    if (order_keep==4) {
-      coeffs[0]=Real(4.0)/3 ,coeffs[1]=Real(-2.0)/12;
-    }
-    else if (order_keep==6) {
-      coeffs[0]=Real(6.0)/4; coeffs[1]=Real(-6.0)/20;coeffs[2]=Real(2.0)/60; 
-    }
-    else {
-      coeffs[0]=Real(1.0);
-    }
-
-    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-      const Box& bx      = mfi.tilebox();
-      const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
-      const Box& bxg     = mfi.growntilebox(NGHOST-1);
-
-      auto const& statefab = statemf.array(mfi);
-      auto const& sensor   = sensormf.array(mfi);
-      auto const& lambda   = lambdamf.array(mfi);
-      auto const& prims    = primsmf.array(mfi);
-      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                    auto const& nfabfy = numflxmf[1].array(mfi);,
-                    auto const& nfabfz = numflxmf[2].array(mfi););
-
-      amrex::ParallelFor(bxnodal,  
-      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      {
-        KEEP(i,j,k,halfsten,coeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
-      });
-
-      // JST artificial dissipation shock capturing
-      if (art_diss==1) {
-        amrex::ParallelFor(bx,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-          {
-            ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
-          });
-
-          amrex::ParallelFor(bxnodal, NCONS,
-          [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-          {
-            JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,lparm);
-          }); 
-        }
-      }
-    }
+    Central::FluxKEEP(statemf,primsmf,numflxmf);
+  }
 
   // Riemann solver
   else {
@@ -387,13 +333,44 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
     }
   }
   } 
-
   // Euler flux corrections near boundaries ////////////////////////////////////
   // Physical boundary order reduction
+  // Recompute fluxes on planes adjacent to physical boundaries
 
 
-  // 
+  // Artificial dissipation
+  // JST artificial dissipation shock capturing
+  if (art_diss==1) {
+  // make multifab for spectral radius and sensor for artificial dissipation
+    MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+    MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+    lambdamf = 0.0_rt;
+    sensormf = 0.0_rt;
+    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+      const Box& bx      = mfi.tilebox();
+      const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
 
+      auto const& statefab = statemf.array(mfi);
+      auto const& sensor   = sensormf.array(mfi);
+      auto const& lambda   = lambdamf.array(mfi);
+      auto const& prims    = primsmf.array(mfi);
+      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                    auto const& nfabfy = numflxmf[1].array(mfi);,
+                    auto const& nfabfz = numflxmf[2].array(mfi););
+      amrex::ParallelFor(bx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+          ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
+        });
+
+        amrex::ParallelFor(bxnodal, NCONS,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+        {
+          JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,lparm);
+        }); 
+    }
+  }
 
   //////////////////////////////////////////////////////////////////////////////
 
@@ -460,7 +437,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
   //////////////////////////////////////////////////////////////////////////////
 
-  // Assemble RHS //////////////////////////////////////////////////////////////
+  // Assemble RHS fluxes ///////////////////////////////////////////////////////
   Gpu::streamSynchronize(); // ensure all fluxes computed before assembly
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
       const Box& bx   = mfi.tilebox();
@@ -482,7 +459,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   //////////////////////////////////////////////////////////////////////////////
 
-  // Add source term ///////////////////////////////////////////////////////////
+  // Add source term to RHS ////////////////////////////////////////////////////
   if (rhs_source) {
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
         const Box& bx   = mfi.tilebox();
@@ -496,7 +473,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
   //////////////////////////////////////////////////////////////////////////////
 
-  // Set solid point rhs to 0 //////////////////////////////////////////////////
+  // Set solid point RHS to 0 //////////////////////////////////////////////////
 #if AMREX_USE_GPIBM
       IBM::IBMultiFab *mfab = IBM::ib.mfa.at(level);
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){

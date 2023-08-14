@@ -4,6 +4,7 @@
 #include <CNS_K.H>
 #include <cns_prob.H>
 #include <CNS_parm.H>
+#include <Central.H>
 
 #ifdef AMREX_USE_GPIBM
 #include <IBM.H>
@@ -12,6 +13,9 @@
 using namespace amrex;
 
 int CNS::NGHOST;
+GpuArray<Real,3> Central::coeffs;  
+int Central::order_keep;
+
 
 bool CNS::rhs_euler=false;
 bool CNS::rhs_visc=false;
@@ -21,7 +25,6 @@ bool CNS::dt_dynamic=false;
 bool CNS::ib_move=false;
 int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
-int  CNS::order_keep=2;
 int  CNS::art_diss=0; 
 int  CNS::order_rk=2;
 int  CNS::stages_rk=2;
@@ -90,7 +93,7 @@ void CNS::read_params()
     amrex::Abort("Need to specify Euler flux type,flux_euler");}
   
   if (flux_euler==1) {
-    if (!pp.query("order_keep",order_keep)) {
+    if (!pp.query("order_keep",Central::order_keep)) {
       amrex::Abort("Need to specify KEEP scheme order of accuracy, order_keep = {2, 4 or 6}");
     }
 
@@ -216,6 +219,17 @@ void CNS::post_init(Real)
     Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
     Vnumflxmf[level][idim].setVal(0.0);
     Vpntvflxmf[level][idim].setVal(0.0);
+  }
+
+  // allocate pointer functions
+  if (Central::order_keep==6) {
+    Central::coeffs={Real(6.0)/4, Real(-6.0)/20, Real(2.0)/60}; 
+  }
+  else if (Central::order_keep==4) {
+    Central::coeffs={Real(4.0)/3, Real(-2.0)/12, 0.0};
+  }
+  else {
+    Central::coeffs={Real(1.0), 0.0, 0.0};
   }
 
 }
