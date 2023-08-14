@@ -4,6 +4,7 @@
 #include <cns_prob.H>
 #include <Central.H>
 #include <Riemann.H>
+#include <High_resolution.H>
 #ifdef AMREX_USE_GPIBM
 #include <IBM.H>
 #endif
@@ -217,54 +218,16 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   //////////////////////////////////////////////////////////////////////////////
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
+  // TODO: Introduce pointer functions or visit/variant
   if(rhs_euler) {
-  // weno5js fvs
-  if (flux_euler==2) {
-    // make multifab for variables
-    Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST);}
-
-    //store eigenvalues max(u+c,u,u-c) in all directions
-    MultiFab lambdamf;
-    lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
-
-    // loop over all fabs
-    for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
-    {
-        const Box& bxg     = mfi.growntilebox(NGHOST);
-        const Box& bxnodal = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
-
-        auto const& statefab = statemf.array(mfi);
-        AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                     auto const& nfabfy = numflxmf[1].array(mfi);,
-                     auto const& nfabfz = numflxmf[2].array(mfi););
-
-        AMREX_D_TERM(auto const& pfabfx = pntflxmf[0].array(mfi);,
-                     auto const& pfabfy = pntflxmf[1].array(mfi);,
-                     auto const& pfabfz = pntflxmf[2].array(mfi););
-
-        auto const& lambda = lambdamf.array(mfi);
-
-        ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,lparm);
-        });
-
-        // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        //     cons2char(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lparm);
-        // });
-
-        ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-              numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); 
-        });
-    }
-  }
-  else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
-  else {Riemann::Flux(statemf,primsmf,numflxmf);}
+    if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
+    else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
+    else {Riemann::Flux(statemf,primsmf,numflxmf);}
   } 
-  // Euler flux corrections near boundaries ////////////////////////////////////
-  // Physical boundary order reduction
-  // Recompute fluxes on planes adjacent to physical boundaries
+  // Flux corrections //
+  // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
+
+  // Order reduction near IBM
 
 
   // Artificial dissipation
@@ -320,12 +283,12 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
         auto const& prims    = primsmf.array(mfi);
 
         AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
-                    auto const& pfabfy = pntvflxmf[1].array(mfi);,
-                    auto const& pfabfz = pntvflxmf[2].array(mfi););
+                    auto const& pfabfy  = pntvflxmf[1].array(mfi);,
+                    auto const& pfabfz  = pntvflxmf[2].array(mfi););
 
         AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                    auto const& nfabfy = numflxmf[1].array(mfi);,
-                    auto const& nfabfz = numflxmf[2].array(mfi););
+                    auto const& nfabfy  = numflxmf[1].array(mfi);,
+                    auto const& nfabfz  = numflxmf[2].array(mfi););
 
         // Compute transport coefficients
         // amrex::ParallelFor(bxg,
