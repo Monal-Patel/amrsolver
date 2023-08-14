@@ -3,6 +3,7 @@
 #include <CNS_hydro_K.H>
 #include <cns_prob.H>
 #include <Central.H>
+#include <Riemann.H>
 #ifdef AMREX_USE_GPIBM
 #include <IBM.H>
 #endif
@@ -195,6 +196,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   MultiFab& primsmf  = Vprimsmf[level];
   Array<MultiFab,AMREX_SPACEDIM>& numflxmf = Vnumflxmf[level];
 
+  // TODO move to cns hydro
   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
       auto const& statefab = statemf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
@@ -257,81 +259,8 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
         });
     }
   }
-  
-  // central-split KEEP 
-  else if (flux_euler==1) {
-    Central::FluxKEEP(statemf,primsmf,numflxmf);
-  }
-
-  // Riemann solver
-  else {
-    FArrayBox qtmp, slopetmp;
-    for (MFIter mfi(statemf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        const Box& bx = mfi.tilebox();
-
-        auto const& sfab = statemf.array(mfi);
-        AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                     auto const& nfabfy = numflxmf[1].array(mfi);,
-                     auto const& nfabfz = numflxmf[2].array(mfi););
-
-        auto const& q = primsmf.array(mfi);
-
-        const Box& bxg1 = amrex::grow(bx,1);
-        slopetmp.resize(bxg1,NCONS);
-        Elixir slopeeli = slopetmp.elixir();
-        auto const& slope = slopetmp.array();
-
-        // x-direction
-        int cdir = 0;
-        const Box& xslpbx = amrex::grow(bx, cdir, 1);
-        amrex::ParallelFor(xslpbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_slope_x(i, j, k, slope, q,lparm);
-        });
-        const Box& xflxbx = amrex::surroundingNodes(bx,cdir);
-        amrex::ParallelFor(xflxbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_riemann_x(i, j, k, nfabfx, slope, q, lparm);
-        });
-
-        // y-direction
-        cdir = 1;
-        const Box& yslpbx = amrex::grow(bx, cdir, 1);
-        amrex::ParallelFor(yslpbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_slope_y(i, j, k, slope, q, lparm);
-        });
-        const Box& yflxbx = amrex::surroundingNodes(bx,cdir);
-        amrex::ParallelFor(yflxbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_riemann_y(i, j, k, nfabfy, slope, q, lparm);
-        });
-
-        // z-direction
-        cdir = 2;
-        const Box& zslpbx = amrex::grow(bx, cdir, 1);
-        amrex::ParallelFor(zslpbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_slope_z(i, j, k, slope, q, lparm);
-        });
-        const Box& zflxbx = amrex::surroundingNodes(bx,cdir);
-        amrex::ParallelFor(zflxbx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            cns_riemann_z(i, j, k, nfabfz, slope, q, lparm);
-        });
-
-        // don't have to do this, but we could
-        // qeli.clear(); // don't need them anymore
-        slopeeli.clear();
-    }
-  }
+  else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
+  else {Riemann::Flux(statemf,primsmf,numflxmf);}
   } 
   // Euler flux corrections near boundaries ////////////////////////////////////
   // Physical boundary order reduction
@@ -417,6 +346,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
         });
       }
       // TODO :: IBM GP visc flux correction
+      // ib.viscfluxcorrection(level, numflxmf, pntvflxmf, dx, dt, time, lparm);
   }
   //////////////////////////////////////////////////////////////////////////////
 
