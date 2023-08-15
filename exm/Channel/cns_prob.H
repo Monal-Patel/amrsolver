@@ -46,7 +46,11 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
   // amrex::RandomEngine re;
 // Real RandomNormal (Real mean, Real stddev, RandomEngine const& random_engine)
   // Real rand_num = 1.0;//amrex::RandomNormal(0.0, 0.0,re);
+#if AMREX_USE_GPU
+  Real rand_num = 0.5;
+#else
   Real rand_num = (Real)rand()/ RAND_MAX;
+#endif
 
   Real A       = 100*2.5;
   Real u_prime = rand_num*A*cos(2*pi*x*nx/lx)*sin(pi*y*ny/ly)*cos(2*pi*z*nz/lz);

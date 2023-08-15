@@ -11,8 +11,10 @@ using namespace amrex;
 namespace Central {
 
   //2 * standard finite difference coefficients
-  extern GpuArray<Real,3> coeffs;  
-  extern GpuArray<Real,3> coeffs2;  
+#if !AMREX_USE_GPU
+  extern GpuArray<Real,3> coeffs;
+  extern GpuArray<Real,3> coeffs2;
+#endif
   extern int order_keep;
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
@@ -37,7 +39,7 @@ namespace Central {
   // Computes fluxes at i-1/2, j-1/2 and k-1/2
   // Computational cost can be reduced by computing and storing flux averages between l and m points
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void KEEP(int i, int j, int k ,int halfsten, const GpuArray<Real,3> coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
+  void KEEP(int i, int j, int k ,int halfsten, const GpuArray<Real,3>& coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
 
     int i1, i2, j1, j2, k1, k2;
     Real rho1, ux1, uy1, uz1, ie1, p1;
@@ -144,7 +146,7 @@ namespace Central {
   }
   ///////////
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void KEEPy(int i, int j, int k ,int halfsten, auto const& coeffs, const auto& prims, const auto& nfabfy, Parm const& parm) {
+  void KEEPy(int i, int j, int k ,int halfsten, const GpuArray<Real,3> coeffs, const auto& prims, const auto& nfabfy, Parm const& parm) {
 
     GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
     int j1, j2;
@@ -189,7 +191,23 @@ namespace Central {
 
     Parm& lparm = *CNS::d_parm;
     int halfsten = order_keep/2;
-    GpuArray<Real,3>* pcoeffs = &coeffs;
+  // TODO: define coeffs outside of this routine and only once
+#if AMREX_USE_GPU
+  GpuArray<Real,3> coeffs;
+  if (order_keep==6) {
+    coeffs[0]=Real(6.0)/4; coeffs[1]=Real(-6.0)/20; coeffs[2]=Real(2.0)/60; 
+  }
+  else if (order_keep==4) { 
+    coeffs[0]=Real(4.0)/3; coeffs[1]=Real(-2.0)/12; coeffs[2]=0.0;
+    }
+  else { coeffs[0]=Real(1.0);coeffs[1]=0.0; coeffs[2]=0.0; }
+#endif
+    ///////////////
+    // GpuArray<Real,3>* coeffs; 
+    // coeffs = (GpuArray<Real,3>*)The_Arena()->alloc(sizeof(GpuArray<Real,3>));
+    // (*coeffs)[0]=Real(4.0)/3;
+    // (*coeffs)[1]=Real(-2.0)/12;
+    // (*coeffs)[2]=0.0;
 
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -204,9 +222,11 @@ namespace Central {
       ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-        KEEP(i,j,k,halfsten,*pcoeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
+        KEEP(i,j,k,halfsten,coeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
       });
     }
+
+    // The_Arena()->free(coeffs);
   }
 
   // TODO: In post_init select the boundaries and planes to reduce order/treat specially -- function to generate box arrays of planes with associated order of numericalscheme to be applied.
@@ -214,7 +234,19 @@ namespace Central {
 
     BCRec& l_phys_bc = *CNS::d_phys_bc;
     Parm& lparm = *CNS::d_parm;
-    GpuArray<Real,3>* pcoeffs2 = &coeffs2;
+#if AMREX_USE_GPU
+    GpuArray<Real,3> coeffs2;
+    coeffs2[0]=Real(1.0);
+    coeffs2[1]=0.0;
+    coeffs2[2]=0.0;
+#endif
+    /////////////// 
+
+    // GpuArray<Real,3>* coeffs2; 
+    // coeffs2 = (GpuArray<Real,3>*)The_Arena()->alloc(sizeof(GpuArray<Real,3>));
+    // (*coeffs2)[0]=Real(1.0);
+    // (*coeffs2)[1]=0.0;
+    // (*coeffs2)[2]=0.0;
 
     for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -240,7 +272,7 @@ namespace Central {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,*pcoeffs2,prims,nfabfy,lparm);
+            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
             // printf("2nd ord %d %d %d \n",i,j,k);
           });
         }
@@ -263,12 +295,14 @@ namespace Central {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,*pcoeffs2,prims,nfabfy,lparm);
+            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
             // printf("2nd ord %d %d %d \n",i,j,k);
           });
         }
       }
     }
+
+    // The_Arena()->free(coeffs2);
   }
 
 }

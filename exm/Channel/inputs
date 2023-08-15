@@ -30,9 +30,9 @@ cns.rhs_euler  = 1 # 0=false, 1=true
 cns.rhs_visc   = 1 # 0=false, 1=true
 cns.rhs_source = 1 # 0=false, 1=true
 cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
-cns.order_keep = 6 # Order of accuracy=2, 4 or 6
+cns.order_keep = 4 # Order of accuracy=2, 4 or 6
 cns.art_diss   = 1
-cns.nghost     = 3 
+cns.nghost     = 2 
 cns.verbose    = 1 # 0=quiet, 1=verbose)
 
 # REFINEMENT / REGRIDDING 
@@ -57,6 +57,6 @@ amr.check_int               = 50000    # number of timesteps between checkpoints
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plot/plt     # root name of plotfile
-amr.plot_int          = 550      # approximately 1 tau flow
+amr.plot_int          = 10      # approximately 1 tau flow
 amr.derive_plot_vars  = pressure temperature x_velocity y_velocity z_velocity
 cns.screen_output     = 50 

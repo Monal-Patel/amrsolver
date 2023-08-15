@@ -13,7 +13,9 @@
 using namespace amrex;
 
 int CNS::NGHOST;
+#if !AMREX_USE_GPU
 GpuArray<Real,3> Central::coeffs,Central::coeffs2;  
+#endif
 int Central::order_keep;
 
 
@@ -222,6 +224,7 @@ void CNS::post_init(Real)
   }
 
   // allocate pointer functions
+#if !AMREX_USE_GPU
   Central::coeffs2={Real(1.0), 0.0, 0.0};
   if (Central::order_keep==6) {
     Central::coeffs={Real(6.0)/4, Real(-6.0)/20, Real(2.0)/60}; 
@@ -232,6 +235,11 @@ void CNS::post_init(Real)
   else {
     Central::coeffs={Real(1.0), 0.0, 0.0};
   }
+#endif
+  // Central::coeffs = (GpuArray<Real,3>*)The_Arena()->alloc(sizeof(GpuArray<Real,3>));
+  // (*Central::coeffs)[0]=Real(4.0)/3;
+  // (*Central::coeffs)[1]=Real(-2.0)/12;
+  // (*Central::coeffs)[2]=0.0;
 
 }
 // -----------------------------------------------------------------------------
