@@ -4,8 +4,8 @@ PRECISION    	= DOUBLE # DOUBLE or FLOAT
 DIM     	= 3
 COMP 		= gcc
 CXXSTD          = c++17 # c++17 default
-USE_CUDA 	= TRUE
-USE_MPI 	= FALSE
+USE_CUDA 	= FALSE
+USE_MPI 	= TRUE
 USE_OMP 	= FALSE
 USE_GPIBM	= FALSE
 
