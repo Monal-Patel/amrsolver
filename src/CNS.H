@@ -151,6 +151,7 @@ public:
     static bool rhs_visc;
     static bool rhs_source;
     static bool ib_move;
+    static bool plot_surf;
 
     static Vector<MultiFab> VdSdt;
     static Vector<MultiFab> VSborder;

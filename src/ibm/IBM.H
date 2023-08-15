@@ -186,7 +186,7 @@ namespace IBM {
 
       void moveGeom();
 
-      void computeSurface();
+      void computeSurf(int lev);
 
     private:
       Array<Real,8> computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMREX_SPACEDIM>& impscell, GpuArray<Real,AMREX_SPACEDIM>& cellsize);

@@ -25,6 +25,7 @@ bool CNS::rhs_source=false;
 bool CNS::verbose = true;
 bool CNS::dt_dynamic=false;
 bool CNS::ib_move=false;
+bool CNS::plot_surf=false;
 int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
 int  CNS::art_diss=0; 
@@ -127,6 +128,9 @@ void CNS::read_params()
   ParmParse ppib("ib");
   if(!ppib.query("move",ib_move)) {
     amrex::Abort("ib.move not specified (0=false, 1=true)");
+  }
+  if(!ppib.query("plot_surf",plot_surf)) {
+    amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
   }
 #endif
 
@@ -404,15 +408,17 @@ void CNS::post_timestep(int /* iteration*/)
 
 void CNS::postCoarseTimeStep (Real time)
 {
+#if AMREX_USE_GPIBM
   if (ib_move) {
     IBM::ib.moveGeom();
     // reallocate variables?
     // Print() << parent->finestLevel() << std::endl;
     for (int lev=0; lev <= parent->finestLevel(); lev++) {
-    IBM::ib.computeMarkers(0);
-    IBM::ib.initialiseGPs(0);
+      IBM::ib.computeMarkers(0);
+      IBM::ib.initialiseGPs(0);
     }
   }
+#endif
 }
 // -----------------------------------------------------------------------------
 
@@ -823,14 +829,21 @@ void CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how
 }
 
 
+// This is called once per level on write timestep.
 void CNS::writePlotFilePost (const std::string& dir,
                                     std::ostream&      os) {
 
-// write geometry
+#if AMREX_USE_GPIBM
+  // write geometry -- each proc holds same geom, even with ib_move, so no communication is required.
+  if (plot_surf) {
+  Print() << "Writing surface data" << std::endl;
+  if (ioproc=0) ib.writeGeom()
 
-// plot surface data
-// if (mod(nt_surfdata_plot,nt)==0) then
-// if (ioproc=0) then
+  IBM::ib.computeSurf(this->level); // computed at each level. From low to high.
+  Print() << "Computed surface data" << std::endl;
 
-
+  Print() << "Writing surface data" << std::endl;
+  if (ioproc=0) ib.writeSurf()
+  }
+#endif
 }

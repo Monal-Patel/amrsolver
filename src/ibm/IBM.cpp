@@ -494,14 +494,13 @@ void IB::moveGeom() {
   // Geometry fair?
 }
 
-void IB::computeSurface() {
+void IB::computeSurf(int lev) {
 
   // for each level 
-    // for each fab
 
 
 
-  // communicate
-
-
+  exit(0);
 }
+
+
