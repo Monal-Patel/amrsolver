@@ -13,7 +13,7 @@
 using namespace amrex;
 
 int CNS::NGHOST;
-GpuArray<Real,3> Central::coeffs;  
+GpuArray<Real,3> Central::coeffs,Central::coeffs2;  
 int Central::order_keep;
 
 
@@ -222,6 +222,7 @@ void CNS::post_init(Real)
   }
 
   // allocate pointer functions
+  Central::coeffs2={Real(1.0), 0.0, 0.0};
   if (Central::order_keep==6) {
     Central::coeffs={Real(6.0)/4, Real(-6.0)/20, Real(2.0)/60}; 
   }

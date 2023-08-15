@@ -12,6 +12,7 @@ namespace Central {
 
   //2 * standard finite difference coefficients
   extern GpuArray<Real,3> coeffs;  
+  extern GpuArray<Real,3> coeffs2;  
   extern int order_keep;
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
@@ -186,23 +187,90 @@ namespace Central {
 
   inline void FluxKEEP(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
+    Parm& lparm = *CNS::d_parm;
+    int halfsten = order_keep/2;
+    GpuArray<Real,3>* pcoeffs = &coeffs;
+
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
       const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
 
-      auto const& statefab = statemf.array(mfi);
+      // auto const& statefab = statemf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
       AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
                     auto const& nfabfy = numflxmf[1].array(mfi);,
                     auto const& nfabfz = numflxmf[2].array(mfi););
 
-      amrex::ParallelFor(bxnodal,  
+      ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-        KEEP(i,j,k,order_keep/2,coeffs,prims,nfabfx,nfabfy,nfabfz,*CNS::d_parm);
+        KEEP(i,j,k,halfsten,*pcoeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
       });
     }
   }
+
+  // TODO: In post_init select the boundaries and planes to reduce order/treat specially -- function to generate box arrays of planes with associated order of numericalscheme to be applied.
+  inline void Flux_2nd_Order_KEEP(Geometry& geom, MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+
+    BCRec& l_phys_bc = *CNS::d_phys_bc;
+    Parm& lparm = *CNS::d_parm;
+    GpuArray<Real,3>* pcoeffs2 = &coeffs2;
+
+    for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+      const Box& bx      = mfi.tilebox();
+      const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
+      auto const& prims  = primsmf.array(mfi);
+      auto const& nfabfy = numflxmf[1].array(mfi);
+
+      // Order reduction at ymin wall boundary
+      if (l_phys_bc.lo(1)==6) {
+        if (geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
+          int jbndry = bxnodal.smallEnd(1);
+          IntVect small,big;
+          small.setVal(0,bxnodal.smallEnd(0));
+          small.setVal(1,jbndry);
+          small.setVal(2,bxnodal.smallEnd(2));
+
+          big.setVal(0,bxnodal.bigEnd(0));
+          big.setVal(1,jbndry);
+          big.setVal(2,bxnodal.bigEnd(2));
+          Box bxboundary(small,big);
+
+          ParallelFor(bxboundary, 
+          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+            KEEPy(i,j,k,1,*pcoeffs2,prims,nfabfy,lparm);
+            // printf("2nd ord %d %d %d \n",i,j,k);
+          });
+        }
+      }
+    
+    // Order reduction at ymax wall boundary
+    if (l_phys_bc.hi(1)==6) {
+      if (geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
+          int jbndry = bxnodal.bigEnd(1);
+          IntVect small,big;
+          small.setVal(0,bxnodal.smallEnd(0));
+          small.setVal(1,jbndry);
+          small.setVal(2,bxnodal.smallEnd(2));
+
+          big.setVal(0,bxnodal.bigEnd(0));
+          big.setVal(1,jbndry);
+          big.setVal(2,bxnodal.bigEnd(2));
+          Box bxboundary(small,big);
+
+          ParallelFor(bxboundary, 
+          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+            KEEPy(i,j,k,1,*pcoeffs2,prims,nfabfy,lparm);
+            // printf("2nd ord %d %d %d \n",i,j,k);
+          });
+        }
+      }
+    }
+  }
+
 }
 
 #endif

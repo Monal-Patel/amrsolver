@@ -223,46 +223,48 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
     if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
     else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
     else {Riemann::Flux(statemf,primsmf,numflxmf);}
-  } 
-  // Flux corrections //
-  // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
 
-  // Order reduction near IBM
-
-
-  // Artificial dissipation
-  // JST artificial dissipation shock capturing
-  if (art_diss==1) {
-  // make multifab for spectral radius and sensor for artificial dissipation
-    MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
-    MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
-    lambdamf = 0.0_rt;
-    sensormf = 0.0_rt;
-    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-      const Box& bx      = mfi.tilebox();
-      const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
-
-      auto const& statefab = statemf.array(mfi);
-      auto const& sensor   = sensormf.array(mfi);
-      auto const& lambda   = lambdamf.array(mfi);
-      auto const& prims    = primsmf.array(mfi);
-      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                    auto const& nfabfy = numflxmf[1].array(mfi);,
-                    auto const& nfabfz = numflxmf[2].array(mfi););
-      amrex::ParallelFor(bx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-          ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
-        });
-
-        amrex::ParallelFor(bxnodal, NCONS,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-        {
-          JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,lparm);
-        }); 
+    // Euler flux corrections //
+    // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
+    if (flux_euler==1 && !(Central::order_keep==2)) {
+      Central::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
     }
-  }
+    // Order reduction near IBM
+
+    // Artificial dissipation
+    // JST artificial dissipation shock capturing
+    if (art_diss==1) {
+    // make multifab for spectral radius and sensor for artificial dissipation
+      MultiFab lambdamf; lambdamf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+      MultiFab sensormf; sensormf.define(statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+      lambdamf = 0.0_rt;
+      sensormf = 0.0_rt;
+      for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+      {
+        const Box& bx      = mfi.tilebox();
+        const Box& bxnodal = mfi.grownnodaltilebox(-1,0);
+
+        auto const& statefab = statemf.array(mfi);
+        auto const& sensor   = sensormf.array(mfi);
+        auto const& lambda   = lambdamf.array(mfi);
+        auto const& prims    = primsmf.array(mfi);
+        AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                      auto const& nfabfy = numflxmf[1].array(mfi);,
+                      auto const& nfabfz = numflxmf[2].array(mfi););
+        amrex::ParallelFor(bx,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+          {
+            ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
+          });
+
+          amrex::ParallelFor(bxnodal, NCONS,
+          [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+          {
+            JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,lparm);
+          }); 
+      }
+    }
+  } 
 
   //////////////////////////////////////////////////////////////////////////////
 

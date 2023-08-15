@@ -287,6 +287,7 @@ namespace HiRes {
     MultiFab lambdamf;
     lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, CNS::NGHOST);
 
+    Parm& lparm = *CNS::d_parm;
     // loop over all fabs
     for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
     {
@@ -305,7 +306,7 @@ namespace HiRes {
         auto const& lambda = lambdamf.array(mfi);
 
         ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,*CNS::d_parm);
+            cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,lparm);
         });
 
         // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
