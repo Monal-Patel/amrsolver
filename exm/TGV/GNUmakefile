@@ -1,6 +1,6 @@
 TINY_PROFILE 	= FALSE
 DEBUG   	= FALSE
-PRECISION    	= DOUBLE # DOUBLE or FLOAT
+#PRECISION    	= DOUBLE # DOUBLE or FLOAT
 DIM     	= 3
 COMP 		= gcc
 CXXSTD          = c++17 # c++17 default

@@ -3,6 +3,7 @@
 .vscode/dryrun.log
 .vscode/settings.json
 .vscode/targets.log
+*.code-workspace
 
 #build folder, executable and output files
 **/tmp_build_dir
