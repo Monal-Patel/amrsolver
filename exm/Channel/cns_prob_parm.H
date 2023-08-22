@@ -15,12 +15,12 @@ struct ProbParm
     Real Ma_b    = 1.5_rt; //originally 1.5    //mach number bulk  = ub/aw  (aw is speed of sound at wall)
     Real u_tau = 35.0_rt; // (m/s)
     Real Tw    = 500.0_rt; // wall temperature (K)
-    Real Mt0   = 0.10;           // initial turbulent mach number
+    // Real Mt0   = 0.10;           // initial turbulent mach number
 
 
-    Real Rgas = 287_rt;// specific gas constant (J/kgK)
+    Real Rgas = 287.0_rt;// specific gas constant (J/kgK)
     // rhow, Pw and P0
-    Real muw = 2.670e-5; // mu at 500K for air
+    Real muw = 2.670533348e-5; // mu at 500K for air
     Real rho_w = Re_tau * muw / (u_tau*h);
     Real Pw   = rho_w*Rgas*Tw; // csal_press(rho_w,T_w,nm_csal)
 

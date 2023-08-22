@@ -34,12 +34,12 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
   // Real T = prob_parm.Tw;
 
   // Turbulent profiles
-  Real T = 677.04110513 + 255.46817*pow(y,0.5) - 176.38967315*exp(-3081.95957181*y);
+  Real T = 677.04110513 + 255.46817*pow(y,0.5) - 176.38967315*exp(-3081.95957181*y)*1.025;
   Real ux = 581.54524091 + 2687.84321585*pow(y,0.5) - 593.73493364* exp(-2008.87100276*y);
 
-  int nx = 3;
+  int nx = 2;
   int ny = 2;
-  int nz = 1;
+  int nz = 3;
 
   // srand(10);
   // Print() << (Real)rand()/ RAND_MAX << std::endl;

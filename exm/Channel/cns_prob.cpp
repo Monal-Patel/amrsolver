@@ -10,12 +10,20 @@ extern "C" {
   {
 
     CNS::h_parm->Cshock = 0.0_rt;
-    CNS::h_parm->Cdamp  = 0.0016_rt;
+    CNS::h_parm->Cdamp  = 0.0001_rt;
 
     CNS::d_parm->Cshock = CNS::h_parm->Cshock;
     CNS::d_parm->Cdamp  = CNS::h_parm->Cdamp;
 
 
+    Print() << CNS::h_prob_parm->muw << std::endl;
+    // Print() << CNS::h_parm->visc_CPU(500) << std::endl;
+    // Print() << CNS::h_parm->cond_CPU(500) << std::endl;
+    Print() << CNS::h_parm->cp << std::endl;
+    // Print() << CNS::h_parm->visc_CPU(500)*CNS::h_parm->cp/ CNS::h_parm->cond_CPU(500)<< std::endl;
+    Print() << CNS::h_prob_parm->rho_w << std::endl;
+    Print() << CNS::h_prob_parm->Pw << std::endl;
+    exit(0);
     // print lv_w , dy^+, dx^+, dz^+
 
   }
