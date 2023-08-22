@@ -227,7 +227,7 @@ void CNS::post_init(Real)
     Vpntvflxmf[level][idim].setVal(0.0);
   }
 
-  // allocate pointer functions
+  // TODO: move to Central.H
 #if !AMREX_USE_GPU
   Central::coeffs2={Real(1.0), 0.0, 0.0};
   if (Central::order_keep==6) {

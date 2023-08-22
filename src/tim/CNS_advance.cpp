@@ -224,14 +224,14 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
     else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
     else {Riemann::Flux(statemf,primsmf,numflxmf);}
 
-    // Euler flux corrections //
+    // Euler flux corrections (overwrite numflxmf) //
     // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
     if (flux_euler==1 && !(Central::order_keep==2)) {
       Central::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
     }
     // Order reduction near IBM
 
-    // Artificial dissipation
+    // Artificial dissipation (adding to numflxmf)
     // JST artificial dissipation shock capturing
     if (art_diss==1) {
     // make multifab for spectral radius and sensor for artificial dissipation
@@ -279,6 +279,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
     // loop over all fabs
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
+        const Box& bx  = mfi.tilebox();
         const Box& bxpflx  = mfi.growntilebox(1);
         const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
@@ -292,28 +293,60 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
                     auto const& nfabfy  = numflxmf[1].array(mfi);,
                     auto const& nfabfz  = numflxmf[2].array(mfi););
 
-        // Compute transport coefficients
-        // amrex::ParallelFor(bxg,
-        // [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        // {
-        //     cons2prim(i, j, k, statefab, prims, *lparm);
-        //     // prim2tran(i, j, k, prims, trans, *lparm);
-        // });
-
         // compute u,v,w,T derivatives and compute physical viscous fluxes
         amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
             viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
         });
 
-        // compute numerical viscous fluxes
+        // Viscous flux corrections (overwrite pfabfx, pfabfy, pfabfz)
+        // TODO:: generalise to wall boundary in y and z directions
+
+        if(geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
+        if ((*h_phys_bc).lo(1)==6) {
+          int jj = bx.smallEnd(1)-1;
+          IntVect small = {bxpflx.smallEnd(0), jj, bxpflx.smallEnd(2)};
+          IntVect big   = {bxpflx.bigEnd(0)  , jj, bxpflx.bigEnd(2)  };
+          Box bxboundary(small,big);
+
+          amrex::ParallelFor(bxboundary,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+              viscfluxes_wall(i, j, k, 0, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
+          });
+        }
+        }
+        if(geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
+        if ((*h_phys_bc).hi(1)==6) {
+          int jj = bx.bigEnd(1) + 1;
+          IntVect small = {bxpflx.smallEnd(0), jj, bxpflx.smallEnd(2)};
+          IntVect big   = {bxpflx.bigEnd(0)  , jj, bxpflx.bigEnd(2)  };
+          Box bxboundary(small,big);
+
+          amrex::ParallelFor(bxboundary,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+              viscfluxes_wall(i, j, k, 1, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
+          });
+        }
+        }
+
+        // else if (l_phys_bc.lo(2)==6) {
+
+        // }
+        // else if (l_phys_bc.hi(2)==6) {
+
+        // }
+        // else if (l_phys_bc.lo(0)==6) {
+
+        // }
+        // else if (l_phys_bc.hi(0)==6) {
+
+
+        // TODO :: IBM GP visc flux correction
+        // ib.viscfluxcorrection(level, numflxmf, pntvflxmf, dx, dt, time, lparm);
+        
+        // compute numerical viscous fluxes (add to numflxmf)
         amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
             visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
         });
       }
-      // TODO :: IBM GP visc flux correction
-      // ib.viscfluxcorrection(level, numflxmf, pntvflxmf, dx, dt, time, lparm);
   }
-  //////////////////////////////////////////////////////////////////////////////
 
   // Re-fluxing ////////////////////////////////////////////////////////////////
   if (fr_as_crse) {

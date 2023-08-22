@@ -193,6 +193,11 @@ CNS::variableSetUp ()
     // desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
 
     ////////////////////////////////////////////////////////////////////////////
+    // allocate pointer functions
+    // d_parm->SetPointers();
+    // Parm::*Viscosity = 
+    // d_parm->Viscosity = d_parm->visc_CPU;
+
 }
 
 void CNS::variableCleanUp ()

@@ -23,7 +23,6 @@ extern "C" {
     // Print() << CNS::h_parm->visc_CPU(500)*CNS::h_parm->cp/ CNS::h_parm->cond_CPU(500)<< std::endl;
     Print() << CNS::h_prob_parm->rho_w << std::endl;
     Print() << CNS::h_prob_parm->Pw << std::endl;
-    exit(0);
     // print lv_w , dy^+, dx^+, dz^+
 
   }
