@@ -258,15 +258,9 @@ namespace Central {
       // Order reduction at ymin wall boundary
       if (l_phys_bc.lo(1)==6) {
         if (geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
-          int jbndry = bxnodal.smallEnd(1);
-          IntVect small,big;
-          small.setVal(0,bxnodal.smallEnd(0));
-          small.setVal(1,jbndry);
-          small.setVal(2,bxnodal.smallEnd(2));
-
-          big.setVal(0,bxnodal.bigEnd(0));
-          big.setVal(1,jbndry);
-          big.setVal(2,bxnodal.bigEnd(2));
+          int jj = bx.smallEnd(1);
+          IntVect small = {bxnodal.smallEnd(0), jj, bxnodal.smallEnd(2)};
+          IntVect big   = {bxnodal.bigEnd(0)  , jj + (order_keep/2) -1, bxnodal.bigEnd(2)  };
           Box bxboundary(small,big);
 
           ParallelFor(bxboundary, 
@@ -281,15 +275,9 @@ namespace Central {
     // Order reduction at ymax wall boundary
     if (l_phys_bc.hi(1)==6) {
       if (geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
-          int jbndry = bxnodal.bigEnd(1);
-          IntVect small,big;
-          small.setVal(0,bxnodal.smallEnd(0));
-          small.setVal(1,jbndry);
-          small.setVal(2,bxnodal.smallEnd(2));
-
-          big.setVal(0,bxnodal.bigEnd(0));
-          big.setVal(1,jbndry);
-          big.setVal(2,bxnodal.bigEnd(2));
+          int jj = bx.bigEnd(1);
+          IntVect small = {bxnodal.smallEnd(0), jj - (order_keep/2) + 1, bxnodal.smallEnd(2)};
+          IntVect big   = {bxnodal.bigEnd(0)  , jj, bxnodal.bigEnd(2)  };
           Box bxboundary(small,big);
 
           ParallelFor(bxboundary, 
