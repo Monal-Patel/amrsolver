@@ -9,7 +9,6 @@ struct Parm
     amrex::Real eos_gamma = 1.4;
     amrex::Real eos_mu = 28.97e-3;// mean molecular weight kg/mol
 
-    //amrex::Real Pr  = 0.72;     // Prandtl number
     //Sutherland's fit from Computational Fluid Mechanics and Heat Transfer 
     amrex::Real visc_ref  = 1.458e-6; // Viscosity reference value
     amrex::Real Tvisc_ref = 110.4;    // Viscosity reference temperature
@@ -24,10 +23,10 @@ struct Parm
     amrex::Real cp = eos_gamma * Ru / (eos_mu * (eos_gamma-amrex::Real(1.0)));
     amrex::Real Rspec = Ru/eos_mu;
 
-    amrex::Real Pr = 0.72;
+    amrex::Real Pr = 0.70;
 
-    amrex:: Real Cshock = 0.0;
-    amrex:: Real Cdamp = 0.0;
+    amrex::Real Cshock = 0.0;
+    amrex::Real Cdamp = 0.0;
 
     public: 
     // AMREX_GPU_DEVICE inline const amrex::Real visc(amrex::Real& T,mu) { 
