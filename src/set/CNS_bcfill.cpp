@@ -4,24 +4,9 @@
 #include <AMReX_PhysBCFunct.H>
 #include <CNS_index_macros.H>
 #include <CNS.H>
+#include <cns_prob.H>
 using namespace amrex;
 
-
-// 2st order accurate for 3 ghost points
-AMREX_GPU_DEVICE inline void dirichlet ( auto& sten, int ivar, int nghost, Real value) noexcept {
-  // reflect
-  Real delta = 2*value;
-  for (int j=0;j<nghost;j++) {
-    sten(ivar,j) = delta - sten(ivar,2*nghost-1-j);
-  }
-}
-
-AMREX_GPU_DEVICE inline void zerograd_pres ( auto& sten, int ivar, int nghost) noexcept {
-  // linear copy
-  for (int j=0;j<nghost;j++) {
-    sten(ivar,j) = sten(ivar,2*nghost-1-j);
-  }
-}
 
 // This is called per boundary point
 struct CnsFillExtDir
@@ -29,106 +14,79 @@ struct CnsFillExtDir
     // create pointers to device (for gpu) parms
     ProbParm* lprobparm = CNS::d_prob_parm;
     Parm*     lparm     = CNS::d_parm;
-    BCRec* l_phys_bc    = CNS::d_phys_bc;
-    int nghost          = CNS::NGHOST;
 
     AMREX_GPU_DEVICE
-    void operator() (const IntVect& iv, Array4<Real> const& data,
-                     const int /*dcomp*/, const int /*numcomp*/,
-                     GeometryData const& geom, const Real /*time*/,
-                     const BCRec* bcr, const int /*bcomp*/,
+    void operator() (const IntVect& iv, Array4<Real> const& dest,
+                     const int dcomp, const int numcomp,
+                     GeometryData const& geom, const Real time,
+                     const BCRec* bcr, const int bcomp,
                      const int /*orig_comp*/) const
         {
+          // Print() << "CnsFillExtDir " << iv << " " << bcomp << " " << dcomp << " " << numcomp << std::endl;
+          // Get BC data
+          const BCRec& bc = bcr[bcomp];
 
-        // TODO: Avoid if statement by having different options for user defined BCs in cns_bcfill
-        // Print() << "CNSFillExtDir called " << l_phys_bc->lo(1) << " " << l_phys_bc->hi(1) << " " << geom.Domain().bigEnd(1)+1 << " " << geom.Domain().smallEnd(1)-1 << std::endl;
+          // Get geom data
+          const int* domlo = geom.Domain().loVect();
+          const int* domhi = geom.Domain().hiVect();
+          const Real* prob_lo = geom.ProbLo();
+          const Real* prob_hi = geom.ProbHi();
+          const Real* dx = geom.CellSize();
+          const Real x[AMREX_SPACEDIM] = {
+            AMREX_D_DECL(prob_lo[0] + static_cast<Real>(iv[0] + 0.5) * dx[0],
+                        prob_lo[1] + static_cast<Real>(iv[1] + 0.5) * dx[1],
+                        prob_lo[2] + static_cast<Real>(iv[2] + 0.5) * dx[2])};
 
-        if (l_phys_bc->lo(1)==6 || l_phys_bc->hi(1)==6) {
-          Array2D<Real,0,NPRIM-1,0,5> prims;
+          Real s_int[NCONS] = {0.0};
+          Real s_refl[NCONS] = {0.0};
+          Real s_ext[NCONS] = {0.0};
 
-          // int nghost = 3;
-          int i = iv[0]; int j = iv[1]; int k = iv[2];
-          int jjadd,jj,jstart;
-          int dir = 1;
-          const Real dy = geom.CellSize(dir);
-          Real rho,rhoinv,ux,uy,uz,rhoke,rhoei,p,T;
-
-          // we compute all ghost points in y direction when this function is called at the first ghost point
-          // y=0 boundary/plane
-          if (iv[dir]==geom.Domain().smallEnd(dir)-1) {
-            jstart = -nghost;
-            jjadd  = 1;
-          }
-          // y=ymax boundary/plane
-          else if (iv[dir]==geom.Domain().bigEnd(dir)+1) {
-            jstart = geom.Domain().bigEnd(dir) + nghost;
-            jjadd  = -1;
-          }
-          else { return ;}
-
-            // convert domain points near boundary to primitive vars (rho,u,v,w,T,P(T,rho)), in preparation to fill ghost points in primitive vars
-            jj = jstart + jjadd*nghost; // only convert in domain
-            for (int count=nghost; count<2*nghost; count++ ) {
-              rho    = data(i,jj,k,URHO);
-              rhoinv = Real(1.0)/rho;
-              ux     = data(i,jj,k,UMX)*rhoinv;
-              uy     = data(i,jj,k,UMY)*rhoinv;
-              uz     = data(i,jj,k,UMZ)*rhoinv;
-              rhoke  = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-              rhoei  = (data(i,jj,k,UET) - rhoke);
-              p      = (lparm->eos_gamma - Real(1.0))*rhoei;
-
-              prims(QRHO,count)  = rho;
-              prims(QU,count)    = ux;
-              prims(QV,count)    = uy;
-              prims(QW,count)    = uz;
-              prims(QPRES,count) = p;
-              prims(QT,count)    = p/(rho*lparm->Rspec);
-              jj = jj + jjadd;
+          for (int idir = 0; idir < AMREX_SPACEDIM; ++idir) {
+            if ((bc.lo(idir) == BCType::ext_dir) && (iv[idir] < domlo[idir])) {
+            //  Ghost | Ghost | Ghost || Real | Real | Real
+            //  ^cell to be filled (ext)  ^firs         ^refl
+            IntVect refl(iv);
+            refl[idir] = 2 * domlo[idir] - iv[idir] - 1; // reflection image of the ghost cell across boundary
+            IntVect firs(iv);
+            firs[idir] = domlo[idir];              // interior first cell
+            for (int nc = 0; nc < numcomp; ++nc) { // Fill internal state data
+              s_int[dcomp + nc] = dest(firs, dcomp + nc);
+              s_refl[dcomp + nc] = dest(refl, dcomp + nc);
             }
 
-            // apply BC (fill u,v,w,T,P)
-            dirichlet(prims,QU,nghost,Real(0.0)); 
-            // neumann  (prims,QU,Real(0.0),dy); 
-            dirichlet(prims,QV,nghost,Real(0.0)); 
-            dirichlet(prims,QW,nghost,Real(0.0)); 
-            dirichlet(prims,QT,nghost,lprobparm->Tw); 
-            zerograd_pres(prims,QPRES,nghost); 
+            Real di = Real(firs[idir] + 0.5)*dx[idir] - prob_lo[idir];
+            Real de = prob_lo[idir] - x[idir];
+            Real dratio = de/di; // wall-ghost/wall-first internal distance ratio
+            // For uniform grid, first ghost point dratio=1, second ghost point dratio=3, 5...
 
-            // convert ghost points to conservative vars
-            // compute rho
-            jj = jstart;
-            for (int count=0; count<nghost; count++ ) {
-              p   = prims(QPRES,count);
-              T   = prims(QT,count);
-              rho = p/(lparm->Rspec * T);
-              ux  = prims(QU,count);
-              uy  = prims(QV,count);
-              uz  = prims(QW,count);
-              rhoke  = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-              rhoei  = p/(lparm->eos_gamma - Real(1.0));
+            bcnormal(x, dratio, s_int, s_refl, s_ext, idir, 1, time, geom, *lparm, *lprobparm); // Call bcnormal from prob.H
 
-              // if (rho==Real(0.0)) {
-              //   printf("%d %f %f %f",count,p,rho,T);
-              //   amrex::Abort("rho is 0.0");
-              //   };
-
-              // if (i==0 && k==0) {
-              // printf("fill bc i=%d,jj=%d,k=%d \n",i,jj,k);
-              // printf("fill bc rho %f \n \n",rho);
-              // }
-
-              data(i,jj,k,URHO) = rho;
-              data(i,jj,k,UMX)  = rho*ux;
-              data(i,jj,k,UMY)  = rho*uy;
-              data(i,jj,k,UMZ)  = rho*uz;
-              data(i,jj,k,UET)  = rhoke+rhoei;
-
-              jj = jj + jjadd;
+            for (int nc = 0; nc < numcomp; ++nc) {
+              dest(iv, dcomp + nc) = s_ext[dcomp + nc]; // Only take the wanted components
+            }
+          } else if // hi
+            ((bc.hi(idir) == BCType::ext_dir) && (iv[idir] > domhi[idir])) {
+            IntVect refl(iv);
+            refl[idir] = 2 * domhi[idir] - iv[idir] + 1;
+            IntVect firs(iv);
+            firs[idir] = domhi[idir];
+            for (int nc = 0; nc < numcomp; ++nc) {
+              s_int[dcomp + nc] = dest(firs, dcomp + nc);
+              s_refl[dcomp + nc] = dest(refl, dcomp + nc);
             }
 
+            Real di = prob_hi[idir] - Real(firs[idir] + 0.5)*dx[idir] ;
+            Real de = x[idir] - prob_hi[idir];
+            Real dratio = de/di; // wall-ghost/wall-first internal distance ratio
+
+            bcnormal(x, dratio, s_int, s_refl, s_ext, idir, -1, time, geom, *lparm,*lprobparm);
+
+            for (int nc = 0; nc < numcomp; ++nc) {
+              dest(iv, dcomp + nc) = s_ext[dcomp + nc];
+            }
           }
         }
+      }
 };
 
 // bx                  : Cells outside physical domain and inside bx are filled.
@@ -142,20 +100,9 @@ void cns_bcfill (Box const& bx, FArrayBox& data,
                  const Vector<BCRec>& bcr, const int bcomp,
                  const int scomp)
 {
-  //////////////////////////// ALTERNATIVE POSSIBLE IMPLEMENTATION /////////////
-    // const Real*    dx          = geom.CellSize();
-    // // ymin boundary
-    // if (bx.smallEnd(1) < geom.Domain().smallEnd(1)) {
-    //   // fill ymin boundary
-    // }
-    // if (bx.bigEnd(1) > geom.Domain().bigEnd(1)) {
-    //   // fill ymax boundary
-    // }
-  //////////////////////////////////////////////////////////////////////////////
+  GpuBndryFuncFab<CnsFillExtDir> gpu_bndry_func(CnsFillExtDir{});
+  gpu_bndry_func(bx,data,dcomp,numcomp,geom,time,bcr,bcomp,scomp);
+  Gpu::streamSynchronize();
 
-    // Currently we assume ymax and ymin BC is wall 
-    // GpuBndryFuncFab class operates on all boundaries of the fab. It calls CnsFillExtDir for each ghost point ijk.
-    GpuBndryFuncFab<CnsFillExtDir> gpu_bndry_func(CnsFillExtDir{});
-    gpu_bndry_func(bx,data,dcomp,numcomp,geom,time,bcr,bcomp,scomp);
-    Gpu::streamSynchronize();
+// TODO : pass 0,1,Nghost internal points to bcnormal. The current approach
 }

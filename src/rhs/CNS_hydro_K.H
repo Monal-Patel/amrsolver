@@ -31,7 +31,7 @@ AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const 
 {
     Real rho = u(i,j,k,URHO);
     // Print() << "cons2prim"<< i << j << k << rho << std::endl;
-    rho = max(1e-40,rho);
+    // rho = max(1e-40,rho);
     Real rhoinv = Real(1.0)/rho;
     Real ux = u(i,j,k,UMX)*rhoinv;
     Real uy = u(i,j,k,UMY)*rhoinv;
