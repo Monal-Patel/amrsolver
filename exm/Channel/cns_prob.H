@@ -37,7 +37,7 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
   Real T = 677.04110513 + 255.46817*pow(y,0.5) - 176.38967315*exp(-3081.95957181*y)*1.025;
   Real ux = 581.54524091 + 2687.84321585*pow(y,0.5) - 593.73493364* exp(-2008.87100276*y);
 
-  int nx = 2;
+  int nx = 1;
   int ny = 2;
   int nz = 3;
 
@@ -67,17 +67,17 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
   state(i,j,k,UET  ) = rho*parm.cv*T + Real(0.5)*rho*(ux*ux + u_prime*u_prime + v_prime*v_prime + w_prime*w_prime);
 }
 
-inline void user_tagging(TagBoxArray& tags, MultiFab &sdata, int level) {
+inline void user_tagging(TagBoxArray& tags, const MultiFab &sdata, Geometry const& geom, int level) {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
-  Real dengrad_threshold= Real(0.2);
   for (MFIter mfi(tags,TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
     const Box& bx = mfi.tilebox();
     auto const& tagfab = tags.array(mfi);
-    auto const& sdf = sdata.array(mfi); // state data fab (sdf)
-    int idx = 0; // density index
+    // auto const& sdf = sdata.array(mfi); // state data fab (sdf)
+    // int idx = 0; // density index
+    // const Real* dx      = geom.CellSize();
     ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept 
     {
@@ -89,8 +89,9 @@ inline void user_tagging(TagBoxArray& tags, MultiFab &sdata, int level) {
       // az = max(az,Math::abs(sdf(i,j,k,idx) - sdf(i,j,k-1,idx)));
       // if (max(ax,ay,az) >= dengrad_threshold) {
       //     tagfab(i,j,k) = true;}
-      Real drhox = Math::abs(sdf(i+1,j,k,idx) - sdf(i-1,j,k,idx))/sdf(i,j,k,idx);
-      tagfab(i,j,k) = drhox > 0.5f;
+      // Real drhox = Math::abs(sdf(i+1,j,k,idx) - sdf(i-1,j,k,idx))/sdf(i,j,k,idx);
+      tagfab(i,j,k) = (j==geom.Domain().smallEnd(1) || j==geom.Domain().bigEnd(1)) ;
+      // tagfab(i,j,k) = j == 0 || j==127 ;
     });
   }
 }

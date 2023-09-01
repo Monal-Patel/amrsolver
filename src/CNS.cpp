@@ -198,7 +198,7 @@ void CNS::buildMetrics()
                  << dx[2] << "  \n";
 }
 
-void CNS::post_init(Real)
+void CNS::post_init(Real stop_time)
 {
   if (level > 0) {return;};
 
@@ -211,21 +211,21 @@ void CNS::post_init(Real)
   printTotal();
   }
 
-  // allocate multifabs
-  // time advancing helper multifabs
-  VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
-  VdSdt[level].setVal(0.0);
-  VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
-  VSborder[level].setVal(0.0);
-  Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
-  Vprimsmf[level].setVal(0.0);
-  for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    // Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-    Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory()); // see Vnumflxmf definition in post_regrid() for explanation
-    Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-    Vnumflxmf[level][idim].setVal(0.0);
-    Vpntvflxmf[level][idim].setVal(0.0);
-  }
+  // // allocate multifabs
+  // // time advancing helper multifabs
+  // VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
+  // VdSdt[level].setVal(0.0);
+  // VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+  // VSborder[level].setVal(0.0);
+  // Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
+  // Vprimsmf[level].setVal(0.0);
+  // for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //   // Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+  //   Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory()); // see Vnumflxmf definition in post_regrid() for explanation
+  //   Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+  //   Vnumflxmf[level][idim].setVal(0.0);
+  //   Vpntvflxmf[level][idim].setVal(0.0);
+  // }
 
   // TODO: move to Central.H
 #if !AMREX_USE_GPU
@@ -423,6 +423,7 @@ void CNS::postCoarseTimeStep (Real time)
 // -----------------------------------------------------------------------------
 
 // Gridding -------------------------------------------------------------------
+// Called for each level from 0,1...nlevs-1
 void CNS::post_regrid(int lbase, int new_finest)
 {
 
@@ -464,18 +465,19 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
                    Real time, int /*n_error_buf*/, int /*ngrow*/)
 {
   // MF without ghost points filled (why?)
-  MultiFab sdata(get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NCONS, 1, MFInfo(), Factory());
+  MultiFab sdata(get_new_data(State_Type).boxArray(), get_new_data(State_Type).DistributionMap(), NCONS, NGHOST, MFInfo(), Factory());
 
   // filling ghost points (copied from PeleC)
   const Real cur_time = state[State_Type].curTime();
-  FillPatch(*this, sdata, sdata.nGrow(), cur_time, State_Type, 0, NCONS, 0);
+  FillPatch(*this, sdata, NGHOST, cur_time, State_Type, 0, NCONS);
 
+// TODO: modify user_tagging such that it is called per point. This allows passing of geomdata onto GPU. Like in probinitData.
 #ifdef AMREX_USE_GPIBM
   // call function from cns_prob
   IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
-  user_tagging(tags, sdata, level, ibdata);
+  user_tagging(tags, sdata, level, geom, ibdata);
 #else
-  user_tagging(tags, sdata, level);
+  user_tagging(tags, sdata, geom, level);
 #endif
 
 }
@@ -835,15 +837,15 @@ void CNS::writePlotFilePost (const std::string& dir,
 
 #if AMREX_USE_GPIBM
   // write geometry -- each proc holds same geom, even with ib_move, so no communication is required.
-  if (plot_surf) {
-  Print() << "Writing surface data" << std::endl;
-  if (ioproc=0) ib.writeGeom()
+  // if (plot_surf) {
+  // Print() << "Writing surface data" << std::endl;
+  // if (ioproc=0) ib.writeGeom()
 
-  IBM::ib.computeSurf(this->level); // computed at each level. From low to high.
-  Print() << "Computed surface data" << std::endl;
+  // IBM::ib.computeSurf(this->level); // computed at each level. From low to high.
+  // Print() << "Computed surface data" << std::endl;
 
-  Print() << "Writing surface data" << std::endl;
-  if (ioproc=0) ib.writeSurf()
-  }
+  // Print() << "Writing surface data" << std::endl;
+  // if (ioproc=0) ib.writeSurf()
+  // }
 #endif
 }
