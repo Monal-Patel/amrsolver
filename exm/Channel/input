@@ -31,17 +31,17 @@ cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
 cns.order_keep = 4 # Order of accuracy=2, 4 or 6
 cns.art_diss   = 0
 cns.nghost     = 2 
-cns.verbose    = 1 # 0=quiet, 1=verbose)
+cns.verbose    = 1 # 0=quiet, 1=verbose
 
 # REFINEMENT / REGRIDDING 
-amr.n_cell          = 192 256 192  
+amr.n_cell          = 96 128 64  
 amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 2 2 2 2 # how often to regrid
-amr.blocking_factor = 2
-amr.max_grid_size   = 128
-amr.n_error_buf     = 0 0 0 0 # number of buffer cells in error est
-amr.grid_eff        = 0.99    # what constitutes an efficient grid
+amr.blocking_factor = 16
+amr.max_grid_size   = 64
+amr.n_error_buf     = 2 0 0 0 # number of buffer cells in error est
+amr.grid_eff        = 0.7    # what constitutes an efficient grid
 amr.v               = 1
 # amr.subcycling_mode = # None, Manual, Optimal (n_cycle[lev] is set dynamically), Auto (n_cycle[lev]=ref_ratio[lev])
 fabarray.mfiter_tile_size=128 128 128

@@ -470,16 +470,28 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
   // filling ghost points (copied from PeleC)
   const Real cur_time = state[State_Type].curTime();
   FillPatch(*this, sdata, NGHOST, cur_time, State_Type, 0, NCONS);
+  const auto geomdata = geom.data();
 
-// TODO: modify user_tagging such that it is called per point. This allows passing of geomdata onto GPU. Like in probinitData.
+  for (MFIter mfi(tags,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+  {
+    const Box& bx      = mfi.tilebox();
+    auto const& tagfab = tags.array(mfi);
+    auto const& sdatafab = sdata.array(mfi);
+    int lev = level;
+    ProbParm const *lprobparm = d_prob_parm;
+
+    ParallelFor(bx,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept 
+    {
 #ifdef AMREX_USE_GPIBM
-  // call function from cns_prob
-  IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
-  user_tagging(tags, sdata, level, geom, ibdata);
+    // call function from cns_prob
+    IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
+    user_tagging(i, j, k, tagfab, sdata, level, geom, ibdata);
 #else
-  user_tagging(tags, sdata, geom, level);
+    user_tagging(i, j, k, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif
-
+    });
+  }
 }
 
 // TODO: Add restarts

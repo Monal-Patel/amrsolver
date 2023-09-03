@@ -6,8 +6,8 @@
 
 struct Parm
 {
-    amrex::Real eos_gamma = 1.4;
-    amrex::Real eos_mu = 28.97e-3;// mean molecular weight kg/mol
+    amrex::Real eos_gamma = 1.40; // ratio of specific heats
+    amrex::Real eos_mu = 28.96e-3;// mean molecular weight air kg/mol
 
     //Sutherland's fit from Computational Fluid Mechanics and Heat Transfer 
     amrex::Real visc_ref  = 1.458e-6; // Viscosity reference value

@@ -18,7 +18,7 @@ struct ProbParm
     // Real Mt0   = 0.10;           // initial turbulent mach number
 
 
-    Real Rgas = 287.0_rt;// specific gas constant (J/kgK)
+    Real Rgas = 287.0_rt;// specific gas constant air (J/kgK)
     // rhow, Pw and P0
     Real muw = 2.670533348e-5; // mu at 500K for air
     Real rho_w = Re_tau * muw / (u_tau*h);
