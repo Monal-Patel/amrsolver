@@ -28,11 +28,12 @@ cns.stages_rk  = 2
 cns.rhs_euler  = 1 # 0=false, 1=true
 cns.rhs_visc   = 0 # 0=false, 1=true
 cns.rhs_source = 0 # 0=false, 1=true
-cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
+cns.flux_euler = 0 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
 cns.order_keep = 4 # Order of accuracy=2, 4 or 6
 cns.nghost     = 2 
 cns.verbose    = 1 # 0=quiet, 1=verbose
 cns.screen_output = 1
+cns.art_diss = 0
 
 # REFINEMENT / REGRIDDING 
 amr.n_cell          = 64 16 16
