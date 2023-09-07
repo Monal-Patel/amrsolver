@@ -193,7 +193,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   const auto dx     = geom.CellSizeArray();
   const auto dxinv  = geom.InvCellSizeArray();
   Parm const& lparm = *d_parm; // parameters (thermodynamic)
-  ProbParm const& lprobparm = *d_prob_parm;
+  PROB::ProbParm const& lprobparm = *d_prob_parm;
   MultiFab& primsmf  = Vprimsmf[level];
   Array<MultiFab,AMREX_SPACEDIM>& numflxmf = Vnumflxmf[level];
 

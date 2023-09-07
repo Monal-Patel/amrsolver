@@ -4,7 +4,7 @@
 #include <AMReX_AmrLevel.H>
 #include <AMReX_FluxRegister.H>
 #include <CNS_parm.H>
-#include <cns_prob_parm.H>
+#include <cns_prob.H>
 
 using namespace amrex;
 
@@ -161,8 +161,8 @@ public:
 public:
     static Parm* h_parm;
     static Parm* d_parm;
-    static ProbParm* h_prob_parm;
-    static ProbParm* d_prob_parm;
+    static PROB::ProbParm* h_prob_parm;
+    static PROB::ProbParm* d_prob_parm;
     static BCRec* h_phys_bc;
     static BCRec* d_phys_bc;
 };

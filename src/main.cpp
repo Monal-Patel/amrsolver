@@ -4,6 +4,7 @@
 #include <AMReX_Amr.H>
 
 #include <CNS.H>
+#include <cns_prob.H>
 
 #ifdef AMREX_USE_GPIBM
 #include <IBM.H>
@@ -14,7 +15,7 @@ using namespace amrex;
 amrex::LevelBld* getLevelBld ();
 
 int main (int argc, char* argv[]) {
-    amrex::Initialize(argc,argv);
+    Initialize(argc,argv,true, MPI_COMM_WORLD, PROB::inputs);
 
     BL_PROFILE_VAR("main()", pmain);
 

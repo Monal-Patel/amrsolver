@@ -12,7 +12,7 @@ using namespace amrex;
 struct CnsFillExtDir
 {
     // create pointers to device (for gpu) parms
-    ProbParm* lprobparm = CNS::d_prob_parm;
+    PROB::ProbParm* lprobparm = CNS::d_prob_parm;
     Parm*     lparm     = CNS::d_parm;
 
     AMREX_GPU_DEVICE
@@ -22,7 +22,6 @@ struct CnsFillExtDir
                      const BCRec* bcr, const int bcomp,
                      const int /*orig_comp*/) const
         {
-          // Print() << "CnsFillExtDir " << iv << " " << bcomp << " " << dcomp << " " << numcomp << std::endl;
           // Get BC data
           const BCRec& bc = bcr[bcomp];
 

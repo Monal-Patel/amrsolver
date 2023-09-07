@@ -4,13 +4,34 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
 #include "CNS_parm.H"
-#include "cns_prob_parm.H"
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
+#include <CNS_index_macros.H>
 
-AMREX_GPU_DEVICE inline
+using namespace amrex;
+
+namespace PROB {
+
+struct ProbParm
+{
+  Real p_l = 1.0;
+  Real p_r = 0.1;
+  Real rho_l = 1.0;
+  Real rho_r = 0.125;
+  Real u_l = 0.0;
+  Real u_r = 0.0;
+};
+
+
+void inline inputs() {
+
+  // Abort("inputs not coded");
+
+
+}
+
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm) {
-  using amrex::Real;
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
@@ -35,7 +56,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 }
 
 
-AMREX_GPU_DEVICE inline 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
 
       Real dengrad_threshold = 0.5;
@@ -43,35 +64,14 @@ void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const
       if (drhox > dengrad_threshold) {
         tagfab(i,j,k) = true;
         tagfab(i+1,j,k) = true;
-
-        // if (!(bx.bigEnd(0) == i+1)) {
-          tagfab(i+2,j,k) = true;
-        // }
-
-        // if (!(bx.bigEnd(0) == i+2)) {
-          tagfab(i+3,j,k) = true;
-        // }
+        tagfab(i+2,j,k) = true;
+        tagfab(i+3,j,k) = true;
       }
   }
 
-  void amrex_probinit (const int* /*init*/, const int* /*name*/, const int* /*namelen*/, const amrex_real* /*problo*/, const amrex_real* /*probhi*/)
-  {
-    amrex::ParmParse pp("prob");
-    pp.query("p_l", CNS::h_prob_parm->p_l);
-    pp.query("p_r", CNS::h_prob_parm->p_r);
-    pp.query("rho_l", CNS::h_prob_parm->rho_l);
-    pp.query("rho_r", CNS::h_prob_parm->rho_r);
-    pp.query("u_l", CNS::h_prob_parm->u_l);
-    pp.query("u_r", CNS::h_prob_parm->u_r);
-#if AMREX_USE_GPU
-    amrex::Gpu::htod_memcpy(CNS::d_prob_parm, CNS::h_prob_parm, sizeof(ProbParm));
-#endif
-  }
 
-AMREX_GPU_DEVICE inline
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm, Parm const& parms, auto const dx) {
-
-
 
 }
 
@@ -127,5 +127,20 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
     // s_ext[UET] = q_ext[QRHO]*(eint_ext + ekin_ext);
   }
 }
+
+} // namespace prob
+
+
+// // called once from amr.init
+// void amrex_probinit (const int* /*init*/, const int* /*name*/, const int* /*namelen*/, const amrex_real* /*problo*/, const amrex_real* /*probhi*/)
+//   {
+
+
+// // PROB::h_prob_parm = new PROB::ProbParm{};
+// // #if AMREX_USE_GPU
+//   // PROB::d_prob_parm = (PROB::ProbParm*)The_Device_Arena()->alloc(sizeof(PROB::ProbParm));
+//   // amrex::Gpu::htod_memcpy(PROB::d_prob_parm, PROB::h_prob_parm, sizeof(PROB::ProbParm));
+// // #endif
+// }
 
 #endif

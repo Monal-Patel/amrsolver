@@ -136,7 +136,7 @@ void CNS::read_params()
 
 #if AMREX_USE_GPU
   amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
-  amrex::Gpu::htod_memcpy(d_prob_parm, h_prob_parm, sizeof(ProbParm));
+  amrex::Gpu::htod_memcpy(d_prob_parm, h_prob_parm, sizeof(PROB::ProbParm));
   amrex::Gpu::htod_memcpy(d_phys_bc, h_phys_bc, sizeof(BCRec));
 #endif
 }
@@ -176,7 +176,7 @@ void CNS::initData()
   // S_new = 0.0; // default initialistiaon with Nans (preferred).
 
   Parm const *lparm = d_parm;
-  ProbParm const *lprobparm = d_prob_parm;
+  PROB::ProbParm const *lprobparm = d_prob_parm;
 
   auto const &sma = S_new.arrays();
   amrex::ParallelFor(S_new,
@@ -478,7 +478,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     auto const& tagfab = tags.array(mfi);
     auto const& sdatafab = sdata.array(mfi);
     int lev = level;
-    ProbParm const *lprobparm = d_prob_parm;
+    PROB::ProbParm const *lprobparm = d_prob_parm;
 
     ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept 
