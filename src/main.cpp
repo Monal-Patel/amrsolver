@@ -15,19 +15,19 @@ using namespace amrex;
 amrex::LevelBld* getLevelBld ();
 
 int main (int argc, char* argv[]) {
-    Initialize(argc,argv,true, MPI_COMM_WORLD, PROB::inputs);
-
     BL_PROFILE_VAR("main()", pmain);
+
+    Initialize(argc,argv,true, MPI_COMM_WORLD, PROB::inputs);
 
     Real timer_tot = amrex::second();
     Real timer_init = 0.;
     Real timer_advance = 0.;
 
-
-    // Some key parameters -----------------------------------------------------
     int  max_step = -1;
     Real start_time = Real( 0.0);
     Real stop_time = Real(-1.0);
+
+    // input checks ------------------------------------------------------------
     ParmParse pp;
     if(!pp.query("cns.nghost",CNS::NGHOST)) {
       amrex::Abort("MUST SPECIFY number of ghost points with cns.nghost");};
@@ -49,7 +49,7 @@ int main (int argc, char* argv[]) {
     if (max_step <= 0 || stop_time <= Real(0.0)) {
       amrex::Abort("Exiting because either max_step and/or stop_time is less than or equal to 0.");}
 
-    // Read input and setup ----------------------------------------------------
+    // Setup -------------------------------------------------------------------
     {
         Real timer_init = amrex::second();
         Amr amr(getLevelBld());
