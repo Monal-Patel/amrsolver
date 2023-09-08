@@ -2,7 +2,6 @@
 #define CNS_HYDRO_K_H_
 
 #include "CNS_index_macros.H"
-#include "CNS_parm.H"
 #include <AMReX_FArrayBox.H>
 #include <cmath>
 
@@ -14,7 +13,7 @@ using namespace amrex;
 // flux = flux variables
 
 
-AMREX_GPU_DEVICE inline void cons2prim (int i, int j, int k, const Array4<const Real>& u, Array4<Real> const& q, const Parm& parm) noexcept
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prim (int i, int j, int k, const Array4<const Real>& u, Array4<Real> const& q, const Parm& parm) noexcept
 {
     Real rho = u(i,j,k,URHO);
     // Print() << "cons2prim"<< i << j << k << rho << std::endl;
@@ -253,7 +252,7 @@ void viscfluxes_wall (int i, int j, int k, int loc, auto const& prims, auto cons
 }
 
 // 2nd order accurate interpolation at i-1/2,j-1/2,k-1/2
-AMREX_GPU_DEVICE inline 
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void visc_numericalfluxes(int i, int j, int k, int n, const auto& pfx, const auto& pfy, const auto& pfz, const auto& nfx, const auto& nfy, const auto& nfz) {
 
 nfx(i,j,k,n) += Real(0.5)*(pfx(i-1,j,k,n) + pfx(i,j,k,n));

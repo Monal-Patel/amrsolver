@@ -3,7 +3,6 @@
 
 #include <CNS.H>
 #include "CNS_index_macros.H"
-#include "CNS_parm.H"
 #include <AMReX_FArrayBox.H>
 
 namespace Riemann {
@@ -18,7 +17,7 @@ namespace Riemann {
       return dsgn * min(dlim,Math::abs(dcen));
   }
 
-  AMREX_GPU_DEVICE inline
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_slope_x (int i, int j, int k,
               Array4<Real> const& dq,
               Array4<Real const> const& q, Parm const& parm) noexcept
@@ -52,7 +51,7 @@ namespace Riemann {
     dq(i,j,k,4) = d4;
   }
 
-  AMREX_GPU_DEVICE inline
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_slope_y (int i, int j, int k,
               Array4<Real> const& dq,
               Array4<Real const> const& q, Parm const& parm) noexcept
@@ -86,7 +85,7 @@ namespace Riemann {
     dq(i,j,k,4) = d4;
   }
 
-  AMREX_GPU_DEVICE inline
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_slope_z (int i, int j, int k,
               Array4<Real> const& dq,
               Array4<Real const> const& q, Parm const& parm) noexcept
@@ -122,7 +121,7 @@ namespace Riemann {
   }
 
 
-  AMREX_GPU_DEVICE inline
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void riemann_prob (const Real gamma, const Real smallp, const Real /*smallr*/,
           const Real rl, const Real ul, const Real pl,
           const Real ut1l, const Real ut2l,
@@ -250,7 +249,7 @@ namespace Riemann {
     flxe = ugdnv*(Real(0.5)*rgdnv*(ugdnv*ugdnv+utrans1*utrans1+utrans2*utrans2) + pgdnv/(gamma -Real(1.)) + pgdnv);
   }
 
-AMREX_GPU_DEVICE inline
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void cns_riemann_x (int i, int j, int k,
                Array4<Real> const& fx,
                Array4<Real const> const& dq,
@@ -280,7 +279,7 @@ void cns_riemann_x (int i, int j, int k,
           fx(i,j,k,URHO), fx(i,j,k,UMX), fx(i,j,k,UMY), fx(i,j,k,UMZ), fx(i,j,k,UET));
   }
 
-  AMREX_GPU_DEVICE inline
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_riemann_y (int i, int j, int k, Array4<Real> const& fy,
                       Array4<Real const> const& dq, Array4<Real const> const& q,
                       Parm const& parm) noexcept
@@ -308,7 +307,7 @@ void cns_riemann_x (int i, int j, int k,
           fy(i,j,k,URHO), fy(i,j,k,UMY), fy(i,j,k,UMX), fy(i,j,k,UMZ), fy(i,j,k,UET));
   }
 
-  AMREX_GPU_DEVICE inline 
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
   void cns_riemann_z (int i, int j, int k,
                 Array4<Real> const& fz,
                 Array4<Real const> const& dq,
@@ -338,7 +337,7 @@ void cns_riemann_x (int i, int j, int k,
             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UET));
   }
 
-  inline void Flux(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void Flux(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
     FArrayBox qtmp, slopetmp;
     Parm const& lparm = *CNS::d_parm; // parameters (thermodynamic)
 

@@ -3,10 +3,10 @@
 
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
-#include "CNS_parm.H"
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <CNS_index_macros.H>
+#include <CNS_K.H>
 
 using namespace amrex;
 namespace PROB {
@@ -91,7 +91,7 @@ void inline inputs() {
   pp.add   ("cns.nghost",2);
   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
-  // pp.add   ("cns.visc_type", 0); // 0=constant, 1=dynamic
+  pp.add   ("cns.visc_type", 1); // 0=constant, 1=dynamic
 
   // lets add viscosity type and different flux dissipations!
 

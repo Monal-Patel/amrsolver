@@ -3,7 +3,6 @@
 
 #include <CNS.H>
 #include "CNS_index_macros.H"
-#include "CNS_parm.H"
 #include <AMReX_FArrayBox.H>
 
 namespace HiRes {
@@ -160,7 +159,7 @@ namespace HiRes {
   }
 
   // Computes Euler fluxes with global lax-friedrichs splitting at i-1/2,j-1/2,k-1/2
-  AMREX_GPU_DEVICE inline 
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
   void numericalflux_globallaxsplit (int i, int j, int k, int n, const auto& cons, const auto& pfx, const auto& pfy, const auto& pfz, const auto& lambda, const auto& nfx, const auto& nfy, const auto& nfz) {
 
   GpuArray<Real,5> sten;
@@ -247,7 +246,7 @@ namespace HiRes {
   }
 
   // Computes Euler fluxes at i-1/2,j-1/2,k-1/2
-  AMREX_GPU_DEVICE inline 
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
   void numericalflux (int i, int j, int k, int n, const auto& pfx, const auto& pfy, const auto& pfz, const auto& nfx, const auto& nfy, const auto& nfz) {
 
   GpuArray<Real,5> sten;
@@ -277,7 +276,7 @@ namespace HiRes {
   nfz(i,j,k,n) = weno5js(sten);
   }
 
-  inline void FluxWENO(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void FluxWENO(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {

@@ -3,7 +3,6 @@
 
 #include <CNS.H>
 #include "CNS_index_macros.H"
-#include "CNS_parm.H"
 #include <AMReX_FArrayBox.H>
 
 using namespace amrex;
@@ -187,7 +186,7 @@ namespace Central {
   }
 
 
-  inline void FluxKEEP(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void FluxKEEP(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
     Parm& lparm = *CNS::d_parm;
     int halfsten = order_keep/2;
@@ -230,7 +229,7 @@ namespace Central {
   }
 
   // TODO: In post_init select the boundaries and planes to reduce order/treat specially -- function to generate box arrays of planes with associated order of numericalscheme to be applied.
-  inline void Flux_2nd_Order_KEEP(Geometry& geom, MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void Flux_2nd_Order_KEEP(Geometry& geom, MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
     BCRec& l_phys_bc = *CNS::d_phys_bc;
     Parm& lparm = *CNS::d_parm;

@@ -1,6 +1,5 @@
 #include "CNS_derive.H"
 #include "CNS.H"
-#include "CNS_parm.H"
 #include <CNS_index_macros.H>
 
 using namespace amrex;

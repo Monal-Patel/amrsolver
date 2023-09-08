@@ -3,7 +3,6 @@
 
 #include <AMReX_AmrLevel.H>
 #include <AMReX_FluxRegister.H>
-#include <CNS_parm.H>
 #include <cns_prob.H>
 
 using namespace amrex;

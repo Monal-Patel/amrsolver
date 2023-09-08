@@ -3,7 +3,6 @@
 #include <CNS.H>
 #include <CNS_K.H>
 #include <cns_prob.H>
-#include <CNS_parm.H>
 #include <Central.H>
 
 #ifdef AMREX_USE_GPIBM

@@ -6,16 +6,50 @@
 #include <limits>
 #include <cmath>
 
-#include "CNS_parm.H"
+using namespace amrex;
+struct Parm
+{
+    Real eos_gamma = 1.40; // ratio of specific heats
+    Real eos_mu = 28.96e-3;// mean molecular weight air kg/mol
+
+    //Sutherland's fit from Computational Fluid Mechanics and Heat Transfer 
+    Real visc_ref  = 1.458e-6; // Viscosity reference value
+    Real Tvisc_ref = 110.4;    // Viscosity reference temperature
+    Real cond_ref  = 2.495e-3; // Conductivity reference value
+    Real Tcond_ref = 194.0;    // Conductivity reference temperature
+
+    Real smallr = 1.e-19;
+    Real smallp = 1.e-10;
+
+    Real Ru = Real(8.31451);
+    Real cv = Ru / (eos_mu * (eos_gamma-Real(1.0)));
+    Real cp = eos_gamma * Ru / (eos_mu * (eos_gamma-Real(1.0)));
+    Real Rspec = Ru/eos_mu;
+
+    Real Pr = 0.70;
+
+    Real Cshock = 0.0;
+    Real Cdamp = 0.0;
+
+    public: 
+    // AMREX_GPU_DEVICE inline const Real visc(Real& T,mu) { 
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real ViscositySutherland(Real& T) const { return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}
+
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real ConductivitySutherland(Real& T) const { return cond_ref*T*sqrt(T)/(Tcond_ref + T);}
+
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real ConductivityConstPr(Real& T) const { return cp*ViscositySutherland(T)/Pr;}
+
+    Real visc_CPU(Real T) { return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}
+
+};
+
 
 // TODO: Pass primsmf here to avoid computing primitive variables again.
-AMREX_GPU_HOST_DEVICE 
-inline amrex::Real cns_estdt (amrex::Box const& bx, amrex::Array4<Real const>   const& state, amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dx, Parm const& parm) noexcept
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Real cns_estdt (Box const& bx, Array4<Real const>   const& state, GpuArray<Real,AMREX_SPACEDIM> const& dx, Parm const& parm) noexcept
 {
-    using amrex::Real;
-
-    const auto lo = amrex::lbound(bx);
-    const auto hi = amrex::ubound(bx);
+    const auto lo = lbound(bx);
+    const auto hi = ubound(bx);
 #if !defined(__CUDACC__) || (__CUDACC_VER_MAJOR__ != 9) || (__CUDACC_VER_MINOR__ != 2)
     Real dt = std::numeric_limits<Real>::max();
 #else
@@ -29,7 +63,7 @@ inline amrex::Real cns_estdt (amrex::Box const& bx, amrex::Array4<Real const>   
                 Real mx  = state(i,j,k,UMX);
                 Real my  = state(i,j,k,UMY);
                 Real mz  = state(i,j,k,UMY);
-                Real rhoinv = Real(1.0)/amrex::max(rho,parm.smallr);
+                Real rhoinv = Real(1.0)/max(rho,parm.smallr);
                 Real vx = mx*rhoinv;
                 Real vy = my*rhoinv;
                 Real vz = mz*rhoinv;
@@ -37,10 +71,10 @@ inline amrex::Real cns_estdt (amrex::Box const& bx, amrex::Array4<Real const>   
                 Real rhoei = (state(i,j,k,UET) - ke);
                 Real p  = (parm.eos_gamma-Real(1.0))*rhoei;
                 Real cs = std::sqrt(parm.eos_gamma*p*rhoinv);
-                Real dtx = dx[0]/(amrex::Math::abs(vx)+cs);
-                Real dty = dx[1]/(amrex::Math::abs(vy)+cs);
-                Real dtz = dx[2]/(amrex::Math::abs(vz)+cs);
-                dt = amrex::min(dt,amrex::min(dtx,amrex::min(dty,dtz)));
+                Real dtx = dx[0]/(Math::abs(vx)+cs);
+                Real dty = dx[1]/(Math::abs(vy)+cs);
+                Real dtz = dx[2]/(Math::abs(vz)+cs);
+                dt = min(dt,min(dtx,min(dty,dtz)));
             }
         }
     }
@@ -48,7 +82,7 @@ inline amrex::Real cns_estdt (amrex::Box const& bx, amrex::Array4<Real const>   
     return dt;
 }
 
-AMREX_GPU_DEVICE inline void pointCFL (int i, int j, int k, Array2D<Real,0,2,0,2>& array, const Array4<const Real>& prims, const Parm& parm,const auto dx, Real dt) noexcept
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void pointCFL (int i, int j, int k, Array2D<Real,0,2,0,2>& array, const Array4<const Real>& prims, const Parm& parm,const auto dx, Real dt) noexcept
 {
   Real sos = std::sqrt(parm.eos_gamma*parm.Rspec*prims(i,j,k,QT));
   //
@@ -61,13 +95,10 @@ AMREX_GPU_DEVICE inline void pointCFL (int i, int j, int k, Array2D<Real,0,2,0,2
 }
 
 
-AMREX_GPU_DEVICE
-inline
-void
-cns_compute_temperature (int i, int j, int k, amrex::Array4<amrex::Real> const& u,
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+void cns_compute_temperature (int i, int j, int k, Array4<Real> const& u,
                          Parm const& parm) noexcept
 {
-    using amrex::Real;
 
     Real rhoinv = Real(1.0)/u(i,j,k,URHO);
     Real mx = u(i,j,k,UMX);
