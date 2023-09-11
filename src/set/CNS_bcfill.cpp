@@ -13,7 +13,7 @@ struct CnsFillExtDir
 {
     // create pointers to device (for gpu) parms
     PROB::ProbParm* lprobparm = CNS::d_prob_parm;
-    Parm*     lparm     = CNS::d_parm;
+    PROB::ProbClosures* lclosures = CNS::d_prob_closures;
 
     AMREX_GPU_DEVICE
     void operator() (const IntVect& iv, Array4<Real> const& dest,
@@ -58,7 +58,7 @@ struct CnsFillExtDir
             Real dratio = de/di; // wall-ghost/wall-first internal distance ratio
             // For uniform grid, first ghost point dratio=1, second ghost point dratio=3, 5...
 
-            bcnormal(x, dratio, s_int, s_refl, s_ext, idir, 1, time, geom, *lparm, *lprobparm); // Call bcnormal from prob.H
+            bcnormal(x, dratio, s_int, s_refl, s_ext, idir, 1, time, geom, *lclosures, *lprobparm); // Call bcnormal from prob.H
 
             for (int nc = 0; nc < numcomp; ++nc) {
               dest(iv, dcomp + nc) = s_ext[dcomp + nc]; // Only take the wanted components
@@ -78,7 +78,7 @@ struct CnsFillExtDir
             Real de = x[idir] - prob_hi[idir];
             Real dratio = de/di; // wall-ghost/wall-first internal distance ratio
 
-            bcnormal(x, dratio, s_int, s_refl, s_ext, idir, -1, time, geom, *lparm,*lprobparm);
+            bcnormal(x, dratio, s_int, s_refl, s_ext, idir, -1, time, geom, *lclosures,*lprobparm);
 
             for (int nc = 0; nc < numcomp; ++nc) {
               dest(iv, dcomp + nc) = s_ext[dcomp + nc];

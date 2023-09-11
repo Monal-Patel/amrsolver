@@ -11,7 +11,7 @@ void derpres (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
     auto const dat  = datafab.array();
     auto pfab       = derfab.array(dcomp);
-    Parm const* parm = CNS::d_parm;
+    PROB::ProbClosures const* closures = CNS::d_prob_closures;
 
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -21,7 +21,7 @@ void derpres (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
         Real my = dat(i, j, k, UMY);
         Real mz = dat(i, j, k, UMZ);
         Real rhoeint = dat(i, j, k, UET) - Real(0.5)*rhoinv*(mx*mx + my*my + mz*mz); 
-        pfab(i,j,k) = (parm->eos_gamma-Real(1.0))*rhoeint;
+        pfab(i,j,k) = (closures->gamma-Real(1.0))*rhoeint;
     });
 }
 
@@ -32,7 +32,7 @@ void dertemp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
 
     auto const dat  = datafab.array();
     auto Tfab       = derfab.array(dcomp);
-    Parm const* parm = CNS::d_parm;
+    PROB::ProbClosures const* closures = CNS::d_prob_closures;
 
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -42,7 +42,7 @@ void dertemp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
         Real my = dat(i, j, k, UMY);
         Real mz = dat(i, j, k, UMZ);
         Real rhoeint = dat(i, j, k, UET) - Real(0.5)*rhoinv*(mx*mx + my*my + mz*mz); 
-        Tfab(i,j,k) = (rhoeint*rhoinv)/parm->cv;
+        Tfab(i,j,k) = (rhoeint*rhoinv)/closures->cv;
     });
 }
 

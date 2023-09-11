@@ -4,6 +4,7 @@
 #include <CNS.H>
 #include "CNS_index_macros.H"
 #include <AMReX_FArrayBox.H>
+#include <cns_prob.H>
 
 using namespace amrex;
 
@@ -38,7 +39,7 @@ namespace Central {
   // Computes fluxes at i-1/2, j-1/2 and k-1/2
   // Computational cost can be reduced by computing and storing flux averages between l and m points
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void KEEP(int i, int j, int k ,int halfsten, const GpuArray<Real,3>& coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, Parm const& parm) {
+  void KEEP(int i, int j, int k ,int halfsten, const GpuArray<Real,3>& coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, PROB::ProbClosures const& closures) {
 
     int i1, i2, j1, j2, k1, k2;
     Real rho1, ux1, uy1, uz1, ie1, p1;
@@ -62,7 +63,7 @@ namespace Central {
         ux1  = prims(i1,j,k,QU);
         uy1  = prims(i1,j,k,QV);
         uz1  = prims(i1,j,k,QW);
-        ie1  = parm.cv*prims(i1,j,k,QT);
+        ie1  = closures.cv*prims(i1,j,k,QT);
         p1   = prims(i1,j,k,QPRES);
 
         i2   = i + m - l;
@@ -70,7 +71,7 @@ namespace Central {
         ux2  = prims(i2,j,k,QU);
         uy2  = prims(i2,j,k,QV);
         uz2  = prims(i2,j,k,QW);
-        ie2  = parm.cv*prims(i2,j,k,QT);
+        ie2  = closures.cv*prims(i2,j,k,QT);
         p2   = prims(i2,j,k,QPRES);
 
         massflx = fgQuad(rho1,rho2,ux1,ux2);
@@ -92,7 +93,7 @@ namespace Central {
         ux1  = prims(i,j1,k,QU);
         uy1  = prims(i,j1,k,QV);
         uz1  = prims(i,j1,k,QW);
-        ie1  = parm.cv*prims(i,j1,k,QT);
+        ie1  = closures.cv*prims(i,j1,k,QT);
         p1   = prims(i,j1,k,QPRES);
 
         j2   = j + m - l;
@@ -100,7 +101,7 @@ namespace Central {
         ux2  = prims(i,j2,k,QU);
         uy2  = prims(i,j2,k,QV);
         uz2  = prims(i,j2,k,QW);
-        ie2  = parm.cv*prims(i,j2,k,QT);
+        ie2  = closures.cv*prims(i,j2,k,QT);
         p2   = prims(i,j2,k,QPRES);
 
         massflx = fgQuad(rho1,rho2,uy1,uy2);
@@ -121,7 +122,7 @@ namespace Central {
         ux1  = prims(i,j,k1,QU);
         uy1  = prims(i,j,k1,QV);
         uz1  = prims(i,j,k1,QW);
-        ie1  = parm.cv*prims(i,j,k1,QT);
+        ie1  = closures.cv*prims(i,j,k1,QT);
         p1   = prims(i,j,k1,QPRES);
 
         k2   = k + m - l;
@@ -129,7 +130,7 @@ namespace Central {
         ux2  = prims(i,j,k2,QU);
         uy2  = prims(i,j,k2,QV);
         uz2  = prims(i,j,k2,QW);
-        ie2  = parm.cv*prims(i,j,k2,QT);
+        ie2  = closures.cv*prims(i,j,k2,QT);
         p2   = prims(i,j,k2,QPRES);
 
         massflx = fgQuad(rho1,rho2,uz1,uz2);
@@ -145,7 +146,7 @@ namespace Central {
   }
   ///////////
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void KEEPy(int i, int j, int k ,int halfsten, const GpuArray<Real,3> coeffs, const auto& prims, const auto& nfabfy, Parm const& parm) {
+  void KEEPy(int i, int j, int k ,int halfsten, const GpuArray<Real,3> coeffs, const auto& prims, const auto& nfabfy, PROB::ProbClosures const& parm) {
 
     GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
     int j1, j2;
@@ -188,7 +189,7 @@ namespace Central {
 
   AMREX_FORCE_INLINE void FluxKEEP(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
-    Parm& lparm = *CNS::d_parm;
+    PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
     int halfsten = order_keep/2;
   // TODO: define coeffs outside of this routine and only once
 #if AMREX_USE_GPU
@@ -221,7 +222,7 @@ namespace Central {
       ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-        KEEP(i,j,k,halfsten,coeffs,prims,nfabfx,nfabfy,nfabfz,lparm);
+        KEEP(i,j,k,halfsten,coeffs,prims,nfabfx,nfabfy,nfabfz,lclosures);
       });
     }
 
@@ -232,7 +233,7 @@ namespace Central {
   AMREX_FORCE_INLINE void Flux_2nd_Order_KEEP(Geometry& geom, MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
     BCRec& l_phys_bc = *CNS::d_phys_bc;
-    Parm& lparm = *CNS::d_parm;
+    PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
 #if AMREX_USE_GPU
     GpuArray<Real,3> coeffs2;
     coeffs2[0]=Real(1.0);
@@ -265,7 +266,7 @@ namespace Central {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
+            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lclosures);
             // printf("2nd ord %d %d %d \n",i,j,k);
           });
         }
@@ -282,7 +283,7 @@ namespace Central {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lparm);
+            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lclosures);
             // printf("2nd ord %d %d %d \n",i,j,k);
           });
         }

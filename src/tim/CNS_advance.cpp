@@ -192,7 +192,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   //Aux Variables //////////////////////////////////////////////////////////////
   const auto dx     = geom.CellSizeArray();
   const auto dxinv  = geom.InvCellSizeArray();
-  Parm const& lparm = *d_parm; // parameters (thermodynamic)
+  PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
   PROB::ProbParm const& lprobparm = *d_prob_parm;
   MultiFab& primsmf  = Vprimsmf[level];
   Array<MultiFab,AMREX_SPACEDIM>& numflxmf = Vnumflxmf[level];
@@ -205,7 +205,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
       const Box& bxg       = mfi.growntilebox(NGHOST);
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      { cons2prim(i, j, k, statefab, prims, lparm);});
+      { cons2prim(i, j, k, statefab, prims, lclosures);});
   }
   //////////////////////////////////////////////////////////////////////////////
   Gpu::streamSynchronize(); // ensure primitive variables mf computed before starting mfiter
@@ -213,7 +213,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   // Immersed boundaries ///////////////////////////////////////////////////////
   // Compute on CPU always
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.computeGPs(level, statemf, primsmf, lparm);
+  IBM::ib.computeGPs(level, statemf, primsmf, lclosures);
 #endif
   //////////////////////////////////////////////////////////////////////////////
 
@@ -254,13 +254,13 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
         amrex::ParallelFor(bx,
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            ComputeSensorLambda(i,j,k,prims,lambda,sensor,lparm);
+            ComputeSensorLambda(i,j,k,prims,lambda,sensor,lclosures);
           });
 
           amrex::ParallelFor(bxnodal, NCONS,
           [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
           {
-            JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,lparm);
+            JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,lclosures);
           }); 
       }
     }
@@ -295,7 +295,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
 
         // compute u,v,w,T derivatives and compute physical viscous fluxes
         amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
+            viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
         });
 
         // Viscous flux corrections (overwrite pfabfx, pfabfy, pfabfz)
@@ -309,7 +309,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
           Box bxboundary(small,big);
 
           amrex::ParallelFor(bxboundary,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-              viscfluxes_wall(i, j, k, 0, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
+              viscfluxes_wall(i, j, k, 0, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
           });
         }
         }
@@ -321,7 +321,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
           Box bxboundary(small,big);
 
           amrex::ParallelFor(bxboundary,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-              viscfluxes_wall(i, j, k, 1, prims, pfabfx, pfabfy, pfabfz, dxinv, lparm);
+              viscfluxes_wall(i, j, k, 1, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
           });
         }
         }
@@ -339,7 +339,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
 
 
         // TODO :: IBM GP visc flux correction
-        // ib.viscfluxcorrection(level, numflxmf, pntvflxmf, dx, dt, time, lparm);
+        // ib.viscfluxcorrection(level, numflxmf, pntvflxmf, dx, dt, time, lclosures);
         
         // compute numerical viscous fluxes (add to numflxmf)
         amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
@@ -396,7 +396,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
 
         amrex::ParallelFor(bx,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        { user_source(i,j,k,statefab,dsdtfab,lprobparm,lparm,dx); });
+        { user_source(i,j,k,statefab,dsdtfab,lprobparm,lclosures,dx); });
     }
   }
   //////////////////////////////////////////////////////////////////////////////

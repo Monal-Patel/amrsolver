@@ -6,8 +6,8 @@
 using namespace amrex;
 
 int CNS::num_state_data_types = 0;
-Parm* CNS::h_parm = nullptr;
-Parm* CNS::d_parm = nullptr;
+PROB::ProbClosures* CNS::h_prob_closures = nullptr;
+PROB::ProbClosures* CNS::d_prob_closures = nullptr;
 PROB::ProbParm* CNS::h_prob_parm = nullptr;
 PROB::ProbParm* CNS::d_prob_parm = nullptr;
 BCRec* CNS::h_phys_bc=nullptr;
@@ -105,15 +105,15 @@ CNS::variableSetUp ()
 {
   // Since this is a GPU/CPU code - it is useful to have some basic parameters always available on both CPU and GPU always.
   // These host and device variables are deleted in CNS::variableCleanUp().
-    CNS::h_parm = new Parm{};
+    CNS::h_prob_closures = new PROB::ProbClosures{};
     CNS::h_prob_parm = new PROB::ProbParm{};
     CNS::h_phys_bc = new BCRec{};
 #ifdef AMREX_USE_GPU
-    CNS::d_parm = (Parm*)The_Arena()->alloc(sizeof(Parm));
+    CNS::d_prob_closures = (PROB::ProbClosures*)The_Arena()->alloc(sizeof(PROB::ProbClosures));
     CNS::d_prob_parm = (PROB::ProbParm*)The_Arena()->alloc(sizeof(PROB::ProbParm));
     CNS::d_phys_bc = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
 #else
-    CNS::d_parm      = h_parm;
+    CNS::d_prob_closures  = h_prob_closures;
     CNS::d_prob_parm = h_prob_parm;
     CNS::d_phys_bc   = h_phys_bc;
 #endif
@@ -196,11 +196,11 @@ CNS::variableSetUp ()
 
 void CNS::variableCleanUp ()
 {
-    delete h_parm;
+    delete h_prob_closures;
     delete h_phys_bc;
 
 #ifdef AMREX_USE_GPU
-    The_Arena()->free(d_parm);
+    The_Arena()->free(d_prob_closures);
     The_Arena()->free(d_phys_bc);
 #endif
     desc_lst.clear();

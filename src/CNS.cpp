@@ -134,7 +134,7 @@ void CNS::read_params()
 #endif
 
 #if AMREX_USE_GPU
-  amrex::Gpu::htod_memcpy(d_parm, h_parm, sizeof(Parm));
+  amrex::Gpu::htod_memcpy(d_prob_closures, h_prob_closures, sizeof(PROB::ProbClosures));
   amrex::Gpu::htod_memcpy(d_prob_parm, h_prob_parm, sizeof(PROB::ProbParm));
   amrex::Gpu::htod_memcpy(d_phys_bc, h_phys_bc, sizeof(BCRec));
 #endif
@@ -172,16 +172,15 @@ void CNS::initData()
 
   const auto geomdata = geom.data();
   MultiFab &S_new = get_new_data(State_Type);
-  // S_new = 0.0; // default initialistiaon with Nans (preferred).
 
-  Parm const *lparm = d_parm;
+  PROB::ProbClosures const *lclosures = d_prob_closures;
   PROB::ProbParm const *lprobparm = d_prob_parm;
 
   auto const &sma = S_new.arrays();
   amrex::ParallelFor(S_new,
                      [=] AMREX_GPU_DEVICE(int box_no, int i, int j, int k) noexcept
                      {
-                       prob_initdata(i, j, k, sma[box_no], geomdata, *lparm, *lprobparm);
+                       prob_initdata(i, j, k, sma[box_no], geomdata, *lclosures, *lprobparm);
                      });
 
   // TODO: Could compute primitive variables here
@@ -252,7 +251,7 @@ void CNS::computeTemp(MultiFab &State, int ng)
 {
   BL_PROFILE("CNS::computeTemp()");
 
-  Parm const *lparm = d_parm;
+  PROB::ProbClosures const *lclosures = d_prob_closures;
 
   // This will reset Eint and compute Temperature
 #ifdef AMREX_USE_OMP
@@ -268,7 +267,7 @@ void CNS::computeTemp(MultiFab &State, int ng)
     amrex::ParallelFor(bx,
                        [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
                        {
-                         cns_compute_temperature(i, j, k, sfab, *lparm);
+                         cns_compute_temperature(i, j, k, sfab, *lclosures);
                        });
   }
 }
@@ -376,11 +375,11 @@ Real CNS::estTimeStep () {
 
   const auto dx = geom.CellSizeArray();
   const MultiFab& S = get_new_data(State_Type);
-  Parm const* lparm = d_parm;
+  PROB::ProbClosures const* lclosures = d_prob_closures;
 
   Real estdt = amrex::ReduceMin(S, 0,
   [=] AMREX_GPU_HOST_DEVICE (Box const& bx, Array4<Real const> const& fab) -> Real { 
-    return cns_estdt(bx, fab, dx, *lparm); });
+    return cns_estdt(bx, fab, dx, *lclosures); });
 
   estdt *= cfl;
   ParallelDescriptor::ReduceRealMin(estdt);
@@ -546,7 +545,7 @@ void CNS::printTotal() const
   const auto dx = geom.CellSizeArray();
   const Real dt =  parent->dtLevel(level);
   const MultiFab& primsmf = Vprimsmf[level];
-  Parm const& lparm = *d_parm;
+  PROB::ProbClosures const& lclosures = *d_prob_closures;
   Array2D<Real,0,2,0,2>* arrayCFL;
 
 #if AMREX_USE_GPU
@@ -563,7 +562,7 @@ void CNS::printTotal() const
     amrex::ParallelFor(bx,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     { 
-      pointCFL(i, j, k, *arrayCFL, prims, lparm, dx, dt);
+      pointCFL(i, j, k, *arrayCFL, prims, lclosures, dx, dt);
     });
   };
 

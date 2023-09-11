@@ -9,7 +9,7 @@ namespace HiRes {
 
   // computes Euler fluxes from conserved variable vector 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, const Parm& parm) {
+  void cons2eulerflux(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, const PROB::ProbClosures& closures) {
 
     Real rhoinv = Real(1.0)/cons(i,j,k,URHO);
     Real momx   = cons(i,j,k,UMX);
@@ -22,7 +22,7 @@ namespace HiRes {
 
     Real rhoekin = Real(0.5)*rhoinv*(momx*momx + momy*momy + momz*momz);
     Real rhoeint = rhoet - rhoekin;
-    Real P       = (parm.eos_gamma - Real(1.0))*rhoeint;
+    Real P       = (closures.gamma - Real(1.0))*rhoeint;
 
     fx(i,j,k,URHO)  = momx;
     fx(i,j,k,UMX)   = momx*ux + P;
@@ -82,7 +82,7 @@ namespace HiRes {
 
   // computes Euler fluxes from conserved variable vector and maxeigen value
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, auto const& lambda ,const Parm& parm) {
+  void cons2eulerflux_lambda(int i, int j, int k, auto const& cons, auto const& fx, auto const& fy, auto const& fz, auto const& lambda ,const PROB::ProbClosures& closures) {
 
     Real rhoinv = Real(1.0)/cons(i,j,k,URHO);
     Real momx   = cons(i,j,k,UMX);
@@ -95,7 +95,7 @@ namespace HiRes {
 
     Real rhoekin = Real(0.5)*rhoinv*(momx*momx + momy*momy + momz*momz);
     Real rhoeint = rhoet - rhoekin;
-    Real P       = (parm.eos_gamma - Real(1.0))*rhoeint;
+    Real P       = (closures.gamma - Real(1.0))*rhoeint;
 
     fx(i,j,k,URHO)  = momx;
     fx(i,j,k,UMX)   = momx*ux + P;
@@ -115,7 +115,7 @@ namespace HiRes {
     fz(i,j,k,UMZ)   = momz*uz + P;
     fz(i,j,k,UET)   = (rhoet + P)*uz;
 
-    Real cs=sqrt(parm.eos_gamma*P*rhoinv); 
+    Real cs=sqrt(closures.gamma*P*rhoinv); 
     lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux)); 
     lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy)); 
     lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
@@ -286,7 +286,7 @@ namespace HiRes {
     MultiFab lambdamf;
     lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, CNS::NGHOST);
 
-    Parm& lparm = *CNS::d_parm;
+    PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
     // loop over all fabs
     for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
     {
@@ -305,11 +305,11 @@ namespace HiRes {
         auto const& lambda = lambdamf.array(mfi);
 
         ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,lparm);
+            cons2eulerflux_lambda(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lambda ,lclosures);
         });
 
         // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        //     cons2char(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lparm);
+        //     cons2char(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lclosures);
         // });
 
         ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {

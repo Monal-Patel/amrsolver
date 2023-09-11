@@ -20,9 +20,9 @@ namespace Riemann {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_slope_x (int i, int j, int k,
               Array4<Real> const& dq,
-              Array4<Real const> const& q, Parm const& parm) noexcept
+              Array4<Real const> const& q,PROB::ProbClosures const& closures) noexcept
   {
-    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 2.e-40;
+    Real cspeed = sqrt(closures.gamma*closures.Rspec*q(i,j,k,QT)) + 2.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i-1,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QU) - q(i-1,j,k,QU));
     Real drgt = Real(0.5)*(q(i+1,j,k,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i+1,j,k,QU) - q(i,j,k,QU));
     Real d0 = limiter(dlft, drgt);
@@ -54,9 +54,9 @@ namespace Riemann {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_slope_y (int i, int j, int k,
               Array4<Real> const& dq,
-              Array4<Real const> const& q, Parm const& parm) noexcept
+              Array4<Real const> const& q,PROB::ProbClosures const& closures) noexcept
   {
-    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
+    Real cspeed = sqrt(closures.gamma*closures.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j-1,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QV) - q(i,j-1,k,QV));
     Real drgt = Real(0.5)*(q(i,j+1,k,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j+1,k,QV) - q(i,j,k,QV));
     Real d0 = limiter(dlft, drgt);
@@ -88,10 +88,10 @@ namespace Riemann {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_slope_z (int i, int j, int k,
               Array4<Real> const& dq,
-              Array4<Real const> const& q, Parm const& parm) noexcept
+              Array4<Real const> const& q,PROB::ProbClosures const& closures) noexcept
   {
     
-    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
+    Real cspeed = sqrt(closures.gamma*closures.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real dlft = Real(0.5)*(q(i,j,k,QPRES)-q(i,j,k-1,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k,QW) - q(i,j,k-1,QW));
     Real drgt = Real(0.5)*(q(i,j,k+1,QPRES)-q(i,j,k,QPRES))/cspeed - Real(0.5)*q(i,j,k,QRHO)*(q(i,j,k+1,QW) - q(i,j,k,QW));
     Real d0 = limiter(dlft, drgt);
@@ -254,27 +254,27 @@ void cns_riemann_x (int i, int j, int k,
                Array4<Real> const& fx,
                Array4<Real const> const& dq,
                Array4<Real const> const& q,
-               Parm const& parm) noexcept
+              PROB::ProbClosures const& closures) noexcept
   {
-  Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i-1,j,k,QT)) + 1.e-40;
+  Real cspeed = sqrt(closures.gamma*closures.Rspec*q(i-1,j,k,QT)) + 1.e-40;
   Real rl = q(i-1,j,k,QRHO) + Real(0.5) * ( (dq(i-1,j,k,0)+dq(i-1,j,k,2))/cspeed + dq(i-1,j,k,1));
-  rl = max(rl, parm.smallr);
+  rl = max(rl, 1.0e-40);
   Real ul = q(i-1,j,k,QU) + Real(0.5) * ( (dq(i-1,j,k,2)-dq(i-1,j,k,0))/q(i-1,j,k,QRHO));
   Real pl = q(i-1,j,k,QPRES) + Real(0.5) *  (dq(i-1,j,k,0)+dq(i-1,j,k,2))*cspeed;
-  pl = max(pl, parm.smallp);
+  pl = max(pl, 1.0e-40);
   Real ut1l = q(i-1,j,k,QV) + Real(0.5) * dq(i-1,j,k,3);
   Real ut2l = q(i-1,j,k,QW) + Real(0.5) * dq(i-1,j,k,4);
 
-  cspeed =  sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
+  cspeed =  sqrt(closures.gamma*closures.Rspec*q(i,j,k,QT)) + 1.e-40;
   Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
-  rr = max(rr, parm.smallr);
+  rr = max(rr, 1.0e-40);
   Real ur = q(i,j,k,QU) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
   Real pr = q(i,j,k,QPRES) - Real(0.5) * (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
-  pr = max(pr, parm.smallp);
+  pr = max(pr, 1.0e-40);
   Real ut1r = q(i,j,k,QV) - Real(0.5) * dq(i,j,k,3);
   Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
 
-  riemann_prob(parm.eos_gamma, parm.smallp, parm.smallr,
+  riemann_prob(closures.gamma, 1.0e-40, 1.0e-40,
           rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
           fx(i,j,k,URHO), fx(i,j,k,UMX), fx(i,j,k,UMY), fx(i,j,k,UMZ), fx(i,j,k,UET));
   }
@@ -282,27 +282,27 @@ void cns_riemann_x (int i, int j, int k,
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE
   void cns_riemann_y (int i, int j, int k, Array4<Real> const& fy,
                       Array4<Real const> const& dq, Array4<Real const> const& q,
-                      Parm const& parm) noexcept
+                     PROB::ProbClosures const& closures) noexcept
   {
-  Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j-1,k,QT)) + 1.e-40;
+  Real cspeed = sqrt(closures.gamma*closures.Rspec*q(i,j-1,k,QT)) + 1.e-40;
   Real rl = q(i,j-1,k,QRHO) + Real(0.5) * ( (dq(i,j-1,k,0)+dq(i,j-1,k,2))/cspeed + dq(i,j-1,k,1));
-  rl = max(rl, parm.smallr);
+  rl = max(rl, 1.0e-40);
   Real ul = q(i,j-1,k,QV) + Real(0.5) * ( (dq(i,j-1,k,2)-dq(i,j-1,k,0))/q(i,j-1,k,QRHO));
   Real pl = q(i,j-1,k,QPRES) + Real(0.5) *  (dq(i,j-1,k,0)+dq(i,j-1,k,2))*cspeed;
-  pl = max(pl, parm.smallp);
+  pl = max(pl, 1.0e-40);
   Real ut1l = q(i,j-1,k,QU) + Real(0.5) * dq(i,j-1,k,3);
   Real ut2l = q(i,j-1,k,QW) + Real(0.5) * dq(i,j-1,k,4);
 
-  cspeed =  sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
+  cspeed =  sqrt(closures.gamma*closures.Rspec*q(i,j,k,QT)) + 1.e-40;
   Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
-  rr = max(rr, parm.smallr);
+  rr = max(rr, 1.0e-40);
   Real ur = q(i,j,k,QV) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
   Real pr = q(i,j,k,QPRES) - Real(0.5) * (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
-  pr = max(pr, parm.smallp);
+  pr = max(pr, 1.0e-40);
   Real ut1r = q(i,j,k,QU) - Real(0.5) * dq(i,j,k,3);
   Real ut2r = q(i,j,k,QW) - Real(0.5) * dq(i,j,k,4);
 
-  riemann_prob(parm.eos_gamma, parm.smallp, parm.smallr,
+  riemann_prob(closures.gamma, 1.0e-40, 1.0e-40,
           rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
           fy(i,j,k,URHO), fy(i,j,k,UMY), fy(i,j,k,UMX), fy(i,j,k,UMZ), fy(i,j,k,UET));
   }
@@ -312,34 +312,34 @@ void cns_riemann_x (int i, int j, int k,
                 Array4<Real> const& fz,
                 Array4<Real const> const& dq,
                 Array4<Real const> const& q,
-                Parm const& parm) noexcept
+               PROB::ProbClosures const& closures) noexcept
   {
-    Real cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k+1,QT)) + 1.e-40;
+    Real cspeed = sqrt(closures.gamma*closures.Rspec*q(i,j,k+1,QT)) + 1.e-40;
     Real rl = q(i,j,k-1,QRHO) + Real(0.5) * ( (dq(i,j,k-1,0)+dq(i,j,k-1,2))/cspeed + dq(i,j,k-1,1));
-    rl = max(rl, parm.smallr);
+    rl = max(rl, 1.0e-40);
     Real ul = q(i,j,k-1,QW) + Real(0.5) * ( (dq(i,j,k-1,2)-dq(i,j,k-1,0))/q(i,j,k-1,QRHO));
     Real pl = q(i,j,k-1,QPRES) + Real(0.5) *  (dq(i,j,k-1,0)+dq(i,j,k-1,2))*cspeed;
-    pl = max(pl, parm.smallp);
+    pl = max(pl, 1.0e-40);
     Real ut1l = q(i,j,k-1,QU) + Real(0.5) * dq(i,j,k-1,3);
     Real ut2l = q(i,j,k-1,QV) + Real(0.5) * dq(i,j,k-1,4);
 
-    cspeed = sqrt(parm.eos_gamma*parm.Rspec*q(i,j,k,QT)) + 1.e-40;
+    cspeed = sqrt(closures.gamma*closures.Rspec*q(i,j,k,QT)) + 1.e-40;
     Real rr = q(i,j,k,QRHO) - Real(0.5) * ( (dq(i,j,k,0)+dq(i,j,k,2))/cspeed + dq(i,j,k,1));
-    rr = max(rr, parm.smallr);
+    rr = max(rr, 1.0e-40);
     Real ur = q(i,j,k,QW) - Real(0.5) * ( (dq(i,j,k,2)-dq(i,j,k,0))/q(i,j,k,QRHO));
     Real pr = q(i,j,k,QPRES) - Real(0.5) *  (dq(i,j,k,0)+dq(i,j,k,2))*cspeed;
-    pr = max(pr, parm.smallp);
+    pr = max(pr, 1.0e-40);
     Real ut1r = q(i,j,k,QU) - Real(0.5) * dq(i,j,k,3);
     Real ut2r = q(i,j,k,QV) - Real(0.5) * dq(i,j,k,4);
 
-    riemann_prob(parm.eos_gamma, parm.smallp, parm.smallr,
+    riemann_prob(closures.gamma, 1.0e-40, 1.0e-40,
             rl, ul, pl, ut1l, ut2l, rr, ur, pr, ut1r, ut2r,
             fz(i,j,k,URHO), fz(i,j,k,UMZ), fz(i,j,k,UMX), fz(i,j,k,UMY), fz(i,j,k,UET));
   }
 
   AMREX_FORCE_INLINE void Flux(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
     FArrayBox qtmp, slopetmp;
-    Parm const& lparm = *CNS::d_parm; // parameters (thermodynamic)
+    PROB::ProbClosures const& lclosures = *CNS::d_prob_closures; 
 
     for (MFIter mfi(statemf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -363,13 +363,13 @@ void cns_riemann_x (int i, int j, int k,
       amrex::ParallelFor(xslpbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cns_slope_x(i, j, k, slope, q, lparm);
+          cns_slope_x(i, j, k, slope, q, lclosures);
       });
       const Box& xflxbx = amrex::surroundingNodes(bx,cdir);
       amrex::ParallelFor(xflxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cns_riemann_x(i, j, k, nfabfx, slope, q, lparm);
+          cns_riemann_x(i, j, k, nfabfx, slope, q, lclosures);
       });
 
       // y-direction
@@ -378,13 +378,13 @@ void cns_riemann_x (int i, int j, int k,
       amrex::ParallelFor(yslpbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cns_slope_y(i, j, k, slope, q, lparm);
+          cns_slope_y(i, j, k, slope, q, lclosures);
       });
       const Box& yflxbx = amrex::surroundingNodes(bx,cdir);
       amrex::ParallelFor(yflxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cns_riemann_y(i, j, k, nfabfy, slope, q, lparm);
+          cns_riemann_y(i, j, k, nfabfy, slope, q, lclosures);
       });
 
       // z-direction
@@ -393,13 +393,13 @@ void cns_riemann_x (int i, int j, int k,
       amrex::ParallelFor(zslpbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cns_slope_z(i, j, k, slope, q, lparm);
+          cns_slope_z(i, j, k, slope, q, lclosures);
       });
       const Box& zflxbx = amrex::surroundingNodes(bx,cdir);
       amrex::ParallelFor(zflxbx,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-          cns_riemann_z(i, j, k, nfabfz, slope, q, lparm);
+          cns_riemann_z(i, j, k, nfabfz, slope, q, lclosures);
       });
 
       // don't have to do this, but we could

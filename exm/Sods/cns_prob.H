@@ -6,10 +6,21 @@
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <CNS_index_macros.H>
-#include <CNS_K.H>
+// #include <CNS_K.H>
+#include <Closures.H>
 
 using namespace amrex;
+
+
 namespace PROB {
+
+typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
+
+///////////////////////////////CLOSURES/////////////////////////////////////
+// user can also define their own closure class and use it here by naming it ProbClosures
+
+
+
 
 struct ProbParm
 {
@@ -105,7 +116,7 @@ void inline inputs() {
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, Parm const& parm, ProbParm const& prob_parm) {
+void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
@@ -125,7 +136,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   state(i,j,k,UMX  ) = rhot*uxt;
   state(i,j,k,UMY  ) = Real(0.0);
   state(i,j,k,UMZ  ) = Real(0.0);
-  Real et = Pt/(parm.eos_gamma-Real(1.0));
+  Real et = Pt/(closures.gamma-Real(1.0));
   state(i,j,k,UET) = et + Real(0.5)*rhot*uxt*uxt;
 }
 
@@ -145,7 +156,7 @@ void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const
 
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm, Parm const& parms, auto const dx) {
+void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm, ProbClosures const& closures, auto const dx) {
 
 }
 
@@ -169,7 +180,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::Real s_int[NCONS],
          const amrex::Real s_refl[NCONS], amrex::Real s_ext[NCONS],
          const int idir, const int sgn, const amrex::Real time,
-         amrex::GeometryData const& /*geomdata*/,  Parm const& parm, ProbParm const& prob_parm)
+         amrex::GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& prob_parm)
 {
   if (idir == 1) { // ylo or yhi
 

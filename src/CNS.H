@@ -158,8 +158,8 @@ public:
     static Vector<Array<MultiFab,AMREX_SPACEDIM>> Vnumflxmf,Vpntvflxmf; 
 
 public:
-    static Parm* h_parm;
-    static Parm* d_parm;
+    static PROB::ProbClosures* h_prob_closures;
+    static PROB::ProbClosures* d_prob_closures;
     static PROB::ProbParm* h_prob_parm;
     static PROB::ProbParm* d_prob_parm;
     static BCRec* h_phys_bc;
