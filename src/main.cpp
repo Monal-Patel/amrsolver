@@ -23,9 +23,9 @@ int main (int argc, char* argv[]) {
     Real timer_init = 0.;
     Real timer_advance = 0.;
 
-    int  max_step = -1;
+    int  max_step   = -1;
     Real start_time = Real( 0.0);
-    Real stop_time = Real(-1.0);
+    Real stop_time  = Real(-1.0);
 
     // input checks ------------------------------------------------------------
     ParmParse pp;
