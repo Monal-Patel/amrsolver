@@ -7,8 +7,8 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_Derive.H>
 #include <AMReX_StateDescriptor.H>
-#include <CNS_parm.H>
 #include <CNS_index_macros.H>
+#include <cns_prob.H>
 
 // basic CGAL headers
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -182,7 +182,7 @@ namespace IBM {
 
       void initialiseGPs(int lev);
 
-      void computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& parms);
+      void computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::ProbClosures& closures);
 
       void moveGeom();
 

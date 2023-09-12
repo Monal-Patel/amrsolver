@@ -36,6 +36,19 @@ public:
 //   ~ThermodynamicsBase();
 // };
 
+class FluidState
+{
+private:
+  // cons
+  // prims
+
+public:
+  // FluidState(/* args */);
+  // ~FluidState();
+
+  //cons2prims
+  //prims2cons
+};
 
 class calorifically_perfect_gas_t 
 {
@@ -84,7 +97,6 @@ class visc_suth_t {
     Real Tvisc_ref = 110.4;
   public:
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(Real& T) const {
-    Print() << "Sutherland viscosity" << std::endl;
     return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}
 };
 
@@ -138,8 +150,8 @@ class cond_suth_t {
 ////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////CLOSURES/////////////////////////////////
-template <typename Visc, typename Cond, typename Thermo>
-class closures_derived_base_t : public Cond, public Visc, public Thermo
+template <typename Visc, typename Cond, typename Thermo, typename ProbParms >
+class closures_derived_base_t : public Cond, public Visc, public Thermo, public ProbParms
 {
   private:
   public:
@@ -147,7 +159,6 @@ class closures_derived_base_t : public Cond, public Visc, public Thermo
     // ~IdealPerfectGas();
   Real Cshock = 0.0;
   Real Cdamp  = 0.0;
-
 
 };
 

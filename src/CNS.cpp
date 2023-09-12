@@ -470,11 +470,18 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
   FillPatch(*this, sdata, NGHOST, cur_time, State_Type, 0, NCONS);
   const auto geomdata = geom.data();
 
+#ifdef AMREX_USE_GPIBM
+    // call function from cns_prob
+    IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
+#endif
   for (MFIter mfi(tags,TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
     const Box& bx      = mfi.tilebox();
     auto const& tagfab = tags.array(mfi);
     auto const& sdatafab = sdata.array(mfi);
+#ifdef AMREX_USE_GPIBM
+    auto const& ibfab = ibdata->array(mfi);
+#endif
     int lev = level;
     PROB::ProbParm const *lprobparm = d_prob_parm;
 
@@ -484,7 +491,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 #ifdef AMREX_USE_GPIBM
     // call function from cns_prob
     IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
-    user_tagging(i, j, k, tagfab, sdata, level, geom, ibdata);
+    user_tagging(i, j, k, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
 #else
     user_tagging(i, j, k, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif

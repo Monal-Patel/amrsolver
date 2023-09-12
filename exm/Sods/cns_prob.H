@@ -6,21 +6,12 @@
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <CNS_index_macros.H>
-// #include <CNS_K.H>
 #include <Closures.H>
 
 using namespace amrex;
 
 
 namespace PROB {
-
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
-
-///////////////////////////////CLOSURES/////////////////////////////////////
-// user can also define their own closure class and use it here by naming it ProbClosures
-
-
-
 
 struct ProbParm
 {
@@ -32,56 +23,22 @@ struct ProbParm
   Real u_r = 0.0;
 };
 
+///////////////////////////////CLOSURES/////////////////////////////////////////
+typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
+// user can also define their own closure class and use it here by naming it ProbClosures
+// template <typename Visc, typename Cond, typename Thermo>
+// class closures_derived_user_t : public Cond, public Visc, public Thermo
+// {
+  // private:
+  //
+  // public:
+// };
+////////////////////////////////////////////////////////////////////////////////
+
+
 void inline inputs() {
 
   ParmParse pp;
-
-  // // Simulation time
-  // pp.add("max_step", max_step);
-  // pp.add("stop_time", 2.0);
-  // // pp.add("time_step", 0.0); # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
-  // pp.add("cfl", 0.9);
-
-  // geometry
-  // pp.add   ("geometry.coord_sys"  , 0); //0=cart, 1=RZ  2=spherical
-  // pp.addarr("geometry.is_periodic", std::vector<int>{0,1,1});
-  // pp.addarr("geometry.prob_lo"    , std::vector<Real>{0.0,0.0,0.0});
-  // pp.addarr("geometry.prob_hi"    , std::vector<Real>{10.0,10.0,10.0});
-
-
-  // // Refinement and regridding 
-  // pp.addarr("amr.n_cell", std::vector<int>{64,16,16});
-  // pp.add   ("amr.max_level", 0); // maximum level number allowed
-  // pp.addarr("amr.ref_ratio", std::vector<int>{2,2,2}); // refinement ratio
-  // pp.addarr("amr.regrid_int", std::vector<int>{2,2,2}); // how often to regrid
-
-  // pp.addarr("amr.blocking_factor_x", std::vector<int>{8,8,8}); 
-  // pp.addarr("amr.blocking_factor_y", std::vector<int>{8,8,8}); 
-  // pp.addarr("amr.blocking_factor_z", std::vector<int>{8,8,8}); 
-
-  // pp.addarr("amr.max_grid_size_x", std::vector<int>{64,64,64}); 
-  // pp.addarr("amr.max_grid_size_y", std::vector<int>{64,64,64}); 
-  // pp.addarr("amr.max_grid_size_z", std::vector<int>{64,64,64}); 
-  
-  // pp.addarr("amr.n_error_buf", std::vector<int>{2,2,2}); // n_error_buf_x
-  // pp.add   ("amr.grid_eff",0.7);
-  // pp.add   ("amr.v",1);
-  // define ref_ratio or ref_ratio_vect (AMReX_AMRMesh.cpp l182)
-  // amr.subcycling_mode = # None, Manual, Optimal (n_cycle[lev] is set dynamically), Auto (n_cycle[lev]=ref_ratio[lev])
-  // fabarray.mfiter_tile_size = 8 8 8
-
-  // Checkpoint and plotfiles
-  // pp.add   ("amr.checkpoint_files_output", 0); // 0=no, 1=yes
-  // pp.add   ("amr.check_file", std::string{"chk"}); // root name of checkpoint file
-  // pp.add   ("amr.check_int", 100); // number of timesteps between checkpoints
-  // pp.add   ("amr.plot_files_output", 1); // 0=no, 1=yes
-  // pp.add   ("amr.plot_file", std::string{"./plot/plt"}); // root name of plotfile
-  // pp.add   ("amr.plot_int", 2); // number of timesteps between plotfiles
-  // // pp.addarr("amr.derive_plot_vars", std:vector<std::string>{"x_velocity","pressure", "x_velocity", "y_velocity", "z_velocity", "temperature"}); // list of variables to write to plotfile
-
-  // // Misc
-  // pp.add("fab.do_initval", true);
-  // pp.add("fab.init_snan", true);
 
   // Numerical operators
   //-1 = N/A (Incase of periodic)
@@ -102,7 +59,6 @@ void inline inputs() {
   pp.add   ("cns.nghost",2);
   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
-  pp.add   ("cns.visc_type", 1); // 0=constant, 1=dynamic
 
   // lets add viscosity type and different flux dissipations!
 
@@ -111,7 +67,6 @@ void inline inputs() {
   // pp.add("amrex.fpe_trap_invalid",1);
   // pp.add("amrex.fpe_trap_zero",1);
   // pp.add("amrex.fpe_trap_overflow",1);
-
 
 }
 

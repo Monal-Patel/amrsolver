@@ -294,7 +294,7 @@ Array<Real,8> IB::computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMR
 }
 
 
-void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& lparm) {
+void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::ProbClosures& closures) {
 
   IBMultiFab *mfab = mfa[lev];
   Vector<Array<Real,NPRIM>> stateIMs;
@@ -353,14 +353,14 @@ void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& l
       stateIB[QPRES] = stateIMs[0][QPRES];
       stateIB[QT]    = stateIMs[0][QT];
       // ensure thermodynamic consistency
-      stateIB[QRHO]  = stateIMs[0][QPRES]/(stateIMs[0][QT]*lparm.Rspec); 
+      stateIB[QRHO]  = stateIMs[0][QPRES]/(stateIMs[0][QT]*closures.Rspec); 
 
 
       // extrapolate
       // linear extrapolation
       extrapolateGP( stateGP, stateIB, stateIMs,  ibFab.gpArray[ii].disGP, disIM[lev]);
       // thermodynamic consistency
-      stateGP[QRHO]  = stateGP[QPRES]/(stateGP[QT]*lparm.Rspec);
+      stateGP[QRHO]  = stateGP[QPRES]/(stateGP[QT]*closures.Rspec);
 
       // transfer GP to consfab and primfab
       itemp = indexGP[0];
@@ -378,7 +378,7 @@ void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const Parm& l
       conFab(itemp,jtemp,ktemp,UMY)  = stateGP[QRHO]*stateGP[QV];
       conFab(itemp,jtemp,ktemp,UMZ)  = stateGP[QRHO]*stateGP[QW];
       Real ek   = 0.5_rt*(stateGP[QU]*stateGP[QU] + stateGP[QV]*stateGP[QV] + stateGP[QW]*stateGP[QW]);
-      conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(lparm.eos_gamma-1.0_rt) + stateGP[QRHO]*ek;
+      conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(closures.gamma-1.0_rt) + stateGP[QRHO]*ek;
 
     }
   }
