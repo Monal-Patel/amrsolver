@@ -57,7 +57,7 @@ CNS::CNS(Amr &papa,
     flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level, NCONS));
   }
 
-  // Resize MultiFab vectors based on the number of levels
+  // resize MultiFab vectors based on the number of levels
   int nlevs = parent->finestLevel() + 1;
   VdSdt.resize(nlevs); VSborder.resize(nlevs); Vprimsmf.resize(nlevs);
   Vnumflxmf.resize(nlevs); Vpntvflxmf.resize(nlevs);
@@ -426,8 +426,8 @@ void CNS::post_regrid(int lbase, int new_finest)
 {
 
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.destroyIBMultiFab(level);
-  IBM::ib.buildIBMultiFab(grids, dmap, level);
+  IBM::ib.destroyMFs(level);
+  IBM::ib.buildMFs(grids, dmap, level);
   IBM::ib.computeMarkers(level);
   IBM::ib.initialiseGPs(level);
 #endif
@@ -472,7 +472,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 
 #ifdef AMREX_USE_GPIBM
     // call function from cns_prob
-    IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
+    IBM::IBMultiFab& ibdata = (*IBM::ib.ibMFa[level]);
 #endif
   for (MFIter mfi(tags,TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
@@ -480,7 +480,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     auto const& tagfab = tags.array(mfi);
     auto const& sdatafab = sdata.array(mfi);
 #ifdef AMREX_USE_GPIBM
-    auto const& ibfab = ibdata->array(mfi);
+    auto const& ibfab = ibdata.array(mfi);
 #endif
     int lev = level;
     PROB::ProbParm const *lprobparm = d_prob_parm;
@@ -490,7 +490,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     {
 #ifdef AMREX_USE_GPIBM
     // call function from cns_prob
-    IBM::IBMultiFab *ibdata = IBM::ib.mfa[level];
+    IBM::IBMultiFab& ibdata = *(IBM::ib.ibMFa[level]);
     user_tagging(i, j, k, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
 #else
     user_tagging(i, j, k, tagfab, sdatafab, geomdata ,*lprobparm, lev);
@@ -826,7 +826,7 @@ void CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how
 //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
   plotMF.setVal(0.0_rt, cnt, 2, nGrow);
-  IBM::ib.mfa.at(level)->copytoRealMF(plotMF, 0, cnt);
+  IBM::ib.ibMFa[level]->copytoRealMF(plotMF, 0, cnt);
 #endif
   //------------------------------------------------------------------------------
 

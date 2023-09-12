@@ -31,13 +31,6 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
     Array4<bool> ibMarkers = ibfab.array(); // boolean array
     Array4<Real> realfield = realfab.array(); // real array
 
-    // assert that box sizes is same - TODO
-
-    // const int *lo = fab.loVect();
-    // const int *hi = fab.hiVect();
-    // amrex::Print() << lo[0] << " " << lo[1] << " " << lo[2] << std::endl;
-    // amrex::Print() << hi[0] << " " << hi[1] << " " << hi[2] << std::endl;
-
     amrex::ParallelFor(ibbox,
     [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
     {
@@ -59,12 +52,12 @@ IB::~IB () { delete treePtr;}
 // initialise IB
 void IB::init(Amr* pointer_amr, const int nghost) {
 
-
   IB::NGHOST_IB = nghost;
   IB::pamr = pointer_amr ; // store pointer to main Amr class object's instance
   IB::ref_ratio = pamr->refRatio();
   IB::MAX_LEVEL = pamr->maxLevel();
-  IB::mfa.resize(MAX_LEVEL + 1);
+  IB::ibMFa.resize(MAX_LEVEL + 1);
+  IB::lsMFa.resize(MAX_LEVEL + 1);
 
   // TODO make the next 15 lines simpler
   IB::cellSizes.resize(IB::MAX_LEVEL+1);
@@ -86,13 +79,17 @@ void IB::init(Amr* pointer_amr, const int nghost) {
   readGeom();
 }
 // create IBMultiFabs at a level and store pointers to it
-void IB::buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev) {
-  mfa.at(lev) = new IBMultiFab(bxa,dm,NVAR_IB,NGHOST_IB);
+void IB::buildMFs (const BoxArray& bxa, const DistributionMapping& dm, int lev) {
+  ibMFa.at(lev) = new IBMultiFab(bxa,dm,NVAR_IB,NGHOST_IB);
+  lsMFa[lev].define(bxa,dm,1,NGHOST_IB);
 }
 
-void IB::destroyIBMultiFab (int lev) {
-  if (!mfa.empty()) {
-      delete mfa.at(lev);
+void IB::destroyMFs (int lev) {
+  if (!ibMFa.empty()) {
+      delete ibMFa.at(lev);
+  }
+  if (!lsMFa.empty()) {
+      lsMFa[lev].clear();
   }
 }
 
@@ -100,10 +97,10 @@ void IB::computeMarkers (int lev) {
 
   CGAL::Side_of_triangle_mesh<Polyhedron, K2> inside(IB::geom);
 
-  IBMultiFab *mfab = mfa.at(lev);
-  int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
-  for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
-    IBM::IBFab &fab = mfab->get(mfi);
+  IBMultiFab& mfab = *ibMFa[lev];
+  int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
+  for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
+    IBM::IBFab &fab = mfab.get(mfi);
     const int *lo = fab.loVect();
     const int *hi = fab.hiVect();
 
@@ -167,11 +164,11 @@ void IB::computeMarkers (int lev) {
 
 void IB::initialiseGPs (int lev) {
 
-  IBMultiFab *mfab = mfa[lev];
-  int nhalo = mfab->nGrow(0); // assuming same number of ghost points in all directions
+  IBMultiFab& mfab = *ibMFa[lev];
+  int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
 
-  for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
-    IBM::IBFab &fab = mfab->get(mfi);
+  for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
+    IBM::IBFab &fab = mfab.get(mfi);
 
     for (int ii=0;ii<fab.ngps;ii++) {
       IntArray& idx = fab.gpArray[ii].idx;
@@ -296,20 +293,20 @@ Array<Real,8> IB::computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMR
 
 void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::ProbClosures& closures) {
 
-  IBMultiFab *mfab = mfa[lev];
+  IBMultiFab& mfab = *ibMFa[lev];
   Vector<Array<Real,NPRIM>> stateIMs;
   Array<Real,NPRIM> stateIB,stateGP;
   stateIMs.resize(NUM_IMPS);
   int itemp, jtemp, ktemp;
 
   // for each fab in multifab (at a given level)
-  for (MFIter mfi(*mfab,false); mfi.isValid(); ++mfi) {
+  for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
 
     // prims and cons fab
     auto const &conFab  = consmf.array(mfi); // this is a const becuase .array() returns a const but we can still modify conFab as consmf input argument is not const
     auto const &primFab = primsmf.array(mfi);
 
-    IBM::IBFab& ibFab = mfab->get(mfi);
+    IBM::IBFab& ibFab = mfab.get(mfi);
 
 
     // for each ghost point

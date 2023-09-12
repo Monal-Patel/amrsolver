@@ -79,6 +79,8 @@ namespace IBM {
     public:
       // attributes //
       Vector<gp> gpArray;
+      // Vector<gp>* d_gpArray;
+
       int ngps = 0;
       ///////////////
 
@@ -138,10 +140,13 @@ namespace IBM {
       // vector of cell sizes per level in each direction
       Vector<GpuArray<Real,AMREX_SPACEDIM>> cellSizes;
 
-      // IBMultiFab array
-      Vector<IBMultiFab*> mfa; 
+      // Immersed boundary MultiFab array
+      Vector<IBMultiFab*> ibMFa; 
 
-      // IB geometry
+      // Level set MultiFab array
+      Vector<MultiFab> lsMFa;
+
+      // IB explicit geometry
       Polyhedron geom;  
 
       // AABB tree
@@ -172,9 +177,9 @@ namespace IBM {
 
       void static compute_plane_equations( Polyhedron::Facet& f);
 
-      void buildIBMultiFab (const BoxArray& bxa, const DistributionMapping& dm, int lev);
+      void buildMFs (const BoxArray& bxa, const DistributionMapping& dm, int lev);
 
-      void destroyIBMultiFab (int lev);
+      void destroyMFs (int lev);
 
       void readGeom();
 

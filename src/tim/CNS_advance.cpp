@@ -403,11 +403,11 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   // Set solid point RHS to 0 //////////////////////////////////////////////////
 #if AMREX_USE_GPIBM
-      IBM::IBMultiFab *mfab = IBM::ib.mfa.at(level);
+      IBM::IBMultiFab& mfab = *IBM::ib.ibMFa[level];
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
       const Box& bx   = mfi.tilebox();
       auto const& dsdtfab = dSdt.array(mfi);
-      IBM::IBFab &fab = mfab->get(mfi);
+      IBM::IBFab &fab = mfab.get(mfi);
       Array4<bool> ibMarkers = fab.array();
       amrex::ParallelFor(bx, NCONS,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
