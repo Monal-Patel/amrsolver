@@ -1,7 +1,6 @@
 #ifndef CNS_HYDRO_K_H_
 #define CNS_HYDRO_K_H_
 
-#include "CNS_index_macros.H"
 #include <AMReX_FArrayBox.H>
 #include <cmath>
 

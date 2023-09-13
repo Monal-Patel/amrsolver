@@ -13,18 +13,37 @@ private:
   /* data */ 
 public:
 
-  Real pressure(){
+  Real virtual pressure(){
     return 0.0;
   }
 
-  Real density() {
+  Real virtual density() {
     return 0.0;
   }
-  Real energy() {
+  Real virtual energy() {
     return 0.0;
   }
 
 };
+
+// class stiffgas_t : public EosBase
+// {
+// private:
+//   /* data */
+//   gamma_a =;
+//   gamma_l =;
+
+// public:
+// // state
+
+// Real energy (Real p, Real rho) {
+
+// return eint
+// }
+
+// // pressure (eint,rho)
+
+// }
 
 //
 // class ThermodynamicsBase

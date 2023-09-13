@@ -1,9 +1,3 @@
 CEXE_sources += CNSBld.cpp
 CEXE_sources += CNS_setup.cpp
-
 CEXE_sources += CNS_bcfill.cpp
-
-CEXE_headers += CNS_index_macros.H
-
-CEXE_headers += CNS_derive.H
-CEXE_sources += CNS_derive.cpp

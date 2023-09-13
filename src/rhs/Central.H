@@ -2,7 +2,6 @@
 #define Central_H_
 
 #include <CNS.H>
-#include "CNS_index_macros.H"
 #include <AMReX_FArrayBox.H>
 #include <cns_prob.H>
 

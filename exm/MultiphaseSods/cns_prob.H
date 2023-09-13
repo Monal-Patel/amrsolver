@@ -1,39 +1,52 @@
 #ifndef CNS_PROB_H_
 #define CNS_PROB_H_
 
+
+#define UARL  0
+#define UARG  1
+#define UMX   2
+#define UMY   3
+#define UMZ   4
+#define UET   5
+#define UALP  6
+#define NCONS 7
+
+#define QRHOL  0
+#define QRHOA  1
+#define QU     2
+#define QV     3
+#define QW     4
+#define QT     5
+#define QP     6
+#define QALP   7
+#define NPRIM  8
+
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
+#include <CNS_index_macros.H>
 #include <Closures.H>
 
 using namespace amrex;
 
 
-#define URHO  0
-#define UMX   1
-#define UMY   2
-#define UMZ   3
-#define UET   4
-#define NCONS 5
-
-#define QRHO   0
-#define QU     1
-#define QV     2
-#define QW     3
-#define QT     4
-#define QPRES  5
-#define NPRIM  6
 namespace PROB {
 
 struct ProbParm
 {
-  Real p_l = 1.0;
-  Real p_r = 0.1;
-  Real rho_l = 1.0;
-  Real rho_r = 0.125;
+
+  small = 1.0e-8;
+
+  Real arho_l = 1000.0;
   Real u_l = 0.0;
+  Real p_l = 1.e9;
+  Real alpha_l = 1.0 - small ;
+
+  Real arho_r = 20.0;
+  Real p_r = 1.e5;
   Real u_r = 0.0;
+  Real alpha_r = small;
 };
 
 ///////////////////////////////CLOSURES/////////////////////////////////////////
@@ -46,6 +59,20 @@ typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_
   //
   // public:
 // };
+
+enum StateVariable {
+        Density = 0, Xmom, Ymom, Zmom, Etot
+    };
+
+// TODO define variables as global statics here?
+
+// TODO define physical variable names here
+
+
+// TODO derived vars
+
+
+//TODO add flux scheme selecion here
 ////////////////////////////////////////////////////////////////////////////////
 
 

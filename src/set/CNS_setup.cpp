@@ -1,7 +1,6 @@
 #include <CNS.H>
-#include <CNS_index_macros.H>
-#include "CNS_derive.H"
 #include <cns_prob.H>
+#include <CNS_K.H>
 
 using namespace amrex;
 
@@ -48,9 +47,7 @@ static void set_scalar_bc (BCRec& bc, const BCRec* phys_bc)
     }
 }
 
-static
-void
-set_x_vel_bc(BCRec& bc, const BCRec* phys_bc)
+static void set_x_vel_bc(BCRec& bc, const BCRec* phys_bc)
 {
     const int* lo_bc = phys_bc->lo();
     const int* hi_bc = phys_bc->hi();
@@ -66,9 +63,7 @@ set_x_vel_bc(BCRec& bc, const BCRec* phys_bc)
 #endif
 }
 
-static
-void
-set_y_vel_bc(BCRec& bc, const BCRec* phys_bc)
+static void set_y_vel_bc(BCRec& bc, const BCRec* phys_bc)
 {
     const int* lo_bc = phys_bc->lo();
     const int* hi_bc = phys_bc->hi();
@@ -85,9 +80,7 @@ set_y_vel_bc(BCRec& bc, const BCRec* phys_bc)
 }
 
 #if (AMREX_SPACEDIM == 3)
-static
-void
-set_z_vel_bc(BCRec& bc, const BCRec* phys_bc)
+static void set_z_vel_bc(BCRec& bc, const BCRec* phys_bc)
 {
     const int* lo_bc = phys_bc->lo();
     const int* hi_bc = phys_bc->hi();
@@ -100,11 +93,8 @@ set_z_vel_bc(BCRec& bc, const BCRec* phys_bc)
 }
 #endif
 
-void
-CNS::variableSetUp ()
+void CNS::variableSetUp ()
 {
-  // Since this is a GPU/CPU code - it is useful to have some basic parameters always available on both CPU and GPU always.
-  // These host and device variables are deleted in CNS::variableCleanUp().
     CNS::h_prob_closures = new PROB::ProbClosures{};
     CNS::h_prob_parm = new PROB::ProbParm{};
     CNS::h_phys_bc = new BCRec{};

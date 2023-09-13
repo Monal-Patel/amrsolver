@@ -2,7 +2,6 @@
 #define Riemann_H_
 
 #include <CNS.H>
-#include "CNS_index_macros.H"
 #include <AMReX_FArrayBox.H>
 
 namespace Riemann {

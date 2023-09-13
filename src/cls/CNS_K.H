@@ -1,7 +1,6 @@
 #ifndef CNS_K_H_
 #define CNS_K_H_
 
-#include "CNS_index_macros.H"
 #include <AMReX_FArrayBox.H>
 #include <limits>
 #include <cmath>
@@ -109,4 +108,59 @@ void cns_compute_temperature (int i, int j, int k, Array4<Real> const& u,
     // u(i,j,k,UTEMP) = rhoinv * rhoeint * (Real(1.0)/parm.cv);
 }
 
+
+inline void derpres (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+
+    auto const dat  = datafab.array();
+    auto pfab       = derfab.array(dcomp);
+    PROB::ProbClosures const* closures = CNS::d_prob_closures;
+
+    amrex::ParallelFor(bx,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    {
+        // cons2P
+        Real rhoinv = 1.0_rt / dat(i, j, k, URHO);
+        Real mx = dat(i, j, k, UMX);
+        Real my = dat(i, j, k, UMY);
+        Real mz = dat(i, j, k, UMZ);
+        Real rhoeint = dat(i, j, k, UET) - Real(0.5)*rhoinv*(mx*mx + my*my + mz*mz); 
+        pfab(i,j,k) = (closures->gamma-Real(1.0))*rhoeint;
+    });
+}
+
+inline void dertemp (const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                  const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                  Real /*time*/, const int* /*bcrec*/, int /*level*/)
+{
+
+    auto const dat  = datafab.array();
+    auto Tfab       = derfab.array(dcomp);
+    PROB::ProbClosures const* closures = CNS::d_prob_closures;
+
+    amrex::ParallelFor(bx,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    {
+        // cons2T
+        Real rhoinv = 1.0_rt / dat(i, j, k, URHO);
+        Real mx = dat(i, j, k, UMX);
+        Real my = dat(i, j, k, UMY);
+        Real mz = dat(i, j, k, UMZ);
+        Real rhoeint = dat(i, j, k, UET) - Real(0.5)*rhoinv*(mx*mx + my*my + mz*mz); 
+        Tfab(i,j,k) = (rhoeint*rhoinv)/closures->cv;
+    });
+}
+
+inline void dervel(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,     
+                const FArrayBox& datfab, const Geometry& /*geomdata*/, Real /*time*/, const int* /*bcrec*/, const int /*level*/)
+{
+    auto const dat = datfab.const_array();
+    auto vel = derfab.array();
+
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      vel(i, j, k, dcomp) = dat(i,j,k,1)/dat(i,j,k,0);
+    });
+}
 #endif
