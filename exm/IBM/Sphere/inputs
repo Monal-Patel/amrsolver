@@ -1,7 +1,6 @@
 #------------------------------------------------------------------------------#
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
-amrex.fpe_trap_invalid=1
 # start time is assumed to be 0, unless re-starting
 max_step  = 500
 stop_time = 10.0
@@ -19,7 +18,7 @@ geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0     0.0     0.0
 geometry.prob_hi     =   2.0     2.0     2.0
-amr.n_cell           =    32      32      32
+amr.n_cell           =   16      16      16
 
 #------------- BOUNDARY CONDITIONS, PDE and NUMERICAL SCHEMES -----------------#
 # 0 = Interior           3 = Symmetry
@@ -28,7 +27,7 @@ amr.n_cell           =    32      32      32
 # 6 = user defined
 cns.lo_bc      = 2  -1   -1
 cns.hi_bc      = 2  -1   -1
-cns.order_rk   = -2 # -2, 1, 2 or 3 
+cns.order_rk   =-2 # -2, 1, 2 or 3 
 cns.stages_rk  = 2   
 cns.rhs_euler  = 1 # 0=false, 1=true
 cns.rhs_visc   = 0 # 0=false, 1=true
@@ -45,7 +44,7 @@ amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 4 2 2 # refinement ratio
 amr.regrid_int      = 2 4 8 2 # how often to regrid
 amr.blocking_factor = 2 2 2 4
-amr.max_grid_size   = 32
+amr.max_grid_size   = 64
 amr.n_error_buf     = 1 1 1 1 # number of buffer cells in error est
 amr.grid_eff        = 0.99     # what constitutes an efficient grid
 
@@ -59,3 +58,5 @@ amr.v = 1 # 0=quiet, 1=verbose
 amr.checkpoint_files_output = 0
 #amr.check_file              = chk    # root name of checkpoint file
 #amr.check_int               = 100    # number of timesteps between checkpoints
+
+#amrex.fpe_trap_invalid=1

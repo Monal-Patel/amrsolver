@@ -8,6 +8,9 @@ LAZY := TRUE
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
+# stop on first compile error
+DEFINES += -Wfatal-errors
+
 # CNS uses a coarse grained OMP approach
 DEFINES += -DAMREX_CRSEGRNDOMP
 
@@ -35,7 +38,7 @@ ifeq ($(USE_GPIBM),TRUE)
   include $(AMR_SOLVER)/src/ibm/Make.package
   INCLUDE_LOCATIONS += $(AMR_SOLVER)/src/ibm/
   VPATH_LOCATIONS   += $(AMR_SOLVER)/src/ibm/
-  DEFINES += -DAMREX_USE_GPIBM -Wfatal-errors
+  DEFINES += -DAMREX_USE_GPIBM 
 endif
 
 include $(AMREX_HOME)/Src/Base/Make.package

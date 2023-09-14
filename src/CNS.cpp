@@ -490,7 +490,6 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     {
 #ifdef AMREX_USE_GPIBM
     // call function from cns_prob
-    IBM::IBMultiFab& ibdata = *(IBM::ib.ibMFa[level]);
     user_tagging(i, j, k, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
 #else
     user_tagging(i, j, k, tagfab, sdatafab, geomdata ,*lprobparm, lev);

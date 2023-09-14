@@ -10,7 +10,7 @@
 
 namespace PROB {
 
-//////////////////////////// Physical closures /////////////////////////////////
+//////////////////////////// Physical modelling ////////////////////////////////
 struct ProbParm
 { 
   Real p_l = 1.0;
@@ -23,7 +23,7 @@ struct ProbParm
 
 typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
 
-//////////////////////////// Numerical operators ///////////////////////////////
+//////////////////////////// Numerical modelling ///////////////////////////////
 void inline inputs() {
   ParmParse pp;
 
