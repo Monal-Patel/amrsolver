@@ -7,6 +7,7 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_Derive.H>
 #include <AMReX_StateDescriptor.H>
+#include <AMReX_GpuContainers.H>
 #include <CNS_index_macros.H>
 #include <cns_prob.H>
 
@@ -70,7 +71,34 @@ namespace IBM {
       Vector<Array<Real,8>> ipweights; 
       // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1),
       //  ... ]
+  };
 
+  struct gpData_t {
+
+      // attributes
+      int ngps;
+      Gpu::ManagedVector<GpuArray<int, AMREX_SPACEDIM>> idx;
+      // Point_and_primitive_id closest; // closest surface point (ib point) and face
+      Gpu::ManagedVector<Array<Real,AMREX_SPACEDIM>> ib_xyz;
+      Gpu::ManagedVector<Real> disGP; 
+      Gpu::ManagedVector<Real> disIM; 
+
+      Gpu::ManagedVector<Array<Real,AMREX_SPACEDIM>> imp1_xyz; 
+      Gpu::ManagedVector<Array<int,AMREX_SPACEDIM>> imp1_ijk; 
+      Gpu::ManagedVector<Array<Real,8>> im1_ipweights; 
+      // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1),
+      //  ... ]
+
+      Gpu::ManagedVector<Array<Real,AMREX_SPACEDIM>> imp2_xyz; 
+      Gpu::ManagedVector<Array<int,AMREX_SPACEDIM>> imp2_ijk; 
+      Gpu::ManagedVector<Array<Real,8>> im2_ipweights; 
+
+      void resize (int n) {
+        idx.resize(n); ib_xyz.resize(n);
+        disGP.resize(n); disIM.resize(n); 
+        imp1_xyz.resize(n); imp1_ijk.resize(n); im1_ipweights.resize(n);
+        imp2_xyz.resize(n); imp2_ijk.resize(n); im2_ipweights.resize(n);
+      }
   };
 
   // IBFab holds the solid point and ghost point boolean arrays
@@ -78,8 +106,11 @@ namespace IBM {
   {
     public:
       // attributes //
-      Vector<gp> gpArray;
-      // Vector<gp>* d_gpArray;
+      Vector<gp> gpArray; // problem with this approach is that Vector type is not available on the GPUs.
+
+      gpData_t gpData; // a single structure which holds data.
+
+      // AsyncArray<gp>* gpArrayAsync(1); // designed to be used for temporary transfers, in routines, not for storage.
 
       int ngps = 0;
       ///////////////
@@ -91,6 +122,13 @@ namespace IBM {
       // using IBFab
       explicit IBFab (const IBFab& rhs, MakeType make_type, int scomp, 
                       int ncomp);
+
+      // IBFab (IBFab&& rhs) noexcept = default;
+      // IBFab& operator= (IBFab&&) noexcept = default;
+
+      // IBFab (const IBM::IBFab&) {};
+      // IBFab& operator= (const IBFab&) = delete;
+
      ~IBFab ();
      ///////////////////////////////////////////////////////////////////////////
 
@@ -108,6 +146,10 @@ namespace IBM {
                             const int ngrow, 
                             const MFInfo& info = MFInfo(), 
                             const FabFactory<IBFab>& factory = DefaultFabFactory<IBFab>());
+
+      // move constructor
+      IBMultiFab (IBMultiFab&& rhs) noexcept; 
+
       // destructor
       ~IBMultiFab ();
 
@@ -197,6 +239,8 @@ namespace IBM {
       Array<Real,8> computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMREX_SPACEDIM>& impscell, GpuArray<Real,AMREX_SPACEDIM>& cellsize);
 
       void extrapolateGP(Array<Real,6>& stateGP, Array<Real,6>& stateIB, Vector<Array<Real,6>>& stateIMs, Real dgp, Real dim);
+
+      // AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ComputeGPState(long ii,const IBM::IBFab& ibFab);
 
   };
 

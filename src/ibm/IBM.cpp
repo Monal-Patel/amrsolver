@@ -6,17 +6,30 @@
 using namespace amrex;
 using namespace IBM;
 
-IBFab::IBFab (const Box& b, int ncomp, bool alloc, bool shared, Arena* ar)    
-              : BaseFab<bool>(b,ncomp,alloc,shared,ar) {}
-IBFab::IBFab (const IBFab& rhs, MakeType make_type, int scomp, int ncomp) 
-              : BaseFab<bool>(rhs,make_type,scomp,ncomp) {}
-IBFab::~IBFab () { }
+IBFab::IBFab (const Box& b, int ncomp, bool alloc, bool shared, Arena* ar) : BaseFab<bool>(b,ncomp,alloc,shared,ar) {
+  // gpData = (gpData_t*)The_Managed_Arena()->alloc(sizeof(gpData_t));
+}
+
+IBFab::IBFab (const IBFab& rhs, MakeType make_type, int scomp, int ncomp) : BaseFab<bool>(rhs,make_type,scomp,ncomp) {}
+
+IBFab::~IBFab () { 
+  // The_Managed_Arena()->free(gpData);
+}
 
 IBMultiFab::IBMultiFab ( const BoxArray& bxs, const DistributionMapping& dm, 
                         const int nvar, const int ngrow, const MFInfo& info, 
                         const FabFactory<IBFab>& factory )  :
                         FabArray<IBFab>(bxs,dm,nvar,ngrow,info,factory) {}
 IBMultiFab::~IBMultiFab () {}
+
+IBMultiFab::IBMultiFab (IBMultiFab&& rhs) noexcept
+    : FabArray<IBFab>(std::move(rhs))
+{
+#ifdef AMREX_MEM_PROFILING
+    ++num_multifabs;
+    num_multifabs_hwm = std::max(num_multifabs_hwm, num_multifabs);
+#endif
+}
 
 // for a single level
 void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
@@ -43,11 +56,6 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
 // constructor and destructor
 IB::IB (){}
 IB::~IB () { delete treePtr;}
-
-// void IB::setMaxLevel(int max_lev) {
-//   // parent->finestLevel()
-
-// };
 
 // initialise IB
 void IB::init(Amr* pointer_amr, const int nghost) {
@@ -80,7 +88,7 @@ void IB::init(Amr* pointer_amr, const int nghost) {
 }
 // create IBMultiFabs at a level and store pointers to it
 void IB::buildMFs (const BoxArray& bxa, const DistributionMapping& dm, int lev) {
-  ibMFa.at(lev) = new IBMultiFab(bxa,dm,NVAR_IB,NGHOST_IB);
+  ibMFa[lev] = new IBMultiFab(bxa,dm,NVAR_IB,NGHOST_IB);
   lsMFa[lev].define(bxa,dm,1,NGHOST_IB);
 }
 
@@ -93,19 +101,19 @@ void IB::destroyMFs (int lev) {
   }
 }
 
-void IB::computeMarkers (int lev) {
+ void IB::computeMarkers (int lev) {
 
   CGAL::Side_of_triangle_mesh<Polyhedron, K2> inside(IB::geom);
 
   IBMultiFab& mfab = *ibMFa[lev];
-  int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
-  for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
-    IBM::IBFab &fab = mfab.get(mfi);
-    const int *lo = fab.loVect();
-    const int *hi = fab.hiVect();
+  // int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
 
-    fab.setVal(false); // initialise sld and ghs to false
-    Array4<bool> ibMarkers = fab.array(); // boolean array
+  for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
+    IBM::IBFab &ibFab = mfab.get(mfi);
+    const int *lo = ibFab.loVect();
+    const int *hi = ibFab.hiVect();
+    // const Box& bx = mfi.tilebox();
+    auto const& ibMarkers = mfab.array(mfi); // boolean array
 
     // compute sld markers (including at ghost points) - cannot use ParallelFor - CGAL call causes problems
     for (int k = lo[2]; k <= hi[2]; ++k) {
@@ -120,14 +128,35 @@ void IB::computeMarkers (int lev) {
       if (res == CGAL::ON_BOUNDED_SIDE) { 
           // soild marker
           ibMarkers(i,j,k,0) = true;}
-      else if (res == CGAL::ON_BOUNDARY) { 
+      else {
+          ibMarkers(i,j,k,0) = false;
+          }
+      if (res == CGAL::ON_BOUNDARY) { 
         amrex::Print() << "Grid point on IB surface" << " " << std::endl;
         exit(0);
       }
     }}};
 
     // compute ghs markers ------------------------------
-    fab.ngps =0;
+    TODO: fix "error: function IBM:IBFab::IBFab(const IBM::IBFab &) (declared implictly cannot be referenced -- it is a deleted function)"
+    // const Box& bxg = mfi.growntilebox(nhalo);
+    // amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    // {
+    //   bool ghost = false;
+    //   if (ibMarkers(i,j,k,0)) {
+    //     for (int l = -1; l<=1; ++l) {
+    //       ghost = ghost || (!ibMarkers(i+l,j,k,0));
+    //       ghost = ghost || (!ibMarkers(i,j+l,k,0));
+    //       ghost = ghost || (!ibMarkers(i,j,k+l,0));
+    //     }
+    //     ibMarkers(i,j,k,1) = ghost; 
+        // ibFab.gpData.ngps += ghost;
+        // ibFab.gpData.idx.push_back(GpuArray<int,3>{i,j,k});
+    //   }
+    // });
+
+
+    ibFab.ngps =0;
     for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
     for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
     for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
@@ -139,25 +168,59 @@ void IB::computeMarkers (int lev) {
           ghost = ghost || (!ibMarkers(i,j,k+l,0));
         }
         ibMarkers(i,j,k,1) = ghost; 
-        fab.ngps = fab.ngps + ghost;
+        ibFab.gpData.ngps += ghost;
+        ibFab.gpData.idx.push_back(GpuArray<int,3>{i,j,k});
       }
     }}};
 
+    // DEBUGGING /////////////
+    // auto* idxData = ibFab.gpData.idx.data(); 
+    // amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
+    // {
+    //   printf("ii=%d, i=%d, j=%d, k=%d \n",ii,idxData[ii][0],idxData[ii][1],idxData[ii][2]);
+    // });
+    // exit(0);
+    /////////////////////////
+
+    // allocate space for gp arrays ---------------------
+    // ibFab.gpData.resize(ibFab.ngps);
+
+
+
     // index gps ----------------------------------------
     // allocating space before preferred than using insert
-    fab.gpArray.resize(fab.ngps); // create space for gps
-    int ii=0;
-    for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
-    for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
-    for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
-      if(ibMarkers(i,j,k,1)) {
-        fab.gpArray[ii].idx[0] = i;
-        fab.gpArray[ii].idx[1] = j;
-        fab.gpArray[ii].idx[2] = k;
-        ii += 1;
-      }
-    }}};
-    // Print() <<ii << " " << fab.ngps <<std::endl;
+    // fab.gpArray.resize(fab.ngps); // create space for gps
+    // int ii=0;
+    // for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
+    // for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
+    // for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
+    //   if(ibMarkers(i,j,k,1)) {
+    //     fab.gpArray[ii].idx[0] = i;
+    //     fab.gpArray[ii].idx[1] = j;
+    //     fab.gpArray[ii].idx[2] = k;
+    //     ii += 1;
+    //   }
+    // }}};
+
+    // int temp=0;
+    // int* ii=&temp; 
+    // Print() << "here  " << ii  << "  " << *ii << "  " << temp << std::endl;
+  //   amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+  //   {
+  //     if(ibMarkers(i,j,k,1)) {
+  //       // idxData[0][0] = i;
+  //       // idxData.push_back(GpuArray<int,3>());
+  //       // gpData.idx[0][1] = j;
+  //       // gpData.idx[0][2] = k;
+  //       // gpData.idx.push_back(temp);
+  //       // *ii = *ii + 1;
+        
+  //       printf("here i %d j %d k %d \n",i,j,k);
+  //       // copyidx(gpData.idx[0],i,j,k);
+  //     }
+  //   });
+  //   Gpu::synchronize();
+  //   exit(0);
   }
 }
 
@@ -290,6 +353,14 @@ Array<Real,8> IB::computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMR
   return weights;
 }
 
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
+void ComputeGPState(int ii, const Array4<bool> ibFab, const Array4<Real> primFab, const Array4<Real> conFab) {
+  // const IntArray& indexGP = ibFab.gpArray[ii].idx;
+
+  printf("ii %d\n",ii);
+
+}
+
 
 void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::ProbClosures& closures) {
 
@@ -302,87 +373,104 @@ void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::P
   // for each fab in multifab (at a given level)
   for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
 
-    // prims and cons fab
-    auto const &conFab  = consmf.array(mfi); // this is a const becuase .array() returns a const but we can still modify conFab as consmf input argument is not const
-    auto const &primFab = primsmf.array(mfi);
+    auto const& conFabArr  = consmf.array(mfi); // this is a const becuase .array() returns a const but we can still modify conFab as consmf input argument is not const
+    auto const& primFabArr = primsmf.array(mfi);
+    auto const& ibFabArr = mfab.array(mfi);
 
-    IBM::IBFab& ibFab = mfab.get(mfi);
+    auto& ibFab = mfab.get(mfi);
+    unsigned int nitems = ibFab.ngps;
+    const Vector<gp>& gpArray = ibFab.gpArray;
+
+    // ibFab.d_gpArray = new GpuArray<gp,1>[nitems];
+    // ibFab.d_Array.resize(nitems);
+
+
+
+    amrex::ParallelFor(nitems, [=] AMREX_GPU_DEVICE (int idx)
+    {
+      ComputeGPState(idx,ibFabArr,primFabArr,conFabArr);
+    });
+    Gpu::synchronize();
+    amrex::Abort("here");
+
 
 
     // for each ghost point
-    for (int ii=0;ii<ibFab.ngps;ii++) {
-      IntArray& indexGP = ibFab.gpArray[ii].idx;
+    // for (int ii=0;ii<ibFab.ngps;ii++) {
+    //   IntArray& indexGP = ibFab.gpArray[ii].idx;
 
-      // interpolate IM
-      // for each image point
-      for (int jj=0; jj<NUM_IMPS; jj++) {
-        Array<int,AMREX_SPACEDIM>& indexIM = ibFab.gpArray[ii].impscell[jj]; 
-        for (int kk=0; kk<NPRIM; kk++) {
-          stateIMs[jj][kk] = 0.0_rt; // reset to 0
-        }
+    //   // interpolate IM
+    //   // for each image point
+    //   for (int jj=0; jj<NUM_IMPS; jj++) {
+    //     Array<int,AMREX_SPACEDIM>& indexIM = ibFab.gpArray[ii].impscell[jj]; 
+    //     for (int kk=0; kk<NPRIM; kk++) {
+    //       stateIMs[jj][kk] = 0.0_rt; // reset to 0
+    //     }
 
-        Vector<Array<Real,8>>& weightsIP = ibFab.gpArray[ii].ipweights;
-        // for each IP point
-        for (int ll=0; ll<8; ll++) {
-          itemp = indexIM[0] + IB::indexCube[ll][0];
-          jtemp = indexIM[1] + IB::indexCube[ll][1];
-          ktemp = indexIM[2] + IB::indexCube[ll][2];
-          // for each primitive variable
-          for (int kk=0; kk<NPRIM; kk++) {
-            stateIMs[jj][kk] += primFab(itemp,jtemp,ktemp,kk)*weightsIP[jj][ll];
-            // Print() << kk <<   << " " << primFab(itemp,jtemp,ktemp,kk)  << std::endl;
-          }
-        }
-          // for (int kk=0; kk<NPRIM; kk++) {
-          //   Print() << kk << " " << stateIMs[jj][kk] << std::endl ;
-          // }
-      }
-
-
-      // coordinate transformation for slip BCs --> need normals here!
-
-      // interpolate IB (enforcing BCs) -- TODO:generalise to IBM BCs and make user defined
-      // no-slip velocity
-      stateIB[QU] = 0.0_rt;
-      stateIB[QV] = 0.0_rt;
-      stateIB[QW] = 0.0_rt;
-      // zerograd temperature and pressure
-      stateIB[QPRES] = stateIMs[0][QPRES];
-      stateIB[QT]    = stateIMs[0][QT];
-      // ensure thermodynamic consistency
-      stateIB[QRHO]  = stateIMs[0][QPRES]/(stateIMs[0][QT]*closures.Rspec); 
+    //     Vector<Array<Real,8>>& weightsIP = ibFab.gpArray[ii].ipweights;
+    //     // for each IP point
+    //     for (int ll=0; ll<8; ll++) {
+    //       itemp = indexIM[0] + IB::indexCube[ll][0];
+    //       jtemp = indexIM[1] + IB::indexCube[ll][1];
+    //       ktemp = indexIM[2] + IB::indexCube[ll][2];
+    //       // for each primitive variable
+    //       for (int kk=0; kk<NPRIM; kk++) {
+    //         stateIMs[jj][kk] += primFab(itemp,jtemp,ktemp,kk)*weightsIP[jj][ll];
+    //         // Print() << kk <<   << " " << primFab(itemp,jtemp,ktemp,kk)  << std::endl;
+    //       }
+    //     }
+    //       // for (int kk=0; kk<NPRIM; kk++) {
+    //       //   Print() << kk << " " << stateIMs[jj][kk] << std::endl ;
+    //       // }
+    //   }
 
 
-      // extrapolate
-      // linear extrapolation
-      extrapolateGP( stateGP, stateIB, stateIMs,  ibFab.gpArray[ii].disGP, disIM[lev]);
-      // thermodynamic consistency
-      stateGP[QRHO]  = stateGP[QPRES]/(stateGP[QT]*closures.Rspec);
+    //   // coordinate transformation for slip BCs --> need normals here!
 
-      // transfer GP to consfab and primfab
-      itemp = indexGP[0];
-      jtemp = indexGP[1];
-      ktemp = indexGP[2];
-      // insert Primitive ghost state into primFab 
-      for (int n = 0; n < NPRIM; n++)
-      {
-        primFab(indexGP[0],indexGP[1],indexGP[2],n) = stateGP[n];
-      }
+    //   // interpolate IB (enforcing BCs) -- TODO:generalise to IBM BCs and make user defined
+    //   // no-slip velocity
+    //   stateIB[QU] = 0.0_rt;
+    //   stateIB[QV] = 0.0_rt;
+    //   stateIB[QW] = 0.0_rt;
+    //   // zerograd temperature and pressure
+    //   stateIB[QPRES] = stateIMs[0][QPRES];
+    //   stateIB[QT]    = stateIMs[0][QT];
+    //   // ensure thermodynamic consistency
+    //   stateIB[QRHO]  = stateIMs[0][QPRES]/(stateIMs[0][QT]*closures.Rspec); 
 
-      // insert conservative ghost state into consFab
-      conFab(itemp,jtemp,ktemp,URHO) = stateGP[QRHO];
-      conFab(itemp,jtemp,ktemp,UMX)  = stateGP[QRHO]*stateGP[QU];
-      conFab(itemp,jtemp,ktemp,UMY)  = stateGP[QRHO]*stateGP[QV];
-      conFab(itemp,jtemp,ktemp,UMZ)  = stateGP[QRHO]*stateGP[QW];
-      Real ek   = 0.5_rt*(stateGP[QU]*stateGP[QU] + stateGP[QV]*stateGP[QV] + stateGP[QW]*stateGP[QW]);
-      conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(closures.gamma-1.0_rt) + stateGP[QRHO]*ek;
 
-    }
+    //   // extrapolate
+    //   // linear extrapolation
+    //   extrapolateGP( stateGP, stateIB, stateIMs,  ibFab.gpArray[ii].disGP, disIM[lev]);
+    //   // thermodynamic consistency
+    //   stateGP[QRHO]  = stateGP[QPRES]/(stateGP[QT]*closures.Rspec);
+
+    //   // transfer GP to consfab and primfab
+    //   itemp = indexGP[0];
+    //   jtemp = indexGP[1];
+    //   ktemp = indexGP[2];
+    //   // insert Primitive ghost state into primFab 
+    //   for (int n = 0; n < NPRIM; n++)
+    //   {
+    //     primFab(indexGP[0],indexGP[1],indexGP[2],n) = stateGP[n];
+    //   }
+
+    //   // insert conservative ghost state into consFab
+    //   conFab(itemp,jtemp,ktemp,URHO) = stateGP[QRHO];
+    //   conFab(itemp,jtemp,ktemp,UMX)  = stateGP[QRHO]*stateGP[QU];
+    //   conFab(itemp,jtemp,ktemp,UMY)  = stateGP[QRHO]*stateGP[QV];
+    //   conFab(itemp,jtemp,ktemp,UMZ)  = stateGP[QRHO]*stateGP[QW];
+    //   Real ek   = 0.5_rt*(stateGP[QU]*stateGP[QU] + stateGP[QV]*stateGP[QV] + stateGP[QW]*stateGP[QW]);
+    //   conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(closures.gamma-1.0_rt) + stateGP[QRHO]*ek;
+
+    // }
   }
 }
 
+
+
 // linear extrapolation
-void IB::extrapolateGP(Array<Real,6>& stateGP, Array<Real,6>& stateIB, Vector<Array<Real,6>>& stateIMs, Real dgp, Real dim) {
+inline void IB::extrapolateGP(Array<Real,6>& stateGP, Array<Real,6>& stateIB, Vector<Array<Real,6>>& stateIMs, Real dgp, Real dim) {
 
   for (int kk=0; kk<NPRIM; kk++) {
     stateGP[kk] = stateIB[kk] - (dgp/dim)*(stateIMs[0][kk] - stateIB[kk]);
