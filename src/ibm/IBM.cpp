@@ -373,7 +373,7 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
   conFab(i,j,k,UMY)  = primStateNormal(0,QRHO)*primStateNormal(0,QV);
   conFab(i,j,k,UMZ)  = primStateNormal(0,QRHO)*primStateNormal(0,QW);
   Real ek   = 0.5_rt*(primStateNormal(0,QU)*primStateNormal(0,QU) + primStateNormal(0,QV)* primStateNormal(0,QV) + primStateNormal(0,QW)*primStateNormal(0,QW));
-  conFab(i,j,k,UET) = primStateNormal(0,QPRES)*(closures.gamma-1.0_rt) + primStateNormal(0,QRHO)*ek;
+  conFab(i,j,k,UET) = primStateNormal(0,QPRES)/(closures.gamma-1.0_rt) + primStateNormal(0,QRHO)*ek;
 
   // for (int kk=0; kk<NPRIM; kk++) {
   //   printf("GP consState kk %d, %f \n" , kk, primStateNormal(0,kk)) ;
