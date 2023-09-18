@@ -1,6 +1,8 @@
 #ifndef IBM_H_
 #define IBM_H_
 
+#define NIMPS 2 // number of image points per ghost point
+
 #include <AMReX_Amr.H>
 #include <AMReX_AmrLevel.H>
 #include <AMReX_FabArray.H>
@@ -60,44 +62,68 @@ namespace IBM {
   };
 
   // GP holds the relevant data for each ghost point.
-  struct gp {
+  // struct gp {
 
-      // attributes
-      Array<int , AMREX_SPACEDIM> idx={0};
-      Point_and_primitive_id closest; // closest surface point (ib point) and face
-      Real disGP; 
-      Vector<Array<Real,AMREX_SPACEDIM>> imps; 
-      Vector<Array<int,AMREX_SPACEDIM>> impscell; 
-      Vector<Array<Real,8>> ipweights; 
-      // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1),
-      //  ... ]
-  };
+  //     // attributes
+  //     Array<int , AMREX_SPACEDIM> idx={0};
+  //     Point_and_primitive_id closest; // closest surface point (ib point) and face
+  //     Real disGP; 
+  //     Vector<Array<Real,AMREX_SPACEDIM>> imps; 
+  //     Vector<Array<int,AMREX_SPACEDIM>> impscell; 
+  //     Vector<Array<Real,8>> ipweights; 
+  //     // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1),
+  //     //  ... ]
+  // };
 
   struct gpData_t {
 
-      // attributes
+      gpData_t() {
+        // index cube for image point interpolation
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{0,0,0});
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{0,1,0});
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{1,1,0});
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{1,0,0});
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{0,0,1});
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{0,1,1});
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{1,1,1});
+        indexCube.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{1,0,1});
+      }
+
+      // CPU only attributes
       int ngps;
-      Gpu::ManagedVector<GpuArray<int, AMREX_SPACEDIM>> idx;
+      Vector<Point_and_primitive_id> closest_cgal; // closest surface point (ib point) and face
+
+      // GPU/CPU attributes
+      Gpu::ManagedVector<Array1D<int,0,AMREX_SPACEDIM-1>> gp_ijk;
       // Point_and_primitive_id closest; // closest surface point (ib point) and face
-      Gpu::ManagedVector<Array<Real,AMREX_SPACEDIM>> ib_xyz;
+      Gpu::ManagedVector<Array1D<Real,0,AMREX_SPACEDIM-1>> normal;
+      Gpu::ManagedVector<Array1D<Real,0,AMREX_SPACEDIM-1>> ib_xyz;
       Gpu::ManagedVector<Real> disGP; 
       Gpu::ManagedVector<Real> disIM; 
 
-      Gpu::ManagedVector<Array<Real,AMREX_SPACEDIM>> imp1_xyz; 
-      Gpu::ManagedVector<Array<int,AMREX_SPACEDIM>> imp1_ijk; 
-      Gpu::ManagedVector<Array<Real,8>> im1_ipweights; 
+      Gpu::ManagedVector<Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>> imp_xyz;
+      Gpu::ManagedVector<Array2D<int, 0,NIMPS-1,0,AMREX_SPACEDIM-1>> imp_ijk;
+      Gpu::ManagedVector<Array2D<Real,0,NIMPS-1,0,7>> imp_ipweights;
       // for imp1 [(i,j,k), (i+1,j,k), (i,j+1,k), (i,j,k+1),
       //  ... ]
 
-      Gpu::ManagedVector<Array<Real,AMREX_SPACEDIM>> imp2_xyz; 
-      Gpu::ManagedVector<Array<int,AMREX_SPACEDIM>> imp2_ijk; 
-      Gpu::ManagedVector<Array<Real,8>> im2_ipweights; 
+      // Anti-clockwise order k=0 plane first, then k=1 plane.
+      Gpu::ManagedVector<Array1D<int,0,AMREX_SPACEDIM-1>> indexCube;
+      // = { {0,0,0}, {0,1,0}, {1,1,0}, {1,0,0}, {0,0,1}, {0,1,1}, {1,1,1}, {1,0,1}}; // index cube for image point interpolation
+
+      // Gpu::ManagedVector<GpuArray<Real,AMREX_SPACEDIM>> imp1_xyz; 
+      // Gpu::ManagedVector<GpuArray<int,AMREX_SPACEDIM>> imp1_ijk; 
+      // Gpu::ManagedVector<GpuArray<Real,8>> imp1_ipweights; 
+
+      // Gpu::ManagedVector<GpuArray<Real,AMREX_SPACEDIM>> imp2_xyz; 
+      // Gpu::ManagedVector<GpuArray<int,AMREX_SPACEDIM>> imp2_ijk; 
+      // Gpu::ManagedVector<GpuArray<Real,8>> imp2_ipweights; 
+
 
       void resize (int n) {
-        idx.resize(n); ib_xyz.resize(n);
+        gp_ijk.resize(n); ib_xyz.resize(n);
         disGP.resize(n); disIM.resize(n); 
-        imp1_xyz.resize(n); imp1_ijk.resize(n); im1_ipweights.resize(n);
-        imp2_xyz.resize(n); imp2_ijk.resize(n); im2_ipweights.resize(n);
+        imp_xyz.resize(n); imp_ijk.resize(n); imp_ipweights.resize(n);
       }
   };
 
@@ -106,13 +132,13 @@ namespace IBM {
   {
     public:
       // attributes //
-      Vector<gp> gpArray; // problem with this approach is that Vector type is not available on the GPUs.
+      // Vector<gp> gpArray; // problem with this approach is that Vector type is not available on the GPUs.
 
-      gpData_t gpData; // a single structure which holds data.
+      gpData_t gpData; // a single structure which holds GP data in vectors which can be resized on CPU or GPU.
 
       // AsyncArray<gp>* gpArrayAsync(1); // designed to be used for temporary transfers, in routines, not for storage.
 
-      int ngps = 0;
+      // int ngps = 0;
       ///////////////
 
       // constructors and destructors //
@@ -167,11 +193,7 @@ namespace IBM {
       int MAX_LEVEL = 0;   // need to save this as Amr protects this -- set in ib.init(...)
       int NGHOST_IB = 0; // number of ghost points in IBMultiFab -- set in ib.init(...)
       const int NVAR_IB  = 2; // number of variables in IBMultiFab
-      const int NUM_IMPS = 2; // number of image points per ghost point
-
-      Vector<amrex::Array<int,AMREX_SPACEDIM>> indexCube = { {0,0,0}, {0,1,0}, {1,1,0}, {1,0,0}, {0,0,1}, {0,1,1}, {1,1,1}, {1,0,1}}; // index cube for image point interpolation
-      // Anti-clockwise order k=0 plane first, then k=1 plane.
-
+      // const int NIMPS = 2; // number of image points per ghost point
 
       // pointer to Amr class instance
       Amr*pamr;
@@ -236,9 +258,10 @@ namespace IBM {
       void computeSurf(int lev);
 
     private:
-      Array<Real,8> computeIPweights(Array<Real,AMREX_SPACEDIM>&imp, Array<int,AMREX_SPACEDIM>& impscell, GpuArray<Real,AMREX_SPACEDIM>& cellsize);
+      void computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& impscell, GpuArray<Real,AMREX_SPACEDIM>& dxyz);
 
-      void extrapolateGP(Array<Real,6>& stateGP, Array<Real,6>& stateIB, Vector<Array<Real,6>>& stateIMs, Real dgp, Real dim);
+      // AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+      // void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, Real dgp, Real dim);
 
       // AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void ComputeGPState(long ii,const IBM::IBFab& ibFab);
 
