@@ -171,6 +171,9 @@ void IB::destroyMFs (int lev) {
         ibFab.gpData.ngps += ghost;
         ibFab.gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});
       }
+      else {
+        ibMarkers(i,j,k,1) = false;
+      }
     }}};
 
     // DEBUGGING /////////////
@@ -354,7 +357,7 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
   primStateNormal(1,QPRES) = primStateNormal(2,QPRES);
   primStateNormal(1,QT)    = primStateNormal(2,QT);
   // ensure thermodynamic consistency
-  primStateNormal(1,QRHO)  = primStateNormal(2,QPRES)/(primStateNormal(2,QT)*closures.Rspec); 
+  primStateNormal(1,QRHO)  = primStateNormal(1,QPRES)/(primStateNormal(1,QT)*closures.Rspec); 
 
   // extrapolate GP
   extrapolateGP( primStateNormal, disGP, disIM);
@@ -375,9 +378,9 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
   Real ek   = 0.5_rt*(primStateNormal(0,QU)*primStateNormal(0,QU) + primStateNormal(0,QV)* primStateNormal(0,QV) + primStateNormal(0,QW)*primStateNormal(0,QW));
   conFab(i,j,k,UET) = primStateNormal(0,QPRES)/(closures.gamma-1.0_rt) + primStateNormal(0,QRHO)*ek;
 
-  // for (int kk=0; kk<NPRIM; kk++) {
-  //   printf("GP consState kk %d, %f \n" , kk, primStateNormal(0,kk)) ;
-  // }
+  for (int kk=0; kk<NPRIM; kk++) {
+    printf("GP(%d,%d,%d), consState(%d)=%f \n",i,j,k , kk, primStateNormal(0,kk)) ;
+  }
 
 }
 
