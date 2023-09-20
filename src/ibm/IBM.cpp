@@ -110,18 +110,18 @@ void IB::destroyMFs (int lev) {
 
   for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &ibFab = mfab.get(mfi);
-    const int *lo = ibFab.loVect();
-    const int *hi = ibFab.hiVect();
-    // const Box& bx = mfi.tilebox();
+    const Box& bx = mfi.tilebox();
+    const IntVect& lo = bx.smallEnd();
+    const IntVect& hi = bx.bigEnd();
     auto const& ibMarkers = mfab.array(mfi); // boolean array
 
     // compute sld markers (including at ghost points) - cannot use ParallelFor - CGAL call causes problems
-    for (int k = lo[2]; k <= hi[2]; ++k) {
-    for (int j = lo[1]; j <= hi[1]; ++j) {
-    for (int i = lo[0]; i <= hi[0]; ++i) {
-      Real x=(0.5 + i)*cellSizes[lev][0];
-      Real y=(0.5 + j)*cellSizes[lev][1];
-      Real z=(0.5 + k)*cellSizes[lev][2];
+    for (int k = lo[2]-nhalo; k <= hi[2]+nhalo; ++k) {
+    for (int j = lo[1]-nhalo; j <= hi[1]+nhalo; ++j) {
+    for (int i = lo[0]-nhalo; i <= hi[0]+nhalo; ++i) {
+      Real x=(0.5_rt + Real(i))*cellSizes[lev][0];
+      Real y=(0.5_rt + Real(j))*cellSizes[lev][1];
+      Real z=(0.5_rt + Real(k))*cellSizes[lev][2];
       Point gridpoint(x,y,z);
       CGAL::Bounded_side res = inside(gridpoint);
 
@@ -131,10 +131,8 @@ void IB::destroyMFs (int lev) {
       else {
           ibMarkers(i,j,k,0) = false;
           }
-      if (res == CGAL::ON_BOUNDARY) { 
-        amrex::Print() << "Grid point on IB surface" << " " << std::endl;
-        exit(0);
-      }
+
+      AMREX_ASSERT_WITH_MESSAGE((res != CGAL::ON_BOUNDARY),"Grid point on IB surface");
     }}};
 
     // compute ghs markers ------------------------------
@@ -157,12 +155,13 @@ void IB::destroyMFs (int lev) {
 
 
    ibFab.gpData.ngps=0;
-    for (int k = lo[2]+nhalo; k <= hi[2]-nhalo; ++k) {
-    for (int j = lo[1]+nhalo; j <= hi[1]-nhalo; ++j) {
-    for (int i = lo[0]+nhalo; i <= hi[0]-nhalo; ++i) {
+   int nextra=1;
+    for (int k = lo[2] - nextra; k <= hi[2] + nextra; ++k) {
+    for (int j = lo[1] - nextra; j <= hi[1] + nextra; ++j) {
+    for (int i = lo[0] - nextra; i <= hi[0] + nextra; ++i) {
       bool ghost = false;
       if (ibMarkers(i,j,k,0)) {
-        for (int l = -1; l<=1; ++l) {
+        for (int l = -1; l<=1; l=l+2) {
           ghost = ghost || (!ibMarkers(i+l,j,k,0));
           ghost = ghost || (!ibMarkers(i,j+l,k,0));
           ghost = ghost || (!ibMarkers(i,j,k+l,0));
@@ -215,22 +214,25 @@ void IB::initialiseGPs (int lev) {
       Point cp = closest_elem.first;
       Polyhedron::Face_handle face = closest_elem.second; 
 
-      // // Print() << "closest surface point: " << cp << std::endl;
-      // // Print() << "closest triangle: ( "
-      // //           << face->halfedge()->vertex()->point() << " , "
-      // //           << face->halfedge()->next()->vertex()->point() << " , "
-      // //           << face->halfedge()->next()->next()->vertex()->point()
-      // //           << " )" 
-      // //           << std::endl; 
-      // // Print() << "Normal " << fnormals[face] <<std::endl;
-      // // Print() << "cp-gp " << cp - gp << std::endl; // should be in the direction of normal
-      // // Print() << "Plane " << face->plane().a() << " " << face->plane().b() << " "  << face->plane().c() << " " << face->plane().d() << std::endl;
-      // // amrex::Print() << "------------------- " << std::endl;
+      // amrex::Print() << "------------------- " << std::endl;
+      // Print() << "closest surface point: " << cp << std::endl;
+      // Print() << "closest triangle: ( "
+      //           << face->halfedge()->vertex()->point() << " , "
+      //           << face->halfedge()->next()->vertex()->point() << " , "
+      //           << face->halfedge()->next()->next()->vertex()->point()
+      //           << " )" 
+      //           << std::endl; 
+      // Print() << "Normal " << fnormals[face] <<std::endl;
+      // Print() << "cp-gp " << cp - gp << std::endl; // should be in the direction of normal
+      // Print() << "Plane " << face->plane().a() << " " << face->plane().b() << " "  << face->plane().c() << " " << face->plane().d() << std::endl;
 
       // IB point -------------------------------------------
       Vector_CGAL imp_gp(gp,cp);
+      Real disGP = sqrt(CGAL::squared_distance(gp,cp));
+
+
       //*store*
-      gpData.disGP.push_back(sqrt(imp_gp.squared_length()));
+      gpData.disGP.push_back(disGP);
       Array1D<Real,0,AMREX_SPACEDIM-1> norm = {fnormals[face][0],fnormals[face][1],fnormals[face][2]};
       gpData.normal.push_back(norm);
        
@@ -252,7 +254,28 @@ void IB::initialiseGPs (int lev) {
           imp_xyz(jj,kk) = cp[kk] + (jj+1)*disIM[lev]*fnormals[face][kk];
           imp_ijk(jj,kk) = floor(imp_xyz(jj,kk)/cellSizes[lev][kk] - 0.5_rt);
         }
-        AMREX_ASSERT_WITH_MESSAGE(bxg.contains(IntVect(imp_ijk(jj,0),imp_ijk(jj,1),imp_ijk(jj,2))),"Interpolation point outside fab");
+        // Print() << "---" << std::endl;
+        // // Print() << "bx " << bx  << std::endl;
+        // Print() << "bxg " << bxg << std::endl;
+        // Print() << "gp_ijk " << idx(0) << " " << idx(1) << " " << idx(2) << std::endl;
+        // Print() << "ip_ijk " << imp_ijk(jj,0) << " " << imp_ijk(jj,1) << " " << imp_ijk(jj,2) << std::endl;
+        // Print() << "gp_xyz " << x << " " << y << " " << z << std::endl;
+        // Print() << "ib_xyz " << cp[0] << " " << cp[1] << " " << cp[2] << std::endl;
+        // Print() << "ip_xyz " << imp_xyz(jj,0) << " " << imp_xyz(jj,1) << " " << imp_xyz(jj,2) << std::endl;
+        // Print() << "norm " << fnormals[face] << std::endl;
+        // Print() << "dx  " << cellSizes[lev][0] << " " << cellSizes[lev][1] << " " << cellSizes[lev][2] << std::endl;
+        // Print() << "disIM "  << disIM[lev] << std::endl;
+        // Print() << "disGP " << disGP << std::endl;
+        // Real temp = sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]);
+        // Print() << "diag " << temp << std::endl;
+
+        // AMREX_ASSERT_WITH_MESSAGE(disGP < 1.0*sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]), "Ghost point and IB point distance larger than mesh diagonal");
+        // if (idx(1) == 30 and idx(2)==30) {
+        //   Print() << "HERE" << std::endl;
+        //   exit(0);
+        //   };
+
+        AMREX_ASSERT_WITH_MESSAGE(bxg.contains(imp_ijk(jj,0),imp_ijk(jj,1),imp_ijk(jj,2)),"Interpolation point outside fab");
       }
       // DEBUGGING //////////////
       // Print() << "disGP, disIM (from IB) " << fab.gpArray[ii].disGP << " " << IB::disIM[lev] << std::endl;
@@ -323,28 +346,21 @@ void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, Real dgp,
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
 void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const weights,const Real disGP, const Real disIM, const Array4<bool> ibFab, Array4<Real> primFab, Array4<Real> conFab,auto const idxCube, const PROB::ProbClosures& closures) {
 
-  // printf("ii %d\n",ii);
-
   // interpolate IM ////////////////
   Array2D<Real,0,NIMPS+1,0,NPRIM-1> primStateNormal={0.0};
-  // GP (jj=0),IB (jj=1), IM1 (jj=2),IM2 (jj=3)...
   // for each image point
-  for (int jj=1; jj<=NIMPS; jj++) {
+  for (int jj=0; jj<NIMPS; jj++) {
+  // GP (jj=0),IB (jj=1), IM1 (jj=2),IM2 (jj=3)...
     // for each IP point
     for (int ll=0; ll<8; ll++) {
-      int itemp = imp_ijk(jj-1,0) + idxCube[ll](0);
-      int jtemp = imp_ijk(jj-1,1) + idxCube[ll](1);
-      int ktemp = imp_ijk(jj-1,2) + idxCube[ll](2);
-      // printf("%d %d %d\n", imp_ijk(jj-1,0),imp_ijk(jj-1,1),imp_ijk(jj-1,2));
-      // printf("ijk %d %d %d\n", itemp,jtemp,ktemp);
+      int itemp = imp_ijk(jj,0) + idxCube[ll](0);
+      int jtemp = imp_ijk(jj,1) + idxCube[ll](1);
+      int ktemp = imp_ijk(jj,2) + idxCube[ll](2);
       // for each primitive variable
       for (int kk=0; kk<NPRIM; kk++) {
-        primStateNormal(jj,kk) += primFab(itemp,jtemp,ktemp,kk)*weights(jj-1,ll);
+        primStateNormal(jj+2,kk) += primFab(itemp,jtemp,ktemp,kk)*weights(jj,ll);
       }
     }
-    // for (int kk=0; kk<NPRIM; kk++) {
-    //   printf("IM state %d  (kk=%d, prim=%f) \n",jj , kk, primStateNormal(jj,kk)) ;
-    // }
   }
   // TODO:coordinate transformation for slip BCs --> need normals here!
 
@@ -361,15 +377,17 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
 
   // extrapolate GP
   extrapolateGP( primStateNormal, disGP, disIM);
+  primStateNormal(0,QPRES) = primStateNormal(2,QPRES);
   // thermodynamic consistency
   primStateNormal(0,QRHO)  = primStateNormal(0,QPRES)/(primStateNormal(0,QT)*closures.Rspec);
 
-  // for (int kk=0; kk<NPRIM; kk++) {
-  //   printf("GP PrimState kk %d, %f \n" , kk, primStateNormal(0,kk)) ;
-  // }
+  // insert primitive variables into primsFab
+  int i=gp_ijk(0); int j=gp_ijk(1); int k = gp_ijk(2);
+  for (int kk=0; kk<NPRIM; kk++) {
+    primFab(i,j,k,kk) = primStateNormal(0,kk);
+  }
 
   // insert conservative ghost state into consFab
-  int i=gp_ijk(0); int j=gp_ijk(1); int k = gp_ijk(2);
   conFab(i,j,k,URHO) = primStateNormal(0,QRHO);
   conFab(i,j,k,UMX)  = primStateNormal(0,QRHO)*primStateNormal(0,QU);
 
@@ -377,11 +395,6 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
   conFab(i,j,k,UMZ)  = primStateNormal(0,QRHO)*primStateNormal(0,QW);
   Real ek   = 0.5_rt*(primStateNormal(0,QU)*primStateNormal(0,QU) + primStateNormal(0,QV)* primStateNormal(0,QV) + primStateNormal(0,QW)*primStateNormal(0,QW));
   conFab(i,j,k,UET) = primStateNormal(0,QPRES)/(closures.gamma-1.0_rt) + primStateNormal(0,QRHO)*ek;
-
-  for (int kk=0; kk<NPRIM; kk++) {
-    printf("GP(%d,%d,%d), consState(%d)=%f \n",i,j,k , kk, primStateNormal(0,kk)) ;
-  }
-
 }
 
 
@@ -415,87 +428,8 @@ void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::P
       ComputeGPState(idx,gp_ijk[idx],imp_ijk[idx],ipweights[idx],disGP[idx],disIM[idx],ibFabArr,primFabArr,conFabArr,idxCube,closures);
     });
     
-    // Gpu::synchronize();
-    // amrex::Abort("here");
-
-
-
-    // for each ghost point
-    // for (int ii=0;ii<ibFab.ngps;ii++) {
-    //   IntArray& indexGP = ibFab.gpArray[ii].idx;
-
-    //   // interpolate IM
-    //   // for each image point
-    //   for (int jj=0; jj<NIMPS; jj++) {
-    //     Array<int,AMREX_SPACEDIM>& indexIM = ibFab.gpArray[ii].impscell[jj]; 
-    //     for (int kk=0; kk<NPRIM; kk++) {
-    //       stateIMs[jj][kk] = 0.0_rt; // reset to 0
-    //     }
-
-    //     Vector<Array<Real,8>>& weightsIP = ibFab.gpArray[ii].ipweights;
-    //     // for each IP point
-    //     for (int ll=0; ll<8; ll++) {
-    //       itemp = indexIM[0] + IB::indexCube[ll][0];
-    //       jtemp = indexIM[1] + IB::indexCube[ll][1];
-    //       ktemp = indexIM[2] + IB::indexCube[ll][2];
-    //       // for each primitive variable
-    //       for (int kk=0; kk<NPRIM; kk++) {
-    //         stateIMs[jj][kk] += primFab(itemp,jtemp,ktemp,kk)*weightsIP[jj][ll];
-    //         // Print() << kk <<   << " " << primFab(itemp,jtemp,ktemp,kk)  << std::endl;
-    //       }
-    //     }
-    //       // for (int kk=0; kk<NPRIM; kk++) {
-    //       //   Print() << kk << " " << stateIMs[jj][kk] << std::endl ;
-    //       // }
-    //   }
-
-
-    //   // coordinate transformation for slip BCs --> need normals here!
-
-    //   // interpolate IB (enforcing BCs) -- TODO:generalise to IBM BCs and make user defined
-    //   // no-slip velocity
-    //   stateIB[QU] = 0.0_rt;
-    //   stateIB[QV] = 0.0_rt;
-    //   stateIB[QW] = 0.0_rt;
-    //   // zerograd temperature and pressure
-    //   stateIB[QPRES] = stateIMs[0][QPRES];
-    //   stateIB[QT]    = stateIMs[0][QT];
-    //   // ensure thermodynamic consistency
-    //   stateIB[QRHO]  = stateIMs[0][QPRES]/(stateIMs[0][QT]*closures.Rspec); 
-
-
-    //   // extrapolate
-    //   // linear extrapolation
-      // extrapolateGP( stateGP, stateIB, stateIMs,  ibFab.gpArray[ii].disGP, disIM[lev]);
-    //   // thermodynamic consistency
-    //   stateGP[QRHO]  = stateGP[QPRES]/(stateGP[QT]*closures.Rspec);
-
-    //   // transfer GP to consfab and primfab
-    //   itemp = indexGP[0];
-    //   jtemp = indexGP[1];
-    //   ktemp = indexGP[2];
-    //   // insert Primitive ghost state into primFab 
-    //   for (int n = 0; n < NPRIM; n++)
-    //   {
-    //     primFab(indexGP[0],indexGP[1],indexGP[2],n) = stateGP[n];
-    //   }
-
-    //   // insert conservative ghost state into consFab
-    //   conFab(itemp,jtemp,ktemp,URHO) = stateGP[QRHO];
-    //   conFab(itemp,jtemp,ktemp,UMX)  = stateGP[QRHO]*stateGP[QU];
-    //   conFab(itemp,jtemp,ktemp,UMY)  = stateGP[QRHO]*stateGP[QV];
-    //   conFab(itemp,jtemp,ktemp,UMZ)  = stateGP[QRHO]*stateGP[QW];
-    //   Real ek   = 0.5_rt*(stateGP[QU]*stateGP[QU] + stateGP[QV]*stateGP[QV] + stateGP[QW]*stateGP[QW]);
-    //   conFab(itemp,jtemp,ktemp,UET) = stateGP[QPRES]*(closures.gamma-1.0_rt) + stateGP[QRHO]*ek;
-
-    // }
   }
 }
-
-
-
-
-
 
 void IB::compute_plane_equations( Polyhedron::Facet& f) {
     Polyhedron::Halfedge_handle h = f.halfedge();
