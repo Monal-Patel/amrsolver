@@ -8,9 +8,6 @@
 #include <AMReX_AmrLevel.H>
 #include <Closures.H>
 
-
-#define NIMPS 1 // number of image points per ghost point
-
 namespace PROB {
 
 //////////////////////////// Physical modelling ////////////////////////////////

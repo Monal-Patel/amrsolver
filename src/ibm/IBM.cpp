@@ -114,11 +114,14 @@ void IB::destroyMFs (int lev) {
     const IntVect& lo = bx.smallEnd();
     const IntVect& hi = bx.bigEnd();
     auto const& ibMarkers = mfab.array(mfi); // boolean array
-
+    
     // compute sld markers (including at ghost points) - cannot use ParallelFor - CGAL call causes problems
     for (int k = lo[2]-nhalo; k <= hi[2]+nhalo; ++k) {
     for (int j = lo[1]-nhalo; j <= hi[1]+nhalo; ++j) {
     for (int i = lo[0]-nhalo; i <= hi[0]+nhalo; ++i) {
+      ibMarkers(i,j,k,0) = false; // initialise to false
+      ibMarkers(i,j,k,1) = false; // initialise to false
+
       Real x=(0.5_rt + Real(i))*cellSizes[lev][0];
       Real y=(0.5_rt + Real(j))*cellSizes[lev][1];
       Real z=(0.5_rt + Real(k))*cellSizes[lev][2];
@@ -196,13 +199,23 @@ void IB::initialiseGPs (int lev) {
     IBM::IBFab &ibFab = mfab.get(mfi);
     gpData_t& gpData = ibFab.gpData;
     const Box& bxg = mfi.growntilebox(nhalo);
+    // const Box& bx = mfi.tilebox();
+    const IntVect& lo = bxg.smallEnd();
+    const IntVect& hi = bxg.bigEnd();
+    auto const& ibMarkers = mfab.array(mfi); // boolean array
 
     // we need a CPU loop here (cannot be GPU loop) as CGAL tree seach for closest element to a point needs to be called.
-    for (int ii=0;ii< gpData.ngps;ii++) {
-      Array1D<int,0,AMREX_SPACEDIM-1>& idx = ibFab.gpData.gp_ijk[ii];
-      Real x=(0.5_rt + idx(0))*cellSizes[lev][0];
-      Real y=(0.5_rt + idx(1))*cellSizes[lev][1];
-      Real z=(0.5_rt + idx(2))*cellSizes[lev][2];
+    // instead of looping through previously indexed gps, we loop through the whole ghost point field as it is available on GPU and CPU at all times. Unlike the gp indexes, which are only stored on GPU memory.
+    // Array1D<int,0,AMREX_SPACEDIM-1>& idx = ibFab.gpData.gp_ijk[ii];
+
+    for (int k = lo[2]; k <= hi[2]; ++k) {
+    for (int j = lo[1]; j <= hi[1]; ++j) {
+    for (int i = lo[0]; i <= hi[0]; ++i) {
+
+    if (ibMarkers(i,j,k,1)) {
+      Real x=(0.5_rt + i)*cellSizes[lev][0];
+      Real y=(0.5_rt + j)*cellSizes[lev][1];
+      Real z=(0.5_rt + k)*cellSizes[lev][2];
       Point gp(x,y,z);
 
       // closest surface point and face --------------------------
@@ -229,6 +242,7 @@ void IB::initialiseGPs (int lev) {
       // IB point -------------------------------------------
       Vector_CGAL imp_gp(gp,cp);
       Real disGP = sqrt(CGAL::squared_distance(gp,cp));
+      AMREX_ASSERT_WITH_MESSAGE(disGP < 1.0*sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]), "Ghost point and IB point distance larger than mesh diagonal");
 
 
       //*store*
@@ -251,13 +265,12 @@ void IB::initialiseGPs (int lev) {
       //     i,j  (1) ----------------------      i+1,j  (4)
       for (int jj=0; jj<NIMPS; jj++) {
         for (int kk=0; kk<AMREX_SPACEDIM; kk++) {
-          imp_xyz(jj,kk) = cp[kk] + (jj+1)*disIM[lev]*fnormals[face][kk];
+          imp_xyz(jj,kk) = cp[kk] + Real(jj+1)*disIM[lev]*fnormals[face][kk];
           imp_ijk(jj,kk) = floor(imp_xyz(jj,kk)/cellSizes[lev][kk] - 0.5_rt);
         }
         // Print() << "---" << std::endl;
-        // // Print() << "bx " << bx  << std::endl;
         // Print() << "bxg " << bxg << std::endl;
-        // Print() << "gp_ijk " << idx(0) << " " << idx(1) << " " << idx(2) << std::endl;
+        // Print() << "gp_ijk " << i << " " << j << " " << k << std::endl;
         // Print() << "ip_ijk " << imp_ijk(jj,0) << " " << imp_ijk(jj,1) << " " << imp_ijk(jj,2) << std::endl;
         // Print() << "gp_xyz " << x << " " << y << " " << z << std::endl;
         // Print() << "ib_xyz " << cp[0] << " " << cp[1] << " " << cp[2] << std::endl;
@@ -268,12 +281,6 @@ void IB::initialiseGPs (int lev) {
         // Print() << "disGP " << disGP << std::endl;
         // Real temp = sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]);
         // Print() << "diag " << temp << std::endl;
-
-        // AMREX_ASSERT_WITH_MESSAGE(disGP < 1.0*sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]), "Ghost point and IB point distance larger than mesh diagonal");
-        // if (idx(1) == 30 and idx(2)==30) {
-        //   Print() << "HERE" << std::endl;
-        //   exit(0);
-        //   };
 
         AMREX_ASSERT_WITH_MESSAGE(bxg.contains(imp_ijk(jj,0),imp_ijk(jj,1),imp_ijk(jj,2)),"Interpolation point outside fab");
       }
@@ -294,6 +301,9 @@ void IB::initialiseGPs (int lev) {
       computeIPweights(ipweights, imp_xyz, imp_ijk, cellSizes[lev]);
       // *store*
       gpData.imp_ipweights.push_back(ipweights);
+      }
+    }
+    }
     }
   }
 }
