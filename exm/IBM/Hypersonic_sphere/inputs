@@ -2,7 +2,7 @@
 #                                 INPUT FILE
 #------------------------------------------------------------------------------#
 # start time is assumed to be 0, unless re-starting
-max_step  = 500
+max_step  = 100000
 stop_time = 10.0
 #time_step = 0.02 # at base level, higher level time step is computed based on the number of subcycles (depending on the subcycling strategy). stop_time = max_step*time_step
 # or
@@ -10,15 +10,15 @@ cfl = 0.6
 
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
-ib.filename = sphere_1m_12k.stl
+ib.filename = sphere.stl
 #ib.fields   = 2 #
 
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0     0.0     0.0
-geometry.prob_hi     =   2.0     2.0     2.0
-amr.n_cell           =   16      16      16
+geometry.prob_hi     =   4.0     4.0     4.0
+amr.n_cell           =   64      64      64
 
 #------------- BOUNDARY CONDITIONS, PDE and NUMERICAL SCHEMES -----------------#
 # 0 = Interior           3 = Symmetry
@@ -30,23 +30,23 @@ cns.hi_bc      = 2  -1   -1
 cns.order_rk   =-2 # -2, 1, 2 or 3 
 cns.stages_rk  = 2   
 cns.rhs_euler  = 1 # 0=false, 1=true
-cns.rhs_visc   = 0 # 0=false, 1=true
+cns.rhs_visc   = 1 # 0=false, 1=true
 cns.rhs_source = 0 # 0=false, 1=true
 cns.flux_euler = 0 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
 cns.order_keep = 4 # Order of accuracy=2, 4 or 6
-cns.nghost     = 2 
+#cns.nghost     = 2 
 cns.verbose    = 1 # 0=quiet, 1=verbose
 cns.screen_output = 2
 
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
 amr.max_level       = 0       # maximum level number allowed
-amr.ref_ratio       = 2 4 2 2 # refinement ratio
-amr.regrid_int      = 2 4 8 2 # how often to regrid
-amr.blocking_factor = 2 2 2 4
-amr.max_grid_size   = 64
-amr.n_error_buf     = 1 1 1 1 # number of buffer cells in error est
-amr.grid_eff        = 0.99     # what constitutes an efficient grid
+amr.ref_ratio       = 2 2  # refinement ratio
+amr.regrid_int      = 5 10  # how often to regrid
+amr.blocking_factor = 8 8 
+amr.max_grid_size   = 32
+amr.n_error_buf     = 2 2  # number of buffer cells in error est
+amr.grid_eff        = 0.9     # what constitutes an efficient grid
 
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
