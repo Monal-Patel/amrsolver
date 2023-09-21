@@ -248,8 +248,15 @@ void IB::initialiseGPs (int lev) {
       //*store*
       gpData.disGP.push_back(disGP);
       Array1D<Real,0,AMREX_SPACEDIM-1> norm = {fnormals[face][0],fnormals[face][1],fnormals[face][2]};
+      Array1D<Real,0,AMREX_SPACEDIM-1> tan1 = {norm(1),-norm(0),0.0_rt};
+      Array1D<Real,0,AMREX_SPACEDIM-1> tan2 = {norm(1)*tan1(2)-norm(2)*tan1(1), norm(2)*tan1(0)-norm(0)*tan1(2), norm(0)*tan1(1)-norm(1)*tan1(0)};
+      
+      // norm.tan1 and norm.tan2 == 0
+      AMREX_ASSERT_WITH_MESSAGE( (norm(0)*tan1(0) + norm(1)*tan1(1) + norm(2)*tan1(2) + norm(0)*tan2(0) + norm(1)*tan2(1) + norm(2)*tan2(2)) < 1.0e-9,"norm.tan1 or norm.tan2 not orthogonal");
+
       gpData.normal.push_back(norm);
-       
+      gpData.tangent1.push_back(tan1);
+      gpData.tangent2.push_back(tan2);
 
       // IM points -------------------------------------------
       Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1> imp_xyz; 
@@ -353,9 +360,33 @@ void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, Real dgp,
 
 }
 
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
-void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const weights,const Real disGP, const Real disIM, const Array4<bool> ibFab, Array4<Real> primFab, Array4<Real> conFab,auto const idxCube, const PROB::ProbClosures& closures) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void global2local(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
+  Array1D<Real,0,AMREX_SPACEDIM-1> vel;
+  for (int jj=0; jj<NIMPS; jj++) {
+    vel(0) = primStateNormal(jj+2,QU); vel(1) = primStateNormal(jj+2,QV); vel(2) = primStateNormal(jj+2,QW);
 
+    primStateNormal(jj+2,QU) = vel(0)*norm(0) + vel(1)*norm(1) + vel(2)*norm(2);
+    primStateNormal(jj+2,QV) = vel(0)*tan1(0) + vel(1)*tan1(1) + vel(2)*tan1(2);
+    primStateNormal(jj+2,QW) = vel(0)*tan2(0) + vel(1)*tan2(1) + vel(2)*tan2(2);
+  }
+}
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
+void local2global (Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
+  
+Array1D<Real,0,AMREX_SPACEDIM-1> vel;
+for (int jj=0; jj<NIMPS; jj++) {
+  vel(0) = primStateNormal(jj+2,QU); vel(1) = primStateNormal(jj+2,QV); vel(2) = primStateNormal(jj+2,QW);
+
+  primStateNormal(jj+2,QU) = vel(0)*norm(0) + vel(1)*tan1(0) + vel(2)*tan2(0);
+  primStateNormal(jj+2,QV) = vel(0)*norm(1) + vel(1)*tan1(1) + vel(2)*tan2(1);
+  primStateNormal(jj+2,QW) = vel(0)*norm(2) + vel(1)*tan1(2) + vel(2)*tan2(2);
+  }
+}
+
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
+void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const weights, auto const norm, auto const tan1, auto const tan2, const Real disGP, const Real disIM, const Array4<bool> ibFab, Array4<Real> primFab, Array4<Real> conFab,auto const idxCube, const PROB::ProbClosures& closures) {
   // interpolate IM ////////////////
   Array2D<Real,0,NIMPS+1,0,NPRIM-1> primStateNormal={0.0};
   // for each image point
@@ -372,13 +403,15 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
       }
     }
   }
-  // TODO:coordinate transformation for slip BCs --> need normals here!
+
+  // Convert ux,uy,uz to un,ut1,ut2 at all image points
+  global2local(primStateNormal, norm, tan1, tan2);
 
   // interpolate IB (enforcing BCs) -- TODO:generalise to IBM BCs and make user defined
-  // no-slip velocity
-  primStateNormal(1,QU) = 0.0_rt;
-  primStateNormal(1,QV) = 0.0_rt;
-  primStateNormal(1,QW) = 0.0_rt;
+  // no-slip velocity (in local coordinates)
+  primStateNormal(1,QU) = 0.0_rt; // un
+  primStateNormal(1,QV) = primStateNormal(2,QV); // ut1
+  primStateNormal(1,QW) = primStateNormal(2,QW); // ut2
   // zerograd temperature and pressure
   primStateNormal(1,QPRES) = primStateNormal(2,QPRES);
   primStateNormal(1,QT)    = primStateNormal(2,QT);
@@ -387,9 +420,11 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
 
   // extrapolate GP
   extrapolateGP( primStateNormal, disGP, disIM);
-  primStateNormal(0,QPRES) = primStateNormal(2,QPRES);
   // thermodynamic consistency
   primStateNormal(0,QRHO)  = primStateNormal(0,QPRES)/(primStateNormal(0,QT)*closures.Rspec);
+
+  // Convert un,ut1,ut2 to ux,uy,uz at all image points
+  local2global(primStateNormal, norm, tan1, tan2);
 
   // insert primitive variables into primsFab
   int i=gp_ijk(0); int j=gp_ijk(1); int k = gp_ijk(2);
@@ -400,7 +435,6 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
   // insert conservative ghost state into consFab
   conFab(i,j,k,URHO) = primStateNormal(0,QRHO);
   conFab(i,j,k,UMX)  = primStateNormal(0,QRHO)*primStateNormal(0,QU);
-
   conFab(i,j,k,UMY)  = primStateNormal(0,QRHO)*primStateNormal(0,QV);
   conFab(i,j,k,UMZ)  = primStateNormal(0,QRHO)*primStateNormal(0,QW);
   Real ek   = 0.5_rt*(primStateNormal(0,QU)*primStateNormal(0,QU) + primStateNormal(0,QV)* primStateNormal(0,QV) + primStateNormal(0,QW)*primStateNormal(0,QW));
@@ -429,13 +463,16 @@ void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::P
     auto const idxCube = ibFab.gpData.indexCube.data();
     auto const disGP = ibFab.gpData.disGP.data();
     auto const disIM = ibFab.gpData.disIM.data();
+    auto const norm = ibFab.gpData.normal.data();
+    auto const tan1 = ibFab.gpData.tangent1.data();
+    auto const tan2 = ibFab.gpData.tangent2.data();
 
     // if (WM) or can use templates
     //  ComputeGPStateWM() 
     // else
-    amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int idx)
+    amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
     {
-      ComputeGPState(idx,gp_ijk[idx],imp_ijk[idx],ipweights[idx],disGP[idx],disIM[idx],ibFabArr,primFabArr,conFabArr,idxCube,closures);
+      ComputeGPState(ii, gp_ijk[ii],imp_ijk[ii],ipweights[ii],norm[ii],tan1[ii],tan2[ii],disGP[ii],disIM[ii],ibFabArr,primFabArr,conFabArr,idxCube,closures);
     });
     
   }

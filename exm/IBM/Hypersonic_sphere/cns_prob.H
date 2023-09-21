@@ -88,9 +88,6 @@ void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const
       amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
       if (drhox > dengrad_threshold) {
         tagfab(i,j,k) = true;
-        // tagfab(i+1,j,k) = true;
-        // tagfab(i+2,j,k) = true;
-        // tagfab(i+3,j,k) = true;
       }
       if (ibfab(i,j,k,1)) {
         for (int ii = -1; ii <= 1; ii++) {

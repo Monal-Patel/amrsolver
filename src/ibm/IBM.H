@@ -95,11 +95,8 @@ namespace IBM {
 
       // GPU/CPU attributes
       Gpu::ManagedVector<Array1D<int,0,AMREX_SPACEDIM-1>> gp_ijk;
-      // Point_and_primitive_id closest; // closest surface point (ib point) and face
-      Gpu::ManagedVector<Array1D<Real,0,AMREX_SPACEDIM-1>> normal;
-      Gpu::ManagedVector<Array1D<Real,0,AMREX_SPACEDIM-1>> ib_xyz;
-      Gpu::ManagedVector<Real> disGP; 
-      Gpu::ManagedVector<Real> disIM; 
+      Gpu::ManagedVector<Array1D<Real,0,AMREX_SPACEDIM-1>> normal,tangent1,tangent2, ib_xyz;
+      Gpu::ManagedVector<Real> disGP,disIM; 
 
       Gpu::ManagedVector<Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>> imp_xyz;
       Gpu::ManagedVector<Array2D<int, 0,NIMPS-1,0,AMREX_SPACEDIM-1>> imp_ijk;
