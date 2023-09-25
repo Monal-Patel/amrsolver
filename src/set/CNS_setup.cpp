@@ -141,12 +141,14 @@ void CNS::variableSetUp ()
     set_scalar_bc(bcs[cnt],h_phys_bc);
     name[cnt] = "energy";
 
+    // PROB::ConsBCs
+    // PROB::StateVarNames
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
     bndryfunc.setRunOnGPU(true);
 
 
-    // applies bndry func to all variables in desc_lst starting from from URHO (0).
-    desc_lst.setComponent(State_Type, URHO,name, bcs, bndryfunc);
+    // applies bndry func to all variables in desc_lst starting from from 0.
+    desc_lst.setComponent(State_Type,0,name, bcs, bndryfunc);
 
 
     num_state_data_types = desc_lst.size();
