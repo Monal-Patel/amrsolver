@@ -241,12 +241,6 @@ namespace Central {
 #endif
     /////////////// 
 
-    // GpuArray<Real,3>* coeffs2; 
-    // coeffs2 = (GpuArray<Real,3>*)The_Arena()->alloc(sizeof(GpuArray<Real,3>));
-    // (*coeffs2)[0]=Real(1.0);
-    // (*coeffs2)[1]=0.0;
-    // (*coeffs2)[2]=0.0;
-
     for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
       const Box& bx      = mfi.tilebox();

@@ -126,7 +126,6 @@ public:
                                     std::ostream&      os) override;
     // Parameters
     static int num_state_data_types;
-    static int NGHOST;
     std::unique_ptr<amrex::FluxRegister> flux_reg;
     static int do_reflux;
 

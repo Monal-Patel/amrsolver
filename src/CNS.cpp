@@ -11,7 +11,6 @@
 
 using namespace amrex;
 
-int CNS::NGHOST;
 #if !AMREX_USE_GPU
 GpuArray<Real,3> Central::coeffs,Central::coeffs2;  
 #endif

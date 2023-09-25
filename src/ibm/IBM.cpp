@@ -50,9 +50,9 @@ IB::~IB () { delete treePtr;}
 // };
 
 // initialise IB
-void IB::init(Amr* pointer_amr, const int nghost) {
+void IB::init(Amr* pointer_amr) {
 
-  IB::NGHOST_IB = nghost;
+  IB::NGHOST_IB = NGHOST;
   IB::pamr = pointer_amr ; // store pointer to main Amr class object's instance
   IB::ref_ratio = pamr->refRatio();
   IB::MAX_LEVEL = pamr->maxLevel();

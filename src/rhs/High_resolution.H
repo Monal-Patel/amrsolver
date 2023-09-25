@@ -279,17 +279,17 @@ namespace HiRes {
     // make multifab for variables
     Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, CNS::NGHOST);}
+      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST);}
 
     //store eigenvalues max(u+c,u,u-c) in all directions
     MultiFab lambdamf;
-    lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, CNS::NGHOST);
+    lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
 
     PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
     // loop over all fabs
     for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
     {
-        const Box& bxg     = mfi.growntilebox(CNS::NGHOST);
+        const Box& bxg     = mfi.growntilebox(NGHOST);
         const Box& bxnodal = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
         auto const& statefab = statemf.array(mfi);

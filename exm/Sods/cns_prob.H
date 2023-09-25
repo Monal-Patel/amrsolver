@@ -24,6 +24,8 @@ using namespace amrex;
 #define QT     4
 #define QPRES  5
 #define NPRIM  6
+
+#define NGHOST 2
 namespace PROB {
 
 struct ProbParm
@@ -183,17 +185,5 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
 
 } // namespace prob
 
-
-// // called once from amr.init
-// void amrex_probinit (const int* /*init*/, const int* /*name*/, const int* /*namelen*/, const amrex_real* /*problo*/, const amrex_real* /*probhi*/)
-//   {
-
-
-// // PROB::h_prob_parm = new PROB::ProbParm{};
-// // #if AMREX_USE_GPU
-//   // PROB::d_prob_parm = (PROB::ProbParm*)The_Device_Arena()->alloc(sizeof(PROB::ProbParm));
-//   // amrex::Gpu::htod_memcpy(PROB::d_prob_parm, PROB::h_prob_parm, sizeof(PROB::ProbParm));
-// // #endif
-// }
 
 #endif

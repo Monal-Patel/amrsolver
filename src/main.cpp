@@ -29,8 +29,6 @@ int main (int argc, char* argv[]) {
 
     // input checks ------------------------------------------------------------
     ParmParse pp;
-    if(!pp.query("cns.nghost",CNS::NGHOST)) {
-      amrex::Abort("MUST SPECIFY number of ghost points with cns.nghost");};
 
     pp.query("max_step",max_step);
     pp.query("stop_time",stop_time);
@@ -54,7 +52,7 @@ int main (int argc, char* argv[]) {
         Real timer_init = amrex::second();
         Amr amr(getLevelBld());
 #ifdef AMREX_USE_GPIBM
-        IBM::ib.init(&amr,CNS::NGHOST); // this needs to happen after amr instance and before amr.init
+        IBM::ib.init(&amr); // this needs to happen after amr instance and before amr.init
 #endif
         amr.init(start_time,stop_time);
 
