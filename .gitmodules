@@ -13,3 +13,9 @@
 [submodule "lib/googletest"]
 	path = lib/googletest
 	url = https://github.com/google/googletest.git
+[submodule "lib/autodiff"]
+	path = lib/autodiff
+	url = https://github.com/autodiff/autodiff
+[submodule "lib/Catch2"]
+	path = lib/Catch2
+	url = https://github.com/catchorg/Catch2.git
