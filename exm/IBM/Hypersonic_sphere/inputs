@@ -10,34 +10,15 @@ cfl = 0.6
 
 
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
-ib.filename = square.stl
+ib.filename = sphere.stl
 #ib.fields   = 2 #
 
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     =   0.0     0.0     0.0
-geometry.prob_hi     =   4.0     4.0     4.0
+geometry.prob_hi     =   3.0     3.0     3.0
 amr.n_cell           =   64      64      64
-
-#------------- BOUNDARY CONDITIONS, PDE and NUMERICAL SCHEMES -----------------#
-# 0 = Interior           3 = Symmetry
-# 1 = Inflow             4 = SlipWall
-# 2 = Outflow            5 = NoSlipWall
-# 6 = user defined
-cns.lo_bc      = 2  -1  -1
-cns.hi_bc      = 2  -1  -1
-cns.order_rk   =-2 # -2, 1, 2 or 3 
-cns.stages_rk  = 2   
-cns.rhs_euler  = 1 # 0=false, 1=true
-cns.rhs_visc   = 0 # 0=false, 1=true
-cns.rhs_source = 0 # 0=false, 1=true
-cns.flux_euler = 0 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
-cns.order_keep = 4 # Order of accuracy=2, 4 or 6
-#cns.nghost     = 2 
-cns.verbose    = 1 # 0=quiet, 1=verbose
-cns.screen_output = 2
-
 
 fabarray.mfiter_tile_size=128 128 128
 

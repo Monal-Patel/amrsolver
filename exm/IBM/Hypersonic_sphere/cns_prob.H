@@ -18,7 +18,7 @@ struct ProbParm
   Real rho_l = 1.225;
   Real rho_r = rho_l;
   Real u_l = 700.0;
-  Real u_r = 0.0;
+  Real u_r = u_l*0.5;
 };
 
 typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
@@ -35,15 +35,15 @@ void inline inputs() {
   // 6 = user defined
   pp.addarr("cns.lo_bc", std::vector<int>{2,-1,-1});
   pp.addarr("cns.hi_bc", std::vector<int>{2,-1,-1});
-  pp.add   ("cns.order_rk", 2); // -2, 1, 2 or 3"
+  pp.add   ("cns.order_rk", -2); // -2, 1, 2 or 3"
   pp.add   ("cns.stages_rk", 2); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
-  pp.add   ("cns.flux_euler", 0); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
-  pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
-  pp.add   ("cns.nghost",2);
+  pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
+  pp.add   ("cns.order_keep", 2); // Order of accuracy=2, 4 or 6"
+  pp.add   ("cns.art_diss", 1); // 0=none, 1=artificial dissipation
+  pp.add   ("cns.nghost",3);
   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
 

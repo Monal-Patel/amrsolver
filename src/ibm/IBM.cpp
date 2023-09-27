@@ -79,7 +79,7 @@ void IB::init(Amr* pointer_amr, const int nghost) {
 
   // TODO make distance ip a parameter
   for (int i=0;i<=IB::MAX_LEVEL;i++) {
-    IB::disIM[i] = 0.6_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
+    IB::disIM[i] = 0.3_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
     + cellSizes[i][1]*cellSizes[i][1] + cellSizes[i][2]*cellSizes[i][2]);
   }
 
