@@ -22,7 +22,7 @@
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 2
+#define NGHOST 3
 
 namespace PROB {
 
@@ -34,7 +34,7 @@ struct ProbParm
   Real rho_l = 1.225;
   Real rho_r = rho_l;
   Real u_l = 700.0;
-  Real u_r = u_l*0.5;
+  Real u_r = u_l*0.0;
 };
 
 typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
@@ -56,7 +56,7 @@ void inline inputs() {
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
-  pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
+  pp.add   ("cns.flux_euler", 2); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
   pp.add   ("cns.order_keep", 2); // Order of accuracy=2, 4 or 6"
   pp.add   ("cns.art_diss", 1); // 0=none, 1=artificial dissipation
   pp.add   ("cns.nghost",3);

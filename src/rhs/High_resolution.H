@@ -166,7 +166,7 @@ namespace HiRes {
   GpuArray<Real,6> df={0};
 
   // x direction /////////////////////////////////////////////////////////
-  Real maxeigen = max(lambda(i-3,j,k,0),lambda(i-2,j,k,0),lambda(i-1,j,k,0), lambda(i,j,k,0), lambda(i+1,j,k,0));
+  Real maxeigen = max(lambda(i-3,j,k,0),lambda(i-2,j,k,0),lambda(i-1,j,k,0), lambda(i,j,k,0), lambda(i+1,j,k,0),lambda(i+2,j,k,0));
 
   df[0] = maxeigen*cons(i-3,j,k,n);
   df[1] = maxeigen*cons(i-2,j,k,n);
@@ -193,56 +193,56 @@ namespace HiRes {
   nfx(i,j,k,n) = flx;
 
   // y direction /////////////////////////////////////////////////////////
-  // maxeigen = max(lambda(i,j-3,k,1),lambda(i,j-2,k,1),lambda(i,j-1,k,1),lambda(i,j,k,1), lambda(i,j+1,k,1), lambda(i,j+2,k,1));
-  // df[0] = maxeigen*cons(i,j-3,k,n);
-  // df[1] = maxeigen*cons(i,j-2,k,n);
-  // df[2] = maxeigen*cons(i,j-1,k,n);
-  // df[3] = maxeigen*cons(i,j  ,k,n);
-  // df[4] = maxeigen*cons(i,j+1,k,n);
-  // df[5] = maxeigen*cons(i,j+2,k,n);
+  maxeigen = max(lambda(i,j-3,k,1),lambda(i,j-2,k,1),lambda(i,j-1,k,1),lambda(i,j,k,1), lambda(i,j+1,k,1), lambda(i,j+2,k,1));
+  df[0] = maxeigen*cons(i,j-3,k,n);
+  df[1] = maxeigen*cons(i,j-2,k,n);
+  df[2] = maxeigen*cons(i,j-1,k,n);
+  df[3] = maxeigen*cons(i,j  ,k,n);
+  df[4] = maxeigen*cons(i,j+1,k,n);
+  df[5] = maxeigen*cons(i,j+2,k,n);
 
-  // // f(j-1/2)^+
-  // sten[0] = Real(0.5)*(pfy(i,j-3,k,n) + df[0]);
-  // sten[1] = Real(0.5)*(pfy(i,j-2,k,n) + df[1]);
-  // sten[2] = Real(0.5)*(pfy(i,j-1,k,n) + df[2]);
-  // sten[3] = Real(0.5)*(pfy(i,j  ,k,n) + df[3]);
-  // sten[4] = Real(0.5)*(pfy(i,j+1,k,n) + df[4]);
-  // flx = weno5js(sten);
+  // f(j-1/2)^+
+  sten[0] = Real(0.5)*(pfy(i,j-3,k,n) + df[0]);
+  sten[1] = Real(0.5)*(pfy(i,j-2,k,n) + df[1]);
+  sten[2] = Real(0.5)*(pfy(i,j-1,k,n) + df[2]);
+  sten[3] = Real(0.5)*(pfy(i,j  ,k,n) + df[3]);
+  sten[4] = Real(0.5)*(pfy(i,j+1,k,n) + df[4]);
+  flx = weno5js(sten);
 
-  // // f(j-1/2)^-
-  // sten[0] = Real(0.5)*(pfy(i,j-2,k,n) - df[1]);
-  // sten[1] = Real(0.5)*(pfy(i,j-1,k,n) - df[2]);
-  // sten[2] = Real(0.5)*(pfy(i,j  ,k,n) - df[3]);
-  // sten[3] = Real(0.5)*(pfy(i,j+1,k,n) - df[4]);
-  // sten[4] = Real(0.5)*(pfy(i,j+2,k,n) - df[5]);
-  // flx += weno5js(sten);
-  // nfy(i,j,k,n) = flx;
+  // f(j-1/2)^- (note, we are flipping the stencil)
+  sten[4] = Real(0.5)*(pfy(i,j-2,k,n) - df[1]);
+  sten[3] = Real(0.5)*(pfy(i,j-1,k,n) - df[2]);
+  sten[2] = Real(0.5)*(pfy(i,j  ,k,n) - df[3]);
+  sten[1] = Real(0.5)*(pfy(i,j+1,k,n) - df[4]);
+  sten[0] = Real(0.5)*(pfy(i,j+2,k,n) - df[5]);
+  flx += weno5js(sten);
+  nfy(i,j,k,n) = flx;
 
-  // // z direction /////////////////////////////////////////////////////////
-  // maxeigen = max(lambda(i,j,k-3,2),lambda(i,j,k-2,2),lambda(i,j,k-1,2),lambda(i,j,k,2), lambda(i,j,k+1,2), lambda(i,j,k+2,2));
-  // df[0] = maxeigen*cons(i,j,k-3,n);
-  // df[1] = maxeigen*cons(i,j,k-2,n);
-  // df[2] = maxeigen*cons(i,j,k-1,n);
-  // df[3] = maxeigen*cons(i,j,k  ,n);
-  // df[4] = maxeigen*cons(i,j,k+1,n);
-  // df[5] = maxeigen*cons(i,j,k+2,n);
+  // z direction /////////////////////////////////////////////////////////
+  maxeigen = max(lambda(i,j,k-3,2),lambda(i,j,k-2,2),lambda(i,j,k-1,2),lambda(i,j,k,2), lambda(i,j,k+1,2), lambda(i,j,k+2,2));
+  df[0] = maxeigen*cons(i,j,k-3,n);
+  df[1] = maxeigen*cons(i,j,k-2,n);
+  df[2] = maxeigen*cons(i,j,k-1,n);
+  df[3] = maxeigen*cons(i,j,k  ,n);
+  df[4] = maxeigen*cons(i,j,k+1,n);
+  df[5] = maxeigen*cons(i,j,k+2,n);
 
-  // // f(k-1/2)^+
-  // sten[0] = Real(0.5)*(pfz(i,j,k-3,n) + df[0]);
-  // sten[1] = Real(0.5)*(pfz(i,j,k-2,n) + df[1]);
-  // sten[2] = Real(0.5)*(pfz(i,j,k-1,n) + df[2]);
-  // sten[3] = Real(0.5)*(pfz(i,j,k  ,n) + df[3]);
-  // sten[4] = Real(0.5)*(pfz(i,j,k+1,n) + df[4]);
-  // flx = weno5js(sten);
+  // f(k-1/2)^+
+  sten[0] = Real(0.5)*(pfz(i,j,k-3,n) + df[0]);
+  sten[1] = Real(0.5)*(pfz(i,j,k-2,n) + df[1]);
+  sten[2] = Real(0.5)*(pfz(i,j,k-1,n) + df[2]);
+  sten[3] = Real(0.5)*(pfz(i,j,k  ,n) + df[3]);
+  sten[4] = Real(0.5)*(pfz(i,j,k+1,n) + df[4]);
+  flx = weno5js(sten);
 
-  // // f(k-1/2)^-
-  // sten[0] = Real(0.5)*(pfz(i,j,k-2,n) - df[1]);
-  // sten[1] = Real(0.5)*(pfz(i,j,k-1,n) - df[2]);
-  // sten[2] = Real(0.5)*(pfz(i,j,k  ,n) - df[3]);
-  // sten[3] = Real(0.5)*(pfz(i,j,k+1,n) - df[4]);
-  // sten[4] = Real(0.5)*(pfz(i,j,k+2,n) - df[5]);
-  // flx += weno5js(sten);
-  // nfz(i,j,k,n) = flx;
+  // f(k-1/2)^- (note, we are flipping the stencil)
+  sten[4] = Real(0.5)*(pfz(i,j,k-2,n) - df[1]);
+  sten[3] = Real(0.5)*(pfz(i,j,k-1,n) - df[2]);
+  sten[2] = Real(0.5)*(pfz(i,j,k  ,n) - df[3]);
+  sten[1] = Real(0.5)*(pfz(i,j,k+1,n) - df[4]);
+  sten[0] = Real(0.5)*(pfz(i,j,k+2,n) - df[5]);
+  flx += weno5js(sten);
+  nfz(i,j,k,n) = flx;
   }
 
   // Computes Euler fluxes at i-1/2,j-1/2,k-1/2
