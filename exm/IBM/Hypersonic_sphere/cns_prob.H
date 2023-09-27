@@ -3,10 +3,26 @@
 
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
-#include <CNS_index_macros.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_AmrLevel.H>
 #include <Closures.H>
+
+#define URHO  0
+#define UMX   1
+#define UMY   2
+#define UMZ   3
+#define UET   4
+#define NCONS 5
+
+#define QRHO   0
+#define QU     1
+#define QV     2
+#define QW     3
+#define QT     4
+#define QPRES  5
+#define NPRIM  6
+
+#define NGHOST 2
 
 namespace PROB {
 

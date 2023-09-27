@@ -10,7 +10,7 @@
 #include <AMReX_Derive.H>
 #include <AMReX_StateDescriptor.H>
 #include <AMReX_GpuContainers.H>
-#include <CNS_index_macros.H>
+// #include <CNS_index_macros.H>
 #include <cns_prob.H>
 
 // basic CGAL headers

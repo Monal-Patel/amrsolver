@@ -1,7 +1,6 @@
 #include <IBM.H>
 #include <CGAL/Side_of_triangle_mesh.h>
 #include <AMReX_ParmParse.H>
-#include <CNS_index_macros.H>
 
 using namespace amrex;
 using namespace IBM;
@@ -58,9 +57,9 @@ IB::IB (){}
 IB::~IB () { delete treePtr;}
 
 // initialise IB
-void IB::init(Amr* pointer_amr) {
+void IB::init(Amr* pointer_amr, int nghost) {
 
-  IB::NGHOST_IB = NGHOST;
+  IB::NGHOST_IB = nghost;
   IB::pamr = pointer_amr ; // store pointer to main Amr class object's instance
   IB::ref_ratio = pamr->refRatio();
   IB::MAX_LEVEL = pamr->maxLevel();

@@ -61,9 +61,11 @@ CNS::CNS(Amr &papa,
   VdSdt.resize(nlevs); VSborder.resize(nlevs); Vprimsmf.resize(nlevs);
   Vnumflxmf.resize(nlevs); Vpntvflxmf.resize(nlevs);
 
+#ifdef AMREX_USE_GPIBM
   IBM::ib.buildMFs(grids, dmap, level);
   // IBM::ib.computeMarkers(level);
   // IBM::ib.initialiseGPs(level);
+#endif
 
   buildMetrics();
 }
