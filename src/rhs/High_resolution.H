@@ -122,39 +122,40 @@ namespace HiRes {
 
   /////////////////////////
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-  Real weno5js(const GpuArray<Real,NCONS>& s)
+  Real weno5js(const GpuArray<Real,5>& s)
   { 
     constexpr Real eps = 1e-40;
-    constexpr Real q   = 2.0_rt;
+    constexpr int q   = 2; // tunable positive integer
 
-    Real vl[3];
-    Real beta[3];
-    Real alpha[3];
+    Real vl[3], beta[3], alpha[3];
 
-    // TODO: REMOVE POW() for speed-up!
-    beta[2] = (13.0_rt / 12.0_rt) * pow(s[0] - 2.0_rt * s[1] + s[2], 2) +
-              0.25 * pow(s[0] - 4.0_rt * s[1] + 3.0_rt * s[2], 2);
-    beta[1] = (13.0_rt / 12.0_rt) * pow(s[1] - 2.0_rt * s[2] + s[3], 2) +
-              0.25 * (s[1] - s[3]) * (s[1] - s[3]);
-    beta[0] = (13.0_rt / 12.0_rt) * pow(s[2] - 2.0_rt * s[3] + s[4], q) +
-              0.25_rt * pow(3.0_rt * s[2] - 4.0_rt * s[3] + s[4], q);
+    beta[0] = (13.0_rt / 12.0_rt) * (s[0] - 2.0_rt * s[1] + s[2]) 
+                                  * (s[0] - 2.0_rt * s[1] + s[2]) 
+              + 0.25 * (s[0] - 4.0_rt * s[1] + 3.0_rt * s[2]) 
+                     * (s[0] - 4.0_rt * s[1] + 3.0_rt * s[2]) ;
 
-    beta[2] = 1.0_rt / ((eps + beta[2]) * (eps + beta[2]));
-    beta[1] = 1.0_rt / ((eps + beta[1]) * (eps + beta[1]));
-    beta[0] = 1.0_rt / ((eps + beta[0]) * (eps + beta[0]));
+    beta[1] = (13.0_rt / 12.0_rt) * (s[1] - 2.0_rt * s[2] + s[3]) 
+                                  * (s[1] - 2.0_rt * s[2] + s[3])
+              +  0.25 * (s[1] - s[3]) * (s[1] - s[3])
+                      * (s[1] - s[3]) * (s[1] - s[3]);
 
-    alpha[2] = beta[2];
-    alpha[1] = 6.0_rt * beta[1];
-    alpha[0] = 3.0_rt * beta[0];
-    Real alpha1 = 1.0_rt / (alpha[2] + alpha[1] + alpha[0]);
+    beta[2] = (13.0_rt / 12.0_rt) * (s[2] - 2.0_rt * s[3] + s[4])
+                                  * (s[2] - 2.0_rt * s[3] + s[4])
+              + 0.25_rt * (3.0_rt * s[2] - 4.0_rt * s[3] + s[4])
+                        * (3.0_rt * s[2] - 4.0_rt * s[3] + s[4]);
 
-    vl[2] = 2.0_rt * s[0] - 7.0_rt * s[1] + 11.0_rt * s[2];
-    vl[1] = -s[1] + 5.0_rt * s[2] + 2.0_rt * s[3];
-    vl[0] = 2.0_rt * s[2] + 5.0_rt * s[3] - s[4];
+    alpha[0] = 0.1_rt / pow(eps + beta[0],q);
+    alpha[1] = 0.6_rt / pow(eps + beta[1],q);
+    alpha[2] = 0.3_rt / pow(eps + beta[2],q);
+    Real sum = 1.0_rt / (alpha[0] + alpha[1] + alpha[2]);
 
-    Real sl = (Real(1.0)/6.0_rt) * alpha1 * (alpha[2] * vl[2] + alpha[1] * vl[1] + alpha[0] * vl[0]);
+    vl[0] = 2.0_rt * s[0] - 7.0_rt * s[1] + 11.0_rt * s[2];
+    vl[1] =         -s[1] + 5.0_rt * s[2] + 2.0_rt *  s[3];
+    vl[2] = 2.0_rt * s[2] + 5.0_rt * s[3] -           s[4];
 
-    return sl ;
+    Real fr = (Real(1.0)/6.0_rt) * sum * (alpha[0] * vl[0] + alpha[1] * vl[1] + alpha[2] * vl[2]);
+
+    return fr ;
   }
 
   // Computes Euler fluxes with global lax-friedrichs splitting at i-1/2,j-1/2,k-1/2
@@ -162,10 +163,10 @@ namespace HiRes {
   void numericalflux_globallaxsplit (int i, int j, int k, int n, const auto& cons, const auto& pfx, const auto& pfy, const auto& pfz, const auto& lambda, const auto& nfx, const auto& nfy, const auto& nfz) {
 
   GpuArray<Real,5> sten;
-  GpuArray<Real,6> df;
+  GpuArray<Real,6> df={0};
 
   // x direction /////////////////////////////////////////////////////////
-  Real maxeigen = max(lambda(i-3,j,k,0),lambda(i-2,j,k,0),lambda(i-1,j,k,0),lambda(i,j,k,0), lambda(i+1,j,k,0), lambda(i+2,j,k,0));
+  Real maxeigen = max(lambda(i-3,j,k,0),lambda(i-2,j,k,0),lambda(i-1,j,k,0), lambda(i,j,k,0), lambda(i+1,j,k,0));
 
   df[0] = maxeigen*cons(i-3,j,k,n);
   df[1] = maxeigen*cons(i-2,j,k,n);
@@ -182,66 +183,66 @@ namespace HiRes {
   sten[4] = Real(0.5)*(pfx(i+1,j,k,n) + df[4]);
   Real flx = weno5js(sten);
 
-  // f(i-1/2)^-
-  sten[0] = Real(0.5)*(pfx(i-2,j,k,n) - df[1]);
-  sten[1] = Real(0.5)*(pfx(i-1,j,k,n) - df[2]);
+  // f(i-1/2)^- (note, we are flipping the stencil)
+  sten[4] = Real(0.5)*(pfx(i-2,j,k,n) - df[1]);
+  sten[3] = Real(0.5)*(pfx(i-1,j,k,n) - df[2]);
   sten[2] = Real(0.5)*(pfx(i  ,j,k,n) - df[3]);
-  sten[3] = Real(0.5)*(pfx(i+1,j,k,n) - df[4]);
-  sten[4] = Real(0.5)*(pfx(i+2,j,k,n) - df[5]);
+  sten[1] = Real(0.5)*(pfx(i+1,j,k,n) - df[4]);
+  sten[0] = Real(0.5)*(pfx(i+2,j,k,n) - df[5]);
   flx += weno5js(sten);
   nfx(i,j,k,n) = flx;
 
   // y direction /////////////////////////////////////////////////////////
-  maxeigen = max(lambda(i,j-3,k,0),lambda(i,j-2,k,0),lambda(i,j-1,k,0),lambda(i,j,k,0), lambda(i,j+1,k,0), lambda(i,j+2,k,0));
-  df[0] = maxeigen*cons(i,j-3,k,n);
-  df[1] = maxeigen*cons(i,j-2,k,n);
-  df[2] = maxeigen*cons(i,j-1,k,n);
-  df[3] = maxeigen*cons(i,j  ,k,n);
-  df[4] = maxeigen*cons(i,j+1,k,n);
-  df[5] = maxeigen*cons(i,j+2,k,n);
+  // maxeigen = max(lambda(i,j-3,k,1),lambda(i,j-2,k,1),lambda(i,j-1,k,1),lambda(i,j,k,1), lambda(i,j+1,k,1), lambda(i,j+2,k,1));
+  // df[0] = maxeigen*cons(i,j-3,k,n);
+  // df[1] = maxeigen*cons(i,j-2,k,n);
+  // df[2] = maxeigen*cons(i,j-1,k,n);
+  // df[3] = maxeigen*cons(i,j  ,k,n);
+  // df[4] = maxeigen*cons(i,j+1,k,n);
+  // df[5] = maxeigen*cons(i,j+2,k,n);
 
-  // f(j-1/2)^+
-  sten[0] = Real(0.5)*(pfy(i,j-3,k,n) + df[0]);
-  sten[1] = Real(0.5)*(pfy(i,j-2,k,n) + df[1]);
-  sten[2] = Real(0.5)*(pfy(i,j-1,k,n) + df[2]);
-  sten[3] = Real(0.5)*(pfy(i,j  ,k,n) + df[3]);
-  sten[4] = Real(0.5)*(pfy(i,j+1,k,n) + df[4]);
-  flx = weno5js(sten);
+  // // f(j-1/2)^+
+  // sten[0] = Real(0.5)*(pfy(i,j-3,k,n) + df[0]);
+  // sten[1] = Real(0.5)*(pfy(i,j-2,k,n) + df[1]);
+  // sten[2] = Real(0.5)*(pfy(i,j-1,k,n) + df[2]);
+  // sten[3] = Real(0.5)*(pfy(i,j  ,k,n) + df[3]);
+  // sten[4] = Real(0.5)*(pfy(i,j+1,k,n) + df[4]);
+  // flx = weno5js(sten);
 
-  // f(j-1/2)^-
-  sten[0] = Real(0.5)*(pfy(i,j-2,k,n) - df[1]);
-  sten[1] = Real(0.5)*(pfy(i,j-1,k,n) - df[2]);
-  sten[2] = Real(0.5)*(pfy(i,j  ,k,n) - df[3]);
-  sten[3] = Real(0.5)*(pfy(i,j+1,k,n) - df[4]);
-  sten[4] = Real(0.5)*(pfy(i,j+2,k,n) - df[5]);
-  flx += weno5js(sten);
-  nfy(i,j,k,n) = flx;
+  // // f(j-1/2)^-
+  // sten[0] = Real(0.5)*(pfy(i,j-2,k,n) - df[1]);
+  // sten[1] = Real(0.5)*(pfy(i,j-1,k,n) - df[2]);
+  // sten[2] = Real(0.5)*(pfy(i,j  ,k,n) - df[3]);
+  // sten[3] = Real(0.5)*(pfy(i,j+1,k,n) - df[4]);
+  // sten[4] = Real(0.5)*(pfy(i,j+2,k,n) - df[5]);
+  // flx += weno5js(sten);
+  // nfy(i,j,k,n) = flx;
 
-  // z direction /////////////////////////////////////////////////////////
-  maxeigen = max(lambda(i,j,k-3,0),lambda(i,j,k-2,0),lambda(i,j,k-1,0),lambda(i,j,k,0), lambda(i,j,k+1,0), lambda(i,j,k+2,0));
-  df[0] = maxeigen*cons(i,j,k-3,n);
-  df[1] = maxeigen*cons(i,j,k-2,n);
-  df[2] = maxeigen*cons(i,j,k-1,n);
-  df[3] = maxeigen*cons(i,j,k  ,n);
-  df[4] = maxeigen*cons(i,j,k+1,n);
-  df[5] = maxeigen*cons(i,j,k+2,n);
+  // // z direction /////////////////////////////////////////////////////////
+  // maxeigen = max(lambda(i,j,k-3,2),lambda(i,j,k-2,2),lambda(i,j,k-1,2),lambda(i,j,k,2), lambda(i,j,k+1,2), lambda(i,j,k+2,2));
+  // df[0] = maxeigen*cons(i,j,k-3,n);
+  // df[1] = maxeigen*cons(i,j,k-2,n);
+  // df[2] = maxeigen*cons(i,j,k-1,n);
+  // df[3] = maxeigen*cons(i,j,k  ,n);
+  // df[4] = maxeigen*cons(i,j,k+1,n);
+  // df[5] = maxeigen*cons(i,j,k+2,n);
 
-  // f(k-1/2)^+
-  sten[0] = Real(0.5)*(pfz(i,j,k-3,n) + df[0]);
-  sten[1] = Real(0.5)*(pfz(i,j,k-2,n) + df[1]);
-  sten[2] = Real(0.5)*(pfz(i,j,k-1,n) + df[2]);
-  sten[3] = Real(0.5)*(pfz(i,j,k  ,n) + df[3]);
-  sten[4] = Real(0.5)*(pfz(i,j,k+1,n) + df[4]);
-  flx = weno5js(sten);
+  // // f(k-1/2)^+
+  // sten[0] = Real(0.5)*(pfz(i,j,k-3,n) + df[0]);
+  // sten[1] = Real(0.5)*(pfz(i,j,k-2,n) + df[1]);
+  // sten[2] = Real(0.5)*(pfz(i,j,k-1,n) + df[2]);
+  // sten[3] = Real(0.5)*(pfz(i,j,k  ,n) + df[3]);
+  // sten[4] = Real(0.5)*(pfz(i,j,k+1,n) + df[4]);
+  // flx = weno5js(sten);
 
-  // f(k-1/2)^-
-  sten[0] = Real(0.5)*(pfz(i,j,k-2,n) - df[1]);
-  sten[1] = Real(0.5)*(pfz(i,j,k-1,n) - df[2]);
-  sten[2] = Real(0.5)*(pfz(i,j,k  ,n) - df[3]);
-  sten[3] = Real(0.5)*(pfz(i,j,k+1,n) - df[4]);
-  sten[4] = Real(0.5)*(pfz(i,j,k+2,n) - df[5]);
-  flx += weno5js(sten);
-  nfz(i,j,k,n) = flx;
+  // // f(k-1/2)^-
+  // sten[0] = Real(0.5)*(pfz(i,j,k-2,n) - df[1]);
+  // sten[1] = Real(0.5)*(pfz(i,j,k-1,n) - df[2]);
+  // sten[2] = Real(0.5)*(pfz(i,j,k  ,n) - df[3]);
+  // sten[3] = Real(0.5)*(pfz(i,j,k+1,n) - df[4]);
+  // sten[4] = Real(0.5)*(pfz(i,j,k+2,n) - df[5]);
+  // flx += weno5js(sten);
+  // nfz(i,j,k,n) = flx;
   }
 
   // Computes Euler fluxes at i-1/2,j-1/2,k-1/2
@@ -290,7 +291,7 @@ namespace HiRes {
     for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
     {
         const Box& bxg     = mfi.growntilebox(NGHOST);
-        const Box& bxnodal = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
+        const Box& bxnodal = mfi.nodaltilebox(); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
         auto const& statefab = statemf.array(mfi);
         AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,

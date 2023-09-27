@@ -25,7 +25,7 @@ using namespace amrex;
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 2
+#define NGHOST 3
 namespace PROB {
 
 struct ProbParm
@@ -63,15 +63,15 @@ void inline inputs() {
   // 6 = user defined
   pp.addarr("cns.lo_bc", std::vector<int>{2,-1,-1});
   pp.addarr("cns.hi_bc", std::vector<int>{2,-1,-1});
-  pp.add   ("cns.order_rk", 2); // -2, 1, 2 or 3"
-  pp.add   ("cns.stages_rk", 2); // 1, 2 or 3
+  pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
+  pp.add   ("cns.stages_rk", 3); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
-  pp.add   ("cns.flux_euler", 0); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
+  pp.add   ("cns.flux_euler", 2); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
   pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
   pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
-  pp.add   ("cns.nghost",2);
+  // pp.add   ("cns.nghost",2);
   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
 
