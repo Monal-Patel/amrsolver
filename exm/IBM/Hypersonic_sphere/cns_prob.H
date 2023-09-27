@@ -10,20 +10,20 @@
 
 namespace PROB {
 
-//////////////////////////// Physical closures /////////////////////////////////
+//////////////////////////// Physical modelling ////////////////////////////////
 struct ProbParm
 { 
-  Real p_l = 1.0;
-  Real p_r = 0.1;
-  Real rho_l = 1.0;
-  Real rho_r = 0.125;
-  Real u_l = 0.0;
-  Real u_r = 0.0;
+  Real p_l = 1.0e5;
+  Real p_r = p_l;
+  Real rho_l = 1.225;
+  Real rho_r = rho_l;
+  Real u_l = 700.0;
+  Real u_r = u_l*0.5;
 };
 
 typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
 
-//////////////////////////// Numerical operators ///////////////////////////////
+//////////////////////////// Numerical modelling ///////////////////////////////
 void inline inputs() {
   ParmParse pp;
 
@@ -35,15 +35,15 @@ void inline inputs() {
   // 6 = user defined
   pp.addarr("cns.lo_bc", std::vector<int>{2,-1,-1});
   pp.addarr("cns.hi_bc", std::vector<int>{2,-1,-1});
-  pp.add   ("cns.order_rk", 2); // -2, 1, 2 or 3"
+  pp.add   ("cns.order_rk", -2); // -2, 1, 2 or 3"
   pp.add   ("cns.stages_rk", 2); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
-  pp.add   ("cns.flux_euler", 0); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
-  pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
-  pp.add   ("cns.nghost",2);
+  pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
+  pp.add   ("cns.order_keep", 2); // Order of accuracy=2, 4 or 6"
+  pp.add   ("cns.art_diss", 1); // 0=none, 1=artificial dissipation
+  pp.add   ("cns.nghost",3);
   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
 
@@ -88,52 +88,18 @@ void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const
       amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
       if (drhox > dengrad_threshold) {
         tagfab(i,j,k) = true;
-        tagfab(i+1,j,k) = true;
-        tagfab(i+2,j,k) = true;
-        tagfab(i+3,j,k) = true;
       }
+      if (ibfab(i,j,k,1)) {
+        for (int ii = -1; ii <= 1; ii++) {
+          for (int jj = -1; jj <= 1; jj++) {
+            for (int kk = -1; kk <= 1; kk++) {
+              tagfab(i+ii,j+jj,k+kk) = true;
+            }
+          }
+        }
+      }
+      // tagfab(i,j,k) = tagfab(i,j,k) || ibfab(i,j,k,1);
   }
-
-// void user_tagging(amrex::TagBoxArray& tags, amrex::MultiFab& sdata, int level, IBM::IBMultiFab* ibdata){
-
-// #ifdef AMREX_USE_OMP
-// #pragma omp parallel if (Gpu::notInLaunchRegion())
-// #endif
-//     for (amrex::MFIter mfi(tags,amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
-//     {
-//         const amrex::Box& bx = mfi.tilebox();
-//         auto const& tagfab = tags.array(mfi);
-//         auto const& sdatafab = sdata.array(mfi);
-
-//         if (ibdata!=nullptr) {
-//           auto const& ibdatafab = ibdata->array(mfi);
-//           amrex::ParallelFor(bx,
-//           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-//           {
-//             // tagging on ghs
-//             tagfab(i,j,k) = ibdatafab(i,j,k,1);
-//             // or fluid neighbour
-//             bool condition = false; 
-//             for (int l=-1; l<=1 ; l+=2) {
-//               condition = condition || ibdatafab(i+l,j,k,0);
-//               condition = condition || ibdatafab(i,j+l,k,0);
-//               condition = condition || ibdatafab(i,j,k+l,0);
-//             }
-//             condition = condition && !ibdatafab(i,j,k,0);
-//             tagfab(i,j,k) = tagfab(i,j,k) || condition   ;
-//           });}
-
-//         else  {
-//           // Temporary tagging on density in x only
-//           amrex::ParallelFor(bx,
-//           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-//           {
-//           // amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,0) - sdatafab(i-1,j,k,0))/sdatafab(i,j,k,0);
-//           // tagfab(i,j,k) = drhox > 0.5f;
-//           });
-//         };
-//         };
-
 
 //////////////////////////// Boundary conditions ///////////////////////////////
 /**

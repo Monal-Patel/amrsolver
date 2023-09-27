@@ -7,42 +7,6 @@
 #include <cns_prob.H>
 
 using namespace amrex;
-// struct Parm
-// {
-//     Real eos_gamma = 1.40; // ratio of specific heats
-//     Real eos_mu = 28.96e-3;// mean molecular weight air kg/mol
-
-//     //Sutherland's fit from Computational Fluid Mechanics and Heat Transfer 
-//     Real visc_ref  = 1.458e-6; // Viscosity reference value
-//     Real Tvisc_ref = 110.4;    // Viscosity reference temperature
-//     Real cond_ref  = 2.495e-3; // Conductivity reference value
-//     Real Tcond_ref = 194.0;    // Conductivity reference temperature
-
-//     Real smallr = 1.e-19;
-//     Real smallp = 1.e-10;
-
-//     Real Ru = Real(8.31451);
-//     Real cv = Ru / (eos_mu * (eos_gamma-Real(1.0)));
-//     Real cp = eos_gamma * Ru / (eos_mu * (eos_gamma-Real(1.0)));
-//     Real Rspec = Ru/eos_mu;
-
-//     Real Pr = 0.70;
-
-//     Real Cshock = 0.0;
-//     Real Cdamp = 0.0;
-
-//     public: 
-
-//     AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real ViscositySutherland(Real& T) const { return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}
-
-//     AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real ConductivitySutherland(Real& T) const { return cond_ref*T*sqrt(T)/(Tcond_ref + T);}
-
-//     AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real ConductivityConstPr(Real& T) const { return cp*ViscositySutherland(T)/Pr;}
-
-//     Real visc_CPU(Real T) { return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}
-
-// };
-
 
 // TODO: Pass primsmf here to avoid computing primitive variables again.
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

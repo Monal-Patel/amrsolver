@@ -176,8 +176,8 @@ class closures_derived_base_t : public Cond, public Visc, public Thermo, public 
   public:
     // IdealPerfectGas(/* args */);
     // ~IdealPerfectGas();
-  Real Cshock = 0.0;
-  Real Cdamp  = 0.0;
+  Real Cshock = 1.0;
+  Real Cdamp  = 0.01;
 
 };
 
