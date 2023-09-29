@@ -108,15 +108,6 @@ namespace IBM {
       Gpu::ManagedVector<Array1D<int,0,AMREX_SPACEDIM-1>> indexCube;
       // = { {0,0,0}, {0,1,0}, {1,1,0}, {1,0,0}, {0,0,1}, {0,1,1}, {1,1,1}, {1,0,1}}; // index cube for image point interpolation
 
-      // Gpu::ManagedVector<GpuArray<Real,AMREX_SPACEDIM>> imp1_xyz; 
-      // Gpu::ManagedVector<GpuArray<int,AMREX_SPACEDIM>> imp1_ijk; 
-      // Gpu::ManagedVector<GpuArray<Real,8>> imp1_ipweights; 
-
-      // Gpu::ManagedVector<GpuArray<Real,AMREX_SPACEDIM>> imp2_xyz; 
-      // Gpu::ManagedVector<GpuArray<int,AMREX_SPACEDIM>> imp2_ijk; 
-      // Gpu::ManagedVector<GpuArray<Real,8>> imp2_ipweights; 
-
-
       void resize (int n) {
         gp_ijk.resize(n); ib_xyz.resize(n);
         disGP.resize(n); disIM.resize(n); 
@@ -255,7 +246,7 @@ namespace IBM {
       void computeSurf(int lev);
 
     private:
-      void computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& impscell, GpuArray<Real,AMREX_SPACEDIM>& dxyz);
+      void computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> markersFab, auto const idxCube);
 
       // AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
       // void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, Real dgp, Real dim);

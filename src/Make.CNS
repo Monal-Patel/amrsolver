@@ -9,7 +9,7 @@ LAZY := TRUE
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 
 # stop on first compile error
-#DEFINES += -DWfatal-errors
+warning_flags +=-Wfatal-errors
 
 # CNS uses a coarse grained OMP approach
 DEFINES += -DAMREX_CRSEGRNDOMP

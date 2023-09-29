@@ -412,7 +412,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
       amrex::ParallelFor(bx, NCONS,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
       {
-      dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1.0_rt - ibMarkers(i,j,k,0));
+      dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
       });
     }
 #endif

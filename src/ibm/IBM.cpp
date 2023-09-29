@@ -71,14 +71,14 @@ void IB::init(Amr* pointer_amr, int nghost) {
   IB::disIM.resize(IB::MAX_LEVEL+1);
   cellSizes[0] = pamr->Geom(0).CellSizeArray();
   for (int i=1;i<=IB::MAX_LEVEL;i++) {
-    for (int j=0;j<=AMREX_SPACEDIM-1;j++) {
+    for (int j=0;j<AMREX_SPACEDIM;j++) {
       cellSizes[i][j] = cellSizes[i-1][j]/ref_ratio[i-1][j];
     }
   }
 
   // TODO make distance ip a parameter
   for (int i=0;i<=IB::MAX_LEVEL;i++) {
-    IB::disIM[i] = 0.3_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
+    IB::disIM[i] = 0.6_rt*sqrt(cellSizes[i][0]*cellSizes[i][0] 
     + cellSizes[i][1]*cellSizes[i][1] + cellSizes[i][2]*cellSizes[i][2]);
   }
 
@@ -170,7 +170,7 @@ void IB::destroyMFs (int lev) {
         }
         ibMarkers(i,j,k,1) = ghost; 
         ibFab.gpData.ngps += ghost;
-        ibFab.gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});
+        // ibFab.gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});
       }
       else {
         ibMarkers(i,j,k,1) = false;
@@ -202,6 +202,7 @@ void IB::initialiseGPs (int lev) {
     const IntVect& lo = bxg.smallEnd();
     const IntVect& hi = bxg.bigEnd();
     auto const& ibMarkers = mfab.array(mfi); // boolean array
+    auto const idxCube = ibFab.gpData.indexCube.data();
 
     // we need a CPU loop here (cannot be GPU loop) as CGAL tree seach for closest element to a point needs to be called.
     // instead of looping through previously indexed gps, we loop through the whole ghost point field as it is available on GPU and CPU at all times. Unlike the gp indexes, which are only stored on GPU memory.
@@ -212,6 +213,9 @@ void IB::initialiseGPs (int lev) {
     for (int i = lo[0]; i <= hi[0]; ++i) {
 
     if (ibMarkers(i,j,k,1)) {
+
+      gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});
+
       Real x=(0.5_rt + i)*cellSizes[lev][0];
       Real y=(0.5_rt + j)*cellSizes[lev][1];
       Real z=(0.5_rt + k)*cellSizes[lev][2];
@@ -247,7 +251,15 @@ void IB::initialiseGPs (int lev) {
       //*store*
       gpData.disGP.push_back(disGP);
       Array1D<Real,0,AMREX_SPACEDIM-1> norm = {fnormals[face][0],fnormals[face][1],fnormals[face][2]};
-      Array1D<Real,0,AMREX_SPACEDIM-1> tan1 = {norm(1),-norm(0),0.0_rt};
+
+      Point p1 = face->halfedge()->vertex()->point();
+      Point p2 = face->halfedge()->next()->vertex()->point();
+      Vector_CGAL tan1_not_unit(p1,p2); 
+      Real len = sqrt(CGAL::squared_distance(p1,p2));
+      Array1D<Real,0,AMREX_SPACEDIM-1> tan1;
+      tan1(0) = tan1_not_unit[0]/len; tan1(1) = tan1_not_unit[1]/len; tan1(2) = tan1_not_unit[2]/len;
+
+      // norm x tan1
       Array1D<Real,0,AMREX_SPACEDIM-1> tan2 = {norm(1)*tan1(2)-norm(2)*tan1(1), norm(2)*tan1(0)-norm(0)*tan1(2), norm(0)*tan1(1)-norm(1)*tan1(0)};
       
       // norm.tan1 and norm.tan2 == 0
@@ -274,20 +286,7 @@ void IB::initialiseGPs (int lev) {
           imp_xyz(jj,kk) = cp[kk] + Real(jj+1)*disIM[lev]*fnormals[face][kk];
           imp_ijk(jj,kk) = floor(imp_xyz(jj,kk)/cellSizes[lev][kk] - 0.5_rt);
         }
-        // Print() << "---" << std::endl;
-        // Print() << "bxg " << bxg << std::endl;
-        // Print() << "gp_ijk " << i << " " << j << " " << k << std::endl;
-        // Print() << "ip_ijk " << imp_ijk(jj,0) << " " << imp_ijk(jj,1) << " " << imp_ijk(jj,2) << std::endl;
-        // Print() << "gp_xyz " << x << " " << y << " " << z << std::endl;
-        // Print() << "ib_xyz " << cp[0] << " " << cp[1] << " " << cp[2] << std::endl;
-        // Print() << "ip_xyz " << imp_xyz(jj,0) << " " << imp_xyz(jj,1) << " " << imp_xyz(jj,2) << std::endl;
-        // Print() << "norm " << fnormals[face] << std::endl;
-        // Print() << "dx  " << cellSizes[lev][0] << " " << cellSizes[lev][1] << " " << cellSizes[lev][2] << std::endl;
-        // Print() << "disIM "  << disIM[lev] << std::endl;
-        // Print() << "disGP " << disGP << std::endl;
-        // Real temp = sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]);
-        // Print() << "diag " << temp << std::endl;
-
+ 
         AMREX_ASSERT_WITH_MESSAGE(bxg.contains(imp_ijk(jj,0),imp_ijk(jj,1),imp_ijk(jj,2)),"Interpolation point outside fab");
       }
       // DEBUGGING //////////////
@@ -304,9 +303,31 @@ void IB::initialiseGPs (int lev) {
 
       // Interpolation points' (ips) weights for each image point
       Array2D<Real,0,NIMPS-1,0,7> ipweights;
-      computeIPweights(ipweights, imp_xyz, imp_ijk, cellSizes[lev]);
+      computeIPweights(ipweights, imp_xyz, imp_ijk, cellSizes[lev], ibMarkers, idxCube);
       // *store*
       gpData.imp_ipweights.push_back(ipweights);
+
+      //  if (k==35) {
+      //   int jj = 0;
+      //   Print() << "--- " << std::endl;
+      //   Print() << "gp array idx " << gpData.normal.size() - 1 << std::endl;
+      //   Print() << "bxg " << bxg << std::endl;
+      //   Print() << "gp_ijk " << i << " " << j << " " << k << std::endl;
+      //   Print() << "im_ijk " << imp_ijk(jj,0) << " " << imp_ijk(jj,1) << " " << imp_ijk(jj,2) << std::endl;
+      //   Print() << "gp_xyz " << x << " " << y << " " << z << std::endl;
+      //   Print() << "ib_xyz " << cp[0] << " " << cp[1] << " " << cp[2] << std::endl;
+      //   Print() << "ip_xyz " << imp_xyz(jj,0) << " " << imp_xyz(jj,1) << " " << imp_xyz(jj,2) << std::endl;
+      //   Print() << "norm " << norm(0) << " " << norm(1) << " " << norm(2) << std::endl;
+      //   Print() << "tan1 " << tan1(0) << " " << tan1(1) << " " << tan1(2) << std::endl;
+      //   Print() << "tan2 " << tan2(0) << " " << tan2(1) << " " << tan2(2) << std::endl;
+      //   Print() << "dx  " << cellSizes[lev][0] << " " << cellSizes[lev][1] << " " << cellSizes[lev][2] << std::endl;
+      //   Real temp = sqrt(cellSizes[lev][0]*cellSizes[lev][0] + cellSizes[lev][1]*cellSizes[lev][1] + cellSizes[lev][2]*cellSizes[lev][2]);
+      //   Print() << "dx diag " << temp << std::endl;
+      //   Print() << "disIM "  << disIM[lev] << std::endl;
+      //   Print() << "disGP " << disGP << std::endl;
+      //   Print() << "weights " << ipweights(jj,0) << " " << ipweights(jj,1) << " " << ipweights(jj,2) << " " << ipweights(jj,3) << " " << ipweights(jj,4) << " " << ipweights(jj,5) << " " << ipweights(jj,6) << " " << ipweights(jj,7) << std::endl;
+      //   }
+
       }
     }
     }
@@ -315,37 +336,92 @@ void IB::initialiseGPs (int lev) {
 }
 
 
-void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, GpuArray<Real,AMREX_SPACEDIM>& dxyz) {
+void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> ibFab, auto const idxCube) {
 
-  for (int jj=0; jj<NIMPS; jj++) {
+  for (int iim=0; iim<NIMPS; iim++) {
+    int i = imp_ijk(iim,0); int j = imp_ijk(iim,1); int k = imp_ijk(iim,2); 
     // tri-linear interpolation
-    Real xl = (Real(imp_ijk(jj,0))+0.5_rt) * dxyz[0];  // bottom left corner of cell
+    Real xl = (Real(i)+0.5_rt) * dxyz[0];  // bottom left corner of cell
     Real xr = xl + dxyz[0];
-    Real yl = (Real(imp_ijk(jj,1))+0.5_rt) * dxyz[1];
+    Real yl = (Real(j)+0.5_rt) * dxyz[1];
     Real yr = yl + dxyz[1];
-    Real zl = (Real(imp_ijk(jj,2))+0.5_rt) * dxyz[2];
+    Real zl = (Real(k)+0.5_rt) * dxyz[2];
     Real zr = zl + dxyz[2];
 
 
-    Real xd =  (imp_xyz(jj,0) - xl )/(xr-xl);
-    Real yd =  (imp_xyz(jj,1) - yl )/(yr-yl);
-    Real zd =  (imp_xyz(jj,2) - zl )/(zr-zl);
+    Real xd =  (imp_xyz(iim,0) - xl )/(xr-xl);
+    Real yd =  (imp_xyz(iim,1) - yl )/(yr-yl);
+    Real zd =  (imp_xyz(iim,2) - zl )/(zr-zl);
 
+    int sumfluid = 0;
+    Real sumweights = 0.0_rt;
     // zd = 0
-    weights(jj,0) = (1.0_rt - xd) *(1.0_rt - yd)*(1.0_rt-zd);
-    weights(jj,1) = (1.0_rt - xd) *yd*(1.0_rt-zd);
-    weights(jj,2) = xd*yd*(1.0_rt-zd);
-    weights(jj,3) = xd*(1.0_rt - yd)*(1.0_rt-zd);
+    int ii = i + idxCube[0](0);
+    int jj = j + idxCube[0](1);
+    int kk = k + idxCube[0](2);
+    int fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,0) = (1.0_rt - xd) *(1.0_rt - yd)*(1.0_rt-zd)*fluid;
+    sumfluid += fluid; sumweights += weights(iim,0);
+
+    ii = i + idxCube[1](0);
+    jj = j + idxCube[1](1);
+    kk = k + idxCube[1](2);
+    fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,1) = (1.0_rt - xd) *yd*(1.0_rt-zd)*fluid;
+    sumfluid += fluid; sumweights += weights(iim,1);
+
+    ii = i + idxCube[2](0);
+    jj = j + idxCube[2](1);
+    kk = k + idxCube[2](2);
+    fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,2) = xd*yd*(1.0_rt-zd)*fluid;
+    sumfluid += fluid; sumweights += weights(iim,2);
+
+    ii = i + idxCube[3](0);
+    jj = j + idxCube[3](1);
+    kk = k + idxCube[3](2);
+    fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,3) = xd*(1.0_rt - yd)*(1.0_rt-zd)*fluid;
+    sumfluid += fluid; sumweights += weights(iim,3);
 
     // zd = 2
-    weights(jj,4) = (1.0_rt - xd) *(1.0_rt - yd)*zd;
-    weights(jj,5) = (1.0_rt - xd) *yd*zd;
-    weights(jj,6) = xd*yd*zd;
-    weights(jj,7) = xd*(1.0_rt - yd)*zd;
+    ii = i + idxCube[4](0);
+    jj = j + idxCube[4](1);
+    kk = k + idxCube[4](2);
+    fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,4) = (1.0_rt - xd) *(1.0_rt - yd)*zd*fluid;
+    sumfluid += fluid; sumweights += weights(iim,4);
 
-    // TODO report if any of the weights are sld points
+    ii = i + idxCube[5](0);
+    jj = j + idxCube[5](1);
+    kk = k + idxCube[5](2);
+    fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,5) = (1.0_rt - xd) *yd*zd*fluid;
+    sumfluid += fluid; sumweights += weights(iim,5);
 
-    AMREX_ASSERT_WITH_MESSAGE(std::abs(weights(jj,0) + weights(jj,1) + weights(jj,2) + weights(jj,3) + weights(jj,4) + weights(jj,5) + weights(jj,6) + weights(jj,7) - Real(1.0)) < Real(1.e-9),"Interpolation point weights do not sum to 1.0");
+    ii = i + idxCube[6](0);
+    jj = j + idxCube[6](1);
+    kk = k + idxCube[6](2);
+    fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,6) = xd*yd*zd*fluid;
+    sumfluid += fluid; sumweights += weights(iim,6);
+
+    ii = i + idxCube[7](0);
+    jj = j + idxCube[7](1);
+    kk = k + idxCube[7](2);
+    fluid = !ibFab(ii,jj,kk, 0);
+    weights(iim,7) = xd*(1.0_rt - yd)*zd*fluid;
+    sumfluid += fluid; sumweights += weights(iim,7);
+
+
+    AMREX_ASSERT_WITH_MESSAGE( sumfluid >= 2,"Less than 2 interpolation points are fluid points");
+
+    // re-normalise
+    for (int ll=0; ll<8; ll++) {
+      weights(iim,ll) = weights(iim,ll)/sumweights;
+    }
+
+    AMREX_ASSERT_WITH_MESSAGE(std::abs(weights(iim,0) + weights(iim,1) + weights(iim,2) + weights(iim,3) + weights(iim,4) + weights(iim,5) + weights(iim,6) + weights(iim,7) - Real(1.0)) < Real(1.e-9),"Interpolation point weights do not sum to 1.0");
   }
 }
 
@@ -354,38 +430,43 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, Real dgp, Real dim) {
 
   for (int kk=0; kk<NPRIM; kk++) {
-    primStateNormal(0,kk) = primStateNormal(1,kk) - (dgp/dim)*(primStateNormal(2,kk) - primStateNormal(1,kk));
+    primStateNormal(0,kk) = primStateNormal(1,kk)- (dgp/dim)*(primStateNormal(2,kk) - primStateNormal(1,kk));
   }
 
 }
 
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void global2local(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void global2local( int jj, Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
   Array1D<Real,0,AMREX_SPACEDIM-1> vel;
-  for (int jj=0; jj<NIMPS; jj++) {
-    vel(0) = primStateNormal(jj+2,QU); vel(1) = primStateNormal(jj+2,QV); vel(2) = primStateNormal(jj+2,QW);
+  vel(0) = primStateNormal(jj,QU); vel(1) = primStateNormal(jj,QV); vel(2) = primStateNormal(jj,QW);
 
-    primStateNormal(jj+2,QU) = vel(0)*norm(0) + vel(1)*norm(1) + vel(2)*norm(2);
-    primStateNormal(jj+2,QV) = vel(0)*tan1(0) + vel(1)*tan1(1) + vel(2)*tan1(2);
-    primStateNormal(jj+2,QW) = vel(0)*tan2(0) + vel(1)*tan2(1) + vel(2)*tan2(2);
-  }
+  primStateNormal(jj,QU) = vel(0)*norm(0) + vel(1)*norm(1) + vel(2)*norm(2);
+  primStateNormal(jj,QV) = vel(0)*tan1(0) + vel(1)*tan1(1) + vel(2)*tan1(2);
+  primStateNormal(jj,QW) = vel(0)*tan2(0) + vel(1)*tan2(1) + vel(2)*tan2(2);
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
-void local2global (Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
+void local2global (int jj, Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, const Array1D<Real,0,AMREX_SPACEDIM-1>& norm, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan1, const Array1D<Real,0,AMREX_SPACEDIM-1>& tan2) {
   
 Array1D<Real,0,AMREX_SPACEDIM-1> vel;
-for (int jj=0; jj<NIMPS; jj++) {
-  vel(0) = primStateNormal(jj+2,QU); vel(1) = primStateNormal(jj+2,QV); vel(2) = primStateNormal(jj+2,QW);
+  vel(0) = primStateNormal(jj,QU); vel(1) = primStateNormal(jj,QV); vel(2) = primStateNormal(jj,QW);
 
-  primStateNormal(jj+2,QU) = vel(0)*norm(0) + vel(1)*tan1(0) + vel(2)*tan2(0);
-  primStateNormal(jj+2,QV) = vel(0)*norm(1) + vel(1)*tan1(1) + vel(2)*tan2(1);
-  primStateNormal(jj+2,QW) = vel(0)*norm(2) + vel(1)*tan1(2) + vel(2)*tan2(2);
-  }
+  primStateNormal(jj,QU) = vel(0)*norm(0) + vel(1)*tan1(0) + vel(2)*tan2(0);
+  primStateNormal(jj,QV) = vel(0)*norm(1) + vel(1)*tan1(1) + vel(2)*tan2(1);
+  primStateNormal(jj,QW) = vel(0)*norm(2) + vel(1)*tan1(2) + vel(2)*tan2(2);
 }
 
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE 
 void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const weights, auto const norm, auto const tan1, auto const tan2, const Real disGP, const Real disIM, const Array4<bool> ibFab, Array4<Real> primFab, Array4<Real> conFab,auto const idxCube, const PROB::ProbClosures& closures) {
+
+  // if (norm(2)> 0.9999_rt) {
+  // Print() << "-------" << std::endl;
+  // Print() << "computeGP ii,i,j,k " << ii << " " << gp_ijk(0) << " " << gp_ijk(1) << " " << gp_ijk(2)  << std::endl;
+  // Print() << "imp_ijk " << imp_ijk(0,0) << " " << imp_ijk(0,1) << " " << imp_ijk(0,2) << std::endl;
+  // Print() << "norm " << norm(0) << " " << norm(1) << " " << norm(2) << std::endl;
+  // Print() << "weights " << weights(0,0) << " " << weights(0,1) << " " << weights(0,2) << " " << weights(0,3) << " " << weights(0,4) << " " << weights(0,5) << " " << weights(0,6) << " " << weights(0,7) << std::endl;
+  // }
+
   // interpolate IM ////////////////
   Array2D<Real,0,NIMPS+1,0,NPRIM-1> primStateNormal={0.0};
   // for each image point
@@ -403,8 +484,10 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
     }
   }
 
-  // Convert ux,uy,uz to un,ut1,ut2 at all image points
-  global2local(primStateNormal, norm, tan1, tan2);
+  // Convert ux,uy,uz to un,ut1,ut2 at IM points only
+  for (int jj=2; jj<2+NIMPS; jj++) {
+    global2local(jj, primStateNormal, norm, tan1, tan2);
+  }
 
   // interpolate IB (enforcing BCs) -- TODO:generalise to IBM BCs and make user defined
   // no-slip velocity (in local coordinates)
@@ -419,17 +502,25 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
 
   // extrapolate GP
   extrapolateGP( primStateNormal, disGP, disIM);
+
+  // limiting p and T
+  // primStateNormal(0,QPRES) = max(primStateNormal(0,QPRES),1.0);
+  // primStateNormal(0,QT)    = max(primStateNormal(0,QT),50.0);
+
   // thermodynamic consistency
   primStateNormal(0,QRHO)  = primStateNormal(0,QPRES)/(primStateNormal(0,QT)*closures.Rspec);
 
-  // Convert un,ut1,ut2 to ux,uy,uz at all image points
-  local2global(primStateNormal, norm, tan1, tan2);
+  // Convert un,ut1,ut2 to ux,uy,uz at GP point only, we don't need to transform at other points
+  local2global(0, primStateNormal, norm, tan1, tan2);
 
   // insert primitive variables into primsFab
   int i=gp_ijk(0); int j=gp_ijk(1); int k = gp_ijk(2);
   for (int kk=0; kk<NPRIM; kk++) {
     primFab(i,j,k,kk) = primStateNormal(0,kk);
   }
+
+  // primFab(i,j,k,jj)
+  // AMREX_ASSERT_WITH_MESSAGE( primFab(i,j,k,QPRES)>50,"P<50 at GP");
 
   // insert conservative ghost state into consFab
   conFab(i,j,k,URHO) = primStateNormal(0,QRHO);
@@ -471,7 +562,7 @@ void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::P
     // else
     amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
     {
-      ComputeGPState(ii, gp_ijk[ii],imp_ijk[ii],ipweights[ii],norm[ii],tan1[ii],tan2[ii],disGP[ii],disIM[ii],ibFabArr,primFabArr,conFabArr,idxCube,closures);
+      ComputeGPState(ii,gp_ijk[ii],imp_ijk[ii],ipweights[ii],norm[ii],tan1[ii],tan2[ii],disGP[ii],disIM[ii],ibFabArr,primFabArr,conFabArr,idxCube,closures);
     });
     
   }

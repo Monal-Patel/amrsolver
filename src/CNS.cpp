@@ -488,6 +488,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     auto const& ibfab = ibdata.array(mfi);
 #endif
     int lev = level;
+    int nt_lev = nStep();
     PROB::ProbParm const *lprobparm = d_prob_parm;
 
     ParallelFor(bx,
@@ -495,9 +496,9 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     {
 #ifdef AMREX_USE_GPIBM
     // call function from cns_prob
-    user_tagging(i, j, k, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
+    user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
 #else
-    user_tagging(i, j, k, tagfab, sdatafab, geomdata ,*lprobparm, lev);
+    user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif
     });
   }
