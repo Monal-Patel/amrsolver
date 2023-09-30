@@ -170,7 +170,7 @@ void IB::destroyMFs (int lev) {
         }
         ibMarkers(i,j,k,1) = ghost; 
         ibFab.gpData.ngps += ghost;
-        // ibFab.gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});
+        if (ghost) {ibFab.gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});}
       }
       else {
         ibMarkers(i,j,k,1) = false;
@@ -213,8 +213,6 @@ void IB::initialiseGPs (int lev) {
     for (int i = lo[0]; i <= hi[0]; ++i) {
 
     if (ibMarkers(i,j,k,1)) {
-
-      gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});
 
       Real x=(0.5_rt + i)*cellSizes[lev][0];
       Real y=(0.5_rt + j)*cellSizes[lev][1];
@@ -427,10 +425,17 @@ void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NI
 
 // linear extrapolation
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, Real dgp, Real dim) {
+void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& state, Real dgp, Real dim) {
 
   for (int kk=0; kk<NPRIM; kk++) {
-    primStateNormal(0,kk) = primStateNormal(1,kk)- (dgp/dim)*(primStateNormal(2,kk) - primStateNormal(1,kk));
+    // Linear
+    state(0,kk) = state(1,kk)- (dgp/dim)*(state(2,kk) - state(1,kk));
+
+    // Van Leer limiter
+    // df = state(1,kk)-state(0,kk) + 1.0e-12;
+    // Real ratio  = (state(2,kk)-state(1,kk) )/( df  + pow(-1,int(signbit(df))) );
+    // Real phi = (ratio + abs(ratio))/(1.0_rt + abs(ratio));
+    // state(0,kk) = state(0,kk) + phi*( state(1,kk)-state(0,kk) )*dim/dgp
   }
 
 }
