@@ -5,7 +5,7 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_AmrLevel.H>
-#include <Closures.H>
+#include <Closures.h>
 
 #define URHO  0
 #define UMX   1

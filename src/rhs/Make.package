@@ -1,1 +1,1 @@
-CEXE_headers += CNS_hydro_K.H Central.H Riemann.H High_resolution.H
+CEXE_headers += CNS_HYRDO_K.h Central.h Riemann.h High_resolution.h

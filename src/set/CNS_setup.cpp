@@ -1,6 +1,6 @@
-#include <CNS.H>
+#include <CNS.h>
 #include <cns_prob.H>
-#include <CNS_K.H>
+#include <CNS_K.h>
 
 using namespace amrex;
 

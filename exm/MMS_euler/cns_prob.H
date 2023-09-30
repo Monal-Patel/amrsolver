@@ -6,7 +6,7 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_REAL.H>
 #include <AMReX_GpuMemory.H>
-#include <Closures.H>
+#include <Closures.h>
 
 using namespace amrex;
 

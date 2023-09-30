@@ -21,3 +21,6 @@
 /tst/AMReX_regtests/output/AMReX-benchmarks/*
 /tst/AMReX_regtests/output/AMReX-tests/*
 /tst/AMReX_regtests/output/web/*
+
+/docs/html
+/docs/latex

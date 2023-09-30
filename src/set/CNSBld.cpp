@@ -1,5 +1,5 @@
 #include <AMReX_LevelBld.H>
-#include <CNS.H>
+#include <CNS.h>
 
 using namespace amrex;
 

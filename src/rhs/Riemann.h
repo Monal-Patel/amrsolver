@@ -1,7 +1,7 @@
 #ifndef Riemann_H_
 #define Riemann_H_
 
-#include <CNS.H>
+#include <CNS.h>
 #include <AMReX_FArrayBox.H>
 
 namespace Riemann {

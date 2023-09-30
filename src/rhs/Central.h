@@ -1,7 +1,7 @@
 #ifndef Central_H_
 #define Central_H_
 
-#include <CNS.H>
+#include <CNS.h>
 #include <AMReX_FArrayBox.H>
 #include <cns_prob.H>
 

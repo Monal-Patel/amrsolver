@@ -1,4 +1,4 @@
-#include <IBM.H>
+#include <IBM.h>
 #include <CGAL/Side_of_triangle_mesh.h>
 #include <AMReX_ParmParse.H>
 

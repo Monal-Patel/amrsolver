@@ -1,12 +1,12 @@
 #include <AMReX_MultiFabUtil.H>
 #include <AMReX_ParmParse.H>
-#include <CNS.H>
-#include <CNS_K.H>
+#include <CNS.h>
+#include <CNS_K.h>
 #include <cns_prob.H>
-#include <Central.H>
+#include <Central.h>
 
 #ifdef AMREX_USE_GPIBM
-#include <IBM.H>
+#include <IBM.h>
 #endif
 
 using namespace amrex;
@@ -230,7 +230,7 @@ void CNS::post_init(Real stop_time)
   //   Vpntvflxmf[level][idim].setVal(0.0);
   // }
 
-  // TODO: move to Central.H
+  // TODO: move to Central.h
 #if !AMREX_USE_GPU
   Central::coeffs2={Real(1.0), 0.0, 0.0};
   if (Central::order_keep==6) {

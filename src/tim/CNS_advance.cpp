@@ -1,12 +1,12 @@
-#include <CNS.H>
+#include <CNS.h>
 #include <AMReX_FluxRegister.H>
-#include <CNS_hydro_K.H>
+#include <CNS_hydro_K.h>
 #include <cns_prob.H>
-#include <Central.H>
-#include <Riemann.H>
-#include <High_resolution.H>
+#include <Central.h>
+#include <Riemann.h>
+#include <High_resolution.h>
 #ifdef AMREX_USE_GPIBM
-#include <IBM.H>
+#include <IBM.h>
 #endif
 using namespace amrex;
 

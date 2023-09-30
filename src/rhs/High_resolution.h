@@ -1,7 +1,7 @@
 #ifndef High_resolution_H
 #define High_resolution_H
 
-#include <CNS.H>
+#include <CNS.h>
 #include <AMReX_FArrayBox.H>
 
 namespace HiRes {

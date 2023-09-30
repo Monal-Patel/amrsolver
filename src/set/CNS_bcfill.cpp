@@ -2,7 +2,7 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_PhysBCFunct.H>
-#include <CNS.H>
+#include <CNS.h>
 #include <cns_prob.H>
 using namespace amrex;
 

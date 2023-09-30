@@ -9,9 +9,9 @@
       "type": "cppdbg",
       "request": "launch",
 
-      "cwd": "${workspaceFolder}/exm/IBM/Square",
-      "program": "${workspaceFolder}/exm/IBM/Square/main3d.gnu.DEBUG.MPI.ex",
-      "args": [ "${workspaceFolder}/exm/IBM/Square/inputs" ],
+      "cwd": "${workspaceFolder}/exm/IBM/Hypersonic_sphere",
+      "program": "${workspaceFolder}/exm/IBM/Hypersonic_sphere/main3d.gnu.DEBUG.MPI.CUDA.ex",
+      "args": [ "${workspaceFolder}/exm/IBM/Hypersonic_sphere/inputs" ],
 
       // "cwd": "${workspaceFolder}/exm/TGV",
       // "program": "${workspaceFolder}/exm/TGV/main3d.gnu.DEBUG.ex",

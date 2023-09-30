@@ -3,11 +3,11 @@
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Amr.H>
 
-#include <CNS.H>
+#include <CNS.h>
 #include <cns_prob.H>
 
 #ifdef AMREX_USE_GPIBM
-#include <IBM.H>
+#include <IBM.h>
 #endif
 
 using namespace amrex;
