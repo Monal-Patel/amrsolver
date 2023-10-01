@@ -41,7 +41,7 @@ extensions = [
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['build_sphinx', 'Thumbs.db', '.DS_Store']
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -54,14 +54,14 @@ html_theme = 'sphinx_rtd_theme'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = ['./sphinx/_build/static']
+html_static_path = ['./']
 
 
 #doxygen_root = "docs/doxygen" # this is just a convenience variable
 doxylink = {
     "amrsolver": (  # "demo" is the role name that you can later use in sphinx to reference this doxygen documentation (see below)
-        f"./doxygen/html/tagfile.xml", # the first parameter of this tuple is the tagfile
-        f"./doxygen/html", # the second parameter of this tuple is a relative path pointing from
+        f"./build_doxygen/html/tagfile.xml", # the first parameter of this tuple is the tagfile
+        f"./build_doxygen/html", # the second parameter of this tuple is a relative path pointing from
                                      # sphinx output directory to the doxygen output folder inside the output
                                      # directory tree.
                                      # Doxylink will use the tagfile to get the html file name of the symbol you want

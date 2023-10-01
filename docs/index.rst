@@ -10,8 +10,7 @@ Welcome to amrsolver's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   temp
-   /doxygen/html/index
+   /build_doxygen/html/index
 
 
 

@@ -1,5 +1,5 @@
 doxygen Doxyfile
 
-doxysphinx build ./ ./doxygen/html ./Doxyfile
+doxysphinx build ./ ./build_sphinx/html ./Doxyfile
 
-sphinx-build -M html ./ ./build
+sphinx-build -M html ./ ./build_sphinx

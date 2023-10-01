@@ -22,7 +22,4 @@
 /tst/AMReX_regtests/output/AMReX-tests/*
 /tst/AMReX_regtests/output/web/*
 
-/docs/build
-/docs/doctrees
-/docs/html
-/docs/doxygen
+/docs/build_*
