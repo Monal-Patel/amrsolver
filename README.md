@@ -1,5 +1,7 @@
 # amrsolver
 
+## docs 
+[Documentation](https://monal-patel.github.io/amrsolver_docs/)
 ## src
 ### cls
 Closures (thermodynamic and transport)
