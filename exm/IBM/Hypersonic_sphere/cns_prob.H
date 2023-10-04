@@ -91,15 +91,34 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   //     uxt = pparm.u_l;
   // }
 
-  if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.7_rt,2) ){
-      Pt = pparm.p_inf;
-      rhot = pparm.rho_inf*0.7;
-      uxt = pparm.u_inf*0.5;
-  } else {
-      Pt = pparm.p_inf;
-      rhot = pparm.rho_inf;
-      uxt = pparm.u_inf;
+  // if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.4_rt,2) ){
+  //     Pt = pparm.p_inf;
+  //     rhot = pparm.rho_inf*0.7;
+  //     uxt = pparm.u_inf*0.9;
+  // } else {
+  //     Pt = pparm.p_inf;
+  //     rhot = pparm.rho_inf;
+  //     uxt = pparm.u_inf;
+  // }
+
+  Real u_small = pparm.u_inf*0.2;
+  Real xstart = 0.1_rt;
+  Real dis = xstart - pparm.x0;
+  Real grad = (pparm.u_inf - u_small)/(dis);
+  if (x < 0.1_rt) {
+    uxt = pparm.u_inf;
+    rhot = pparm.rho_inf;
   }
+  else if ((x > xstart && x < pparm.x0) || pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.6_rt,2) ) { 
+    Real xx = x - xstart;
+    uxt = pparm.u_inf + grad*xx;
+    rhot = pparm.rho_inf/2;
+  } else {
+    uxt = u_small;
+    rhot = pparm.rho_inf/2;
+  }
+
+  Pt = pparm.p_inf;
 
   state(i,j,k,URHO ) = rhot;
   state(i,j,k,UMX  ) = rhot*uxt;
@@ -121,17 +140,17 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
   if (level==0 && nt==0) {
     Real dengrad_threshold = 0.3;
     amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,UMX) - sdatafab(i,j,k,UMX))/sdatafab(i,j,k,UMX);
-    if (drhox > dengrad_threshold) {
-      for (int ii = -1; ii <= 1; ii++) {
-        for (int jj = -1; jj <= 1; jj++) {
-          for (int kk = -1; kk <= 1; kk++) {
-            tagfab(i+ii,j+jj,k+kk) = true;
-          }
-        }
-      }
-    }
+    // if (drhox > dengrad_threshold) {
+    //   for (int ii = -1; ii <= 1; ii++) {
+    //     for (int jj = -1; jj <= 1; jj++) {
+    //       for (int kk = -1; kk <= 1; kk++) {
+    //         tagfab(i+ii,j+jj,k+kk) = true;
+    //       }
+    //     }
+    //   }
+    // }
     
-    if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.35_rt,2) &&  (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) > pow(0.15_rt,2) )){
+    if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.40_rt,2) &&  (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) > pow(0.15_rt,2) )){
       tagfab(i,j,k) = true;
     }
 

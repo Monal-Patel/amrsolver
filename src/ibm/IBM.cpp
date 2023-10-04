@@ -423,19 +423,28 @@ void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NI
   }
 }
 
-// linear extrapolation
+// Taylor expansion around IB point
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& state, Real dgp, Real dim) {
 
+  Real sgn_dgp = -dgp ; // negative sign as taylor expansion is around IB point, IM and GP are in opposite directions
   for (int kk=0; kk<NPRIM; kk++) {
     // Linear
-    state(0,kk) = state(1,kk)- (dgp/dim)*(state(2,kk) - state(1,kk));
+    // Real c1 = state(1,kk);
+    // Real c2 = (state(2,kk) - state(1,kk))/dim
+    // state(0,kk) = c1 + c2*sgn_dgp;
 
-    // Van Leer limiter
-    // df = state(1,kk)-state(0,kk) + 1.0e-12;
-    // Real ratio  = (state(2,kk)-state(1,kk) )/( df  + pow(-1,int(signbit(df))) );
-    // Real phi = (ratio + abs(ratio))/(1.0_rt + abs(ratio));
-    // state(0,kk) = state(0,kk) + phi*( state(1,kk)-state(0,kk) )*dim/dgp
+    // Linear + Van Leer limiter
+    Real c1 = state(1,kk);
+    Real ratio  = (state(3,kk)-state(2,kk) )/( state(2,kk)-state(1,kk) + 1.0e-12);
+    Real phi    = (ratio + std::abs(ratio))/(1.0_rt + std::abs(ratio));
+    Real c2     = phi*(state(2,kk)-state(1,kk))/dim;
+    state(0,kk) = c1 + c2*sgn_dgp;
+
+    // Real c1    =  state(1,kk);
+    // Real c2    =  (-1.5_rt*state(1,kk) + 2.0_rt*state(2,kk) - 0.5_rt*state(3,kk))/sgn_dgp;
+    // Real c3    =  (0.5_rt*state(1,kk) - state(2,kk) + 0.5_rt*state(3,kk))/sgn_dgp/sgn_d;
+    // state(0,kk) = c1 + c2*dim + c3*dim*dim;
   }
 
 }
@@ -506,7 +515,7 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
   primStateNormal(1,QRHO)  = primStateNormal(1,QPRES)/(primStateNormal(1,QT)*closures.Rspec); 
 
   // extrapolate GP
-  extrapolateGP( primStateNormal, disGP, disIM);
+  extrapolateGP(primStateNormal, disGP, disIM);
 
   // limiting p and T
   // primStateNormal(0,QPRES) = max(primStateNormal(0,QPRES),1.0);
