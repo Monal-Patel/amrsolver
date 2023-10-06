@@ -184,7 +184,7 @@ namespace IBM {
       // const int NIMPS = 2; // number of image points per ghost point
 
       // pointer to Amr class instance
-      Amr*pamr;
+      Amr* pamr;
 
       // vector of refinement ratio per level in each direction
       Vector<IntVect> ref_ratio;
