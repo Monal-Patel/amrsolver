@@ -6,6 +6,7 @@
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <Closures.H>
+#include <AMReX_Print.H>
 
 using namespace amrex;
 
@@ -30,6 +31,20 @@ namespace PROB {
 
 struct ProbParm
 {
+  Real M1 = 4;              // upper Mach number
+  Real Re1 = 400;           // upper Reynolds number
+  Real U1 = 1200;           // upper velocity (m/s)
+  Real Uref = U1/M1;        // reference velocity (m/s) - upper speed of sound              
+  Real U2 = 0.375*U1;       // lower velocity (m/s)
+  Real T1 = 100;            // upper temperature (K)
+  Real T2 = 3*T1;           // lower temperature (K)
+  Real dudymax = 1e3;           // max mean velocity gradient (1/s)
+  Real dw = (U1-U2)/dudymax;     // vorticity thickness (m)
+  Real lref = dw/2;              // reference length (m)
+  Real mu1 = (1.458e-6)*(pow(T1,(1.5)))/(110.4+T1);  // Sutherland's model of viscosity (Pa s)
+  Real rho1 = Re1*mu1/(Uref*lref);
+  Real P1 = rho1*287*T1;
+    // sod problem parameters below
   Real p_l = 1.0;
   Real p_r = 0.1;
   Real rho_l = 1.0;
@@ -66,22 +81,11 @@ void inline inputs() {
   pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
   pp.add   ("cns.stages_rk", 3); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
-  pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
+  pp.add   ("cns.rhs_visc", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
   pp.add   ("cns.flux_euler", 2); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
-  pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
-  // pp.add   ("cns.nghost",2);
   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
-
-  // lets add viscosity type and different flux dissipations!
-
-
-  // debugging
-  // pp.add("amrex.fpe_trap_invalid",1);
-  // pp.add("amrex.fpe_trap_zero",1);
-  // pp.add("amrex.fpe_trap_overflow",1);
 
 }
 
@@ -91,30 +95,57 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
 
+  // Print() << "U1=" << prob_parm.U1 << "\n"; // print value of U1 to screen ... why does this print more than just once?!
+  // Print() << "U2=" << prob_parm.U2 << "\n";
+  // Print() << "dudymax=" << prob_parm.dudymax << "\n";
+  // Print() << "dw=" << prob_parm.dw << "\n";
+  // Print() << "lref=" << prob_parm.lref << "\n";
+  // Print() << "mu1=" << prob_parm.mu1 << "\n";
+  // Print() << "T1=" << prob_parm.T1 << "\n";
+  // Print() << "T2=" << prob_parm.T2 << "\n";
+  // Print() << "rho1=" << prob_parm.rho1 << "\n";
+
   Real x = prob_lo[0] + (i+Real(0.5))*dx[0];
-  Real Pt, rhot, uxt;
-  if (x < prob_hi[0]/2) {
-      Pt = prob_parm.p_l;
-      rhot = prob_parm.rho_l;
-      uxt = prob_parm.u_l;
-  } else {
-      Pt = prob_parm.p_r;
-      rhot = prob_parm.rho_r;
-      uxt = prob_parm.u_r;
-  }
+  Real y = prob_lo[1] + (j+Real(0.5))*dx[1];
+  Real Pt, rhot, uxt, uyt, Tt, u1t, u2t, T1t, T2t;
+  
+  // mean pressure is uniform
+  Pt = prob_parm.P1;
+
+  // analytical expression for velocity distribution
+  u1t = prob_parm.U1;
+  u2t = prob_parm.U2;
+  uxt = Real(0.5)*((u1t+u2t)+(u1t-u2t)*tanh(Real(2.0)*y/prob_parm.dw));
+  
+  // ananlytical expression for temperature distribution
+  T1t = prob_parm.T1;
+  T2t = prob_parm.T2;
+  Tt = T1t*(T2t/T1t)*((1-(uxt/u1t))/(1-(u2t/u1t)))
+      +T1t*(((uxt/u1t)-(u2t/u1t))/(1-(u2t/u1t)))
+      +T1t*Real(0.5)*(closures.gamma-Real(1.0))*prob_parm.M1*prob_parm.M1*(1-(uxt/u1t))*((uxt/u1t)-(u2t/u1t));
+  
+  // density profile assuming perfect gas
+  rhot = Pt/(closures.Rspec*Tt);
+
+  // sod problem setup
+  // if (x < prob_hi[0]/2) {
+  //     Pt = prob_parm.p_l;
+  //     rhot = prob_parm.rho_l;
+  //     uxt = prob_parm.u_l;
+  // } else {
+  //     Pt = prob_parm.p_r;
+  //     rhot = prob_parm.rho_r;
+  //     uxt = prob_parm.u_r;
+  // }
+
   state(i,j,k,URHO ) = rhot;
   state(i,j,k,UMX  ) = rhot*uxt;
   state(i,j,k,UMY  ) = Real(0.0);
   state(i,j,k,UMZ  ) = Real(0.0);
   Real et = Pt/(closures.gamma-Real(1.0));
   state(i,j,k,UET) = et + Real(0.5)*rhot*uxt*uxt;
-
-  // eqn42 goes here to compute velocity
-  // state to decide P and T
-  // compute conservative state vector from ideal perfect 
   
 }
-
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
