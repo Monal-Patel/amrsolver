@@ -106,6 +106,7 @@ void IB::destroyMFs (int lev) {
 
   IBMultiFab& mfab = *ibMFa[lev];
   int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
+  const Real* prob_lo = pamr->Geom(lev).data().ProbLo();
 
   for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &ibFab = mfab.get(mfi);
@@ -121,9 +122,9 @@ void IB::destroyMFs (int lev) {
       ibMarkers(i,j,k,0) = false; // initialise to false
       ibMarkers(i,j,k,1) = false; // initialise to false
 
-      Real x=(0.5_rt + Real(i))*cellSizes[lev][0];
-      Real y=(0.5_rt + Real(j))*cellSizes[lev][1];
-      Real z=(0.5_rt + Real(k))*cellSizes[lev][2];
+      Real x=prob_lo[0] + (0.5_rt + Real(i))*cellSizes[lev][0];
+      Real y=prob_lo[1] + (0.5_rt + Real(j))*cellSizes[lev][1];
+      Real z=prob_lo[2] + (0.5_rt + Real(k))*cellSizes[lev][2];
       Point gridpoint(x,y,z);
       CGAL::Bounded_side res = inside(gridpoint);
 
@@ -193,6 +194,7 @@ void IB::initialiseGPs (int lev) {
 
   IBMultiFab& mfab = *ibMFa[lev];
   int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
+  const Real* prob_lo = pamr->Geom(lev).data().ProbLo();
 
   for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &ibFab = mfab.get(mfi);
@@ -214,9 +216,9 @@ void IB::initialiseGPs (int lev) {
 
     if (ibMarkers(i,j,k,1)) {
 
-      Real x=(0.5_rt + i)*cellSizes[lev][0];
-      Real y=(0.5_rt + j)*cellSizes[lev][1];
-      Real z=(0.5_rt + k)*cellSizes[lev][2];
+      Real x=prob_lo[0] + (0.5_rt + i)*cellSizes[lev][0];
+      Real y=prob_lo[1] + (0.5_rt + j)*cellSizes[lev][1];
+      Real z=prob_lo[2] + (0.5_rt + k)*cellSizes[lev][2];
       Point gp(x,y,z);
 
       // closest surface point and face --------------------------
@@ -282,7 +284,7 @@ void IB::initialiseGPs (int lev) {
       for (int jj=0; jj<NIMPS; jj++) {
         for (int kk=0; kk<AMREX_SPACEDIM; kk++) {
           imp_xyz(jj,kk) = cp[kk] + Real(jj+1)*disIM[lev]*fnormals[face][kk];
-          imp_ijk(jj,kk) = floor(imp_xyz(jj,kk)/cellSizes[lev][kk] - 0.5_rt);
+          imp_ijk(jj,kk) = floor((imp_xyz(jj,kk) - prob_lo[kk])/cellSizes[lev][kk] - 0.5_rt);
         }
  
         AMREX_ASSERT_WITH_MESSAGE(bxg.contains(imp_ijk(jj,0),imp_ijk(jj,1),imp_ijk(jj,2)),"Interpolation point outside fab");
@@ -301,7 +303,7 @@ void IB::initialiseGPs (int lev) {
 
       // Interpolation points' (ips) weights for each image point
       Array2D<Real,0,NIMPS-1,0,7> ipweights;
-      computeIPweights(ipweights, imp_xyz, imp_ijk, cellSizes[lev], ibMarkers, idxCube);
+      computeIPweights(ipweights, imp_xyz, imp_ijk, prob_lo, cellSizes[lev], ibMarkers, idxCube);
       // *store*
       gpData.imp_ipweights.push_back(ipweights);
 
@@ -334,16 +336,17 @@ void IB::initialiseGPs (int lev) {
 }
 
 
-void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> ibFab, auto const idxCube) {
+void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, const Real* prob_lo, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> ibFab, auto const idxCube) {
 
   for (int iim=0; iim<NIMPS; iim++) {
     int i = imp_ijk(iim,0); int j = imp_ijk(iim,1); int k = imp_ijk(iim,2); 
     // tri-linear interpolation
-    Real xl = (Real(i)+0.5_rt) * dxyz[0];  // bottom left corner of cell
+    // note xl,xr, ...etc do not have prob_lo added to them. This does not matter as we only need the relative distances between the points.
+    Real xl = prob_lo[0] + (Real(i)+0.5_rt) * dxyz[0];  // bottom left corner of cell
     Real xr = xl + dxyz[0];
-    Real yl = (Real(j)+0.5_rt) * dxyz[1];
+    Real yl = prob_lo[1] + (Real(j)+0.5_rt) * dxyz[1];
     Real yr = yl + dxyz[1];
-    Real zl = (Real(k)+0.5_rt) * dxyz[2];
+    Real zl = prob_lo[2] + (Real(k)+0.5_rt) * dxyz[2];
     Real zr = zl + dxyz[2];
 
 
@@ -431,7 +434,7 @@ void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& state, Real dgp, Real dim)
   for (int kk=0; kk<NPRIM; kk++) {
     // Linear
     // Real c1 = state(1,kk);
-    // Real c2 = (state(2,kk) - state(1,kk))/dim
+    // Real c2 = (state(2,kk) - state(1,kk))/dim;
     // state(0,kk) = c1 + c2*sgn_dgp;
 
     // Linear + Van Leer limiter
