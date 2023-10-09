@@ -8,7 +8,6 @@ stop_time = 10.0
 # or
 cfl = 0.5
 
-
 #-------------------------------- IMMERSED BOUNDARY ---------------------------#
 ib.filename = MSL_coarse_8deg.stl
 #ib.fields   = 2 #
@@ -16,15 +15,15 @@ ib.filename = MSL_coarse_8deg.stl
 #-------------------------------- COMPUTATIONAL DOMAIN ------------------------#
 geometry.is_periodic = 0 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
-geometry.prob_lo     =   -0.1     -0.1     -0.1
-geometry.prob_hi     =   0.16    0.16    0.16
+geometry.prob_lo     =   0.0    0.0    0.0
+geometry.prob_hi     =   0.4    0.4    0.5
 #amr.n_cell           =   64      64     64
 amr.n_cell           =   128     128     128
 
 #-------------------------------- REFINEMENT / REGRIDDING ---------------------#
-amr.max_level       = 1       # maximum level number allowed
+amr.max_level       = 2       # maximum level number allowed
 amr.ref_ratio       = 2 2  # refinement ratio
-amr.regrid_int      = 2000000 200  # how often to regrid
+amr.regrid_int      = 5000000 2000000  # how often to regrid
 amr.blocking_factor_x = 8 8 # blocking factor in x per level
 amr.blocking_factor_y = 8 8 # blocking factor in x per level
 amr.blocking_factor_z = 8 8 # blocking factor in x per level
@@ -37,7 +36,7 @@ amr.grid_eff        = 0.8     # what constitutes an efficient grid
 #-------------------------------- PLOTFILES -----------------------------------#
 amr.plot_files_output = 1
 amr.plot_file         = ./plot/plt # root name of plotfile
-amr.plot_int          = 1     # number of timesteps between plotfiles
+amr.plot_int          = 10     # number of timesteps between plotfiles
 amr.derive_plot_vars  = x_velocity pressure x_velocity y_velocity z_velocity temperature
 amr.v = 1 # 0=quiet, 1=verbose
 

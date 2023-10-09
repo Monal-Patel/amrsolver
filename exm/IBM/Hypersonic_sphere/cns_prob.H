@@ -22,7 +22,7 @@
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 3
+#define NGHOST 4
 
 namespace PROB {
 
@@ -30,7 +30,7 @@ namespace PROB {
 struct ProbParm
 { 
   Real p_inf = 1.0e5;
-  Real rho_inf = 1.225;
+  Real T_inf = 300.0;
   Real u_inf = 1200.0;
 
   Real x0 = 1.0_rt;
@@ -50,10 +50,10 @@ void inline inputs() {
   // 1 = Inflow             4 = SlipWall
   // 2 = Outflow            5 = NoSlipWall
   // 6 = user defined
-  pp.addarr("cns.lo_bc", std::vector<int>{2,-1,-1});
-  pp.addarr("cns.hi_bc", std::vector<int>{2,-1,-1});
-  pp.add   ("cns.order_rk", 2); // -2, 1, 2 or 3"
-  pp.add   ("cns.stages_rk", 2); // 1, 2 or 3
+  pp.addarr("cns.lo_bc", std::vector<int>{2,0,0});
+  pp.addarr("cns.hi_bc", std::vector<int>{2,0,0});
+  pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
+  pp.add   ("cns.stages_rk", 3); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
@@ -76,68 +76,74 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
-  Real Pt, rhot, uxt;
+  Real P, rho, T, ux;
 
   Real x = prob_lo[0] + (i+0.5_rt)*dx[0];
   Real y = prob_lo[1] + (j+0.5_rt)*dx[1];
   Real z = prob_lo[2] + (k+0.5_rt)*dx[2];
   // if (x < prob_hi[0]/8) {
-  //     Pt = pparm.p_l;
-  //     rhot = pparm.rho_l;
-  //     uxt = pparm.u_l*0.0_rt;
+  //     P = pparm.p_l;
+  //     rho = pparm.rho_l;
+  //     ux = pparm.u_l*0.0_rt;
   // } else {
-  //     Pt = pparm.p_l;
-  //     rhot = pparm.rho_l;
-  //     uxt = pparm.u_l;
+  //     P = pparm.p_l;
+  //     rho = pparm.rho_l;
+  //     ux = pparm.u_l;
   // }
 
   // if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.4_rt,2) ){
-  //     Pt = pparm.p_inf;
-  //     rhot = pparm.rho_inf*0.7;
-  //     uxt = pparm.u_inf*0.9;
+  //     P = pparm.p_inf;
+  //     rho = pparm.rho_inf*0.7;
+  //     ux = pparm.u_inf*0.9;
   // } else {
-  //     Pt = pparm.p_inf;
-  //     rhot = pparm.rho_inf;
-  //     uxt = pparm.u_inf;
+  //     P = pparm.p_inf;
+  //     rho = pparm.rho_inf;
+  //     ux = pparm.u_inf;
   // }
 
-  Real u_small = pparm.u_inf*0.2;
-  Real xstart = 0.1_rt;
-  Real dis = xstart - pparm.x0;
+  Real u_small = pparm.u_inf*0.5;
+  Real xstart = 0.2_rt;
+  Real xend   = pparm.x0;
+  Real dis = xstart - xend;
   Real grad = (pparm.u_inf - u_small)/(dis);
-  if (x < 0.1_rt) {
-    uxt = pparm.u_inf;
-    rhot = pparm.rho_inf;
+  if (x < xstart) {
+    ux = pparm.u_inf;
+    T = pparm.T_inf;
+    P = pparm.p_inf;
   }
-  else if ((x > xstart && x < pparm.x0) || pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.6_rt,2) ) { 
+  else if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.6_rt,2) ) { 
     Real xx = x - xstart;
-    uxt = pparm.u_inf + grad*xx;
-    rhot = pparm.rho_inf/2;
+    // ux = pparm.u_inf + grad*xx;
+    ux = u_small;
+    T = pparm.T_inf*3;
+    P = pparm.p_inf;
   } else {
-    uxt = u_small;
-    rhot = pparm.rho_inf/2;
+    // ux = u_small;
+    ux = pparm.u_inf;
+    T = pparm.T_inf*3;
+    P = pparm.p_inf;
   }
 
-  Pt = pparm.p_inf;
 
-  state(i,j,k,URHO ) = rhot;
-  state(i,j,k,UMX  ) = rhot*uxt;
+  rho = P/(closures.Rspec*T);
+  state(i,j,k,URHO ) = rho;
+  state(i,j,k,UMX  ) = rho*ux;
   state(i,j,k,UMY  ) = Real(0.0);
   state(i,j,k,UMZ  ) = Real(0.0);
-  Real et = Pt/(closures.gamma-Real(1.0));
-  state(i,j,k,UET) = et + Real(0.5)*rhot*uxt*uxt;
+  Real eint = rho*closures.cv*T;
+  state(i,j,k,UET) = eint + Real(0.5)*rho*ux*ux;
 }
 
 //
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, const auto &ibfab, const auto& geomdata, const ProbParm& pparm , int level) {
 
-  const Real* dx      = geomdata.CellSize();
+  const Real* dx  = geomdata.CellSize();
   Real x = (i+0.5_rt)*dx[0];
   Real y = (j+0.5_rt)*dx[1];
   Real z = (k+0.5_rt)*dx[2];
 
-  if (level==0 && nt==0) {
+  if ( nt==0) {
     Real dengrad_threshold = 0.3;
     amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,UMX) - sdatafab(i,j,k,UMX))/sdatafab(i,j,k,UMX);
     // if (drhox > dengrad_threshold) {
@@ -149,9 +155,10 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
     //     }
     //   }
     // }
-    
-    if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.40_rt,2) &&  (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) > pow(0.15_rt,2) )){
-      tagfab(i,j,k) = true;
+    if (level==0 ) {
+      if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.50_rt,2) &&  (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) > pow(0.15_rt,2) )){
+        tagfab(i,j,k) = true;
+      }
     }
 
 
