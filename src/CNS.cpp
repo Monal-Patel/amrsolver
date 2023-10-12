@@ -39,6 +39,13 @@ Vector<MultiFab> CNS::VSborder;
 Vector<MultiFab> CNS::Vprimsmf;
 Vector<Array<MultiFab,AMREX_SPACEDIM>> CNS::Vnumflxmf,CNS::Vpntvflxmf; 
 
+PROB::ProbClosures* CNS::h_prob_closures = nullptr;
+PROB::ProbClosures* CNS::d_prob_closures = nullptr;
+PROB::ProbParm* CNS::h_prob_parm = nullptr;
+PROB::ProbParm* CNS::d_prob_parm = nullptr;
+BCRec* CNS::h_phys_bc=nullptr;
+BCRec* CNS::d_phys_bc=nullptr;
+
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented)
 
 CNS::CNS() {}
@@ -616,6 +623,25 @@ void CNS::printTotal() const
 #ifdef BL_LAZY
                        });
 #endif
+}
+
+void CNS::variableCleanUp ()
+{
+    delete h_prob_closures;
+    delete h_phys_bc;
+
+#ifdef AMREX_USE_GPU
+    The_Arena()->free(d_prob_closures);
+    The_Arena()->free(d_phys_bc);
+#endif
+    desc_lst.clear();
+    derive_lst.clear();
+
+    VdSdt.clear();
+    VSborder.clear();
+    Vprimsmf.clear();
+    Vnumflxmf.clear();
+    Vpntvflxmf.clear();
 }
 
 // Plotting

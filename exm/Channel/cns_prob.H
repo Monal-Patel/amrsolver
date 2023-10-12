@@ -66,7 +66,7 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
 }
 
 AMREX_GPU_DEVICE inline 
-void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
+void user_tagging(int i, int j, int k, int nt_level, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
 
     int jmax = geomdata.Domain().bigEnd(1);
     int jmin = geomdata.Domain().smallEnd(1);

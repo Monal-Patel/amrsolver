@@ -5,12 +5,6 @@
 using namespace amrex;
 
 int CNS::num_state_data_types = 0;
-PROB::ProbClosures* CNS::h_prob_closures = nullptr;
-PROB::ProbClosures* CNS::d_prob_closures = nullptr;
-PROB::ProbParm* CNS::h_prob_parm = nullptr;
-PROB::ProbParm* CNS::d_prob_parm = nullptr;
-BCRec* CNS::h_phys_bc=nullptr;
-BCRec* CNS::d_phys_bc=nullptr;
 
 static Box the_same_box (const Box& b) { return b; }
 //static Box grow_box_by_one (const Box& b) { return amrex::grow(b,1); }
@@ -95,27 +89,29 @@ static void set_z_vel_bc(BCRec& bc, const BCRec* phys_bc)
 
 void CNS::variableSetUp ()
 {
-    CNS::h_prob_closures = new PROB::ProbClosures{};
-    CNS::h_prob_parm = new PROB::ProbParm{};
-    CNS::h_phys_bc = new BCRec{};
+    // Closures and Problem structures (available on both CPU and GPU)
+    CNS::h_prob_closures  = new PROB::ProbClosures{};
+    CNS::h_prob_parm      = new PROB::ProbParm{};
+    CNS::h_phys_bc        = new BCRec{};
 #ifdef AMREX_USE_GPU
-    CNS::d_prob_closures = (PROB::ProbClosures*)The_Arena()->alloc(sizeof(PROB::ProbClosures));
-    CNS::d_prob_parm = (PROB::ProbParm*)The_Arena()->alloc(sizeof(PROB::ProbParm));
-    CNS::d_phys_bc = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
+    CNS::d_prob_closures  = (PROB::ProbClosures*)The_Arena()->alloc(sizeof(PROB::ProbClosures));
+    CNS::d_prob_parm      = (PROB::ProbParm*)The_Arena()->alloc(sizeof(PROB::ProbParm));
+    CNS::d_phys_bc        = (BCRec*)The_Arena()->alloc(sizeof(BCRec));
 #else
     CNS::d_prob_closures  = h_prob_closures;
-    CNS::d_prob_parm = h_prob_parm;
-    CNS::d_phys_bc   = h_phys_bc;
+    CNS::d_prob_parm      = h_prob_parm;
+    CNS::d_phys_bc        = h_phys_bc;
 #endif
 
+    // Read input parameters
     read_params();
 
+    // Independent (solved) variables and their boundary condition types
     bool state_data_extrap = false;
     bool store_in_checkpoint = true;
     desc_lst.addDescriptor(State_Type,IndexType::TheCellType(),
                            StateDescriptor::Point,NGHOST,NCONS,
                            &lincc_interp,state_data_extrap,store_in_checkpoint);
-              
     // https://github.com/AMReX-Codes/amrex/issues/396
 
     Vector<BCRec>       bcs(NCONS);
@@ -145,28 +141,23 @@ void CNS::variableSetUp ()
 
     // PROB::ConsBCs
     // PROB::StateVarNames
+
+    // Boundary conditions
     StateDescriptor::BndryFunc bndryfunc(cns_bcfill);
+    StateDescriptor::setBndryFuncThreadSafety(true);
     bndryfunc.setRunOnGPU(true);
-
-
     // applies bndry func to all variables in desc_lst starting from from 0.
     desc_lst.setComponent(State_Type,0,name, bcs, bndryfunc);
-
-
-    num_state_data_types = desc_lst.size();
-
-    StateDescriptor::setBndryFuncThreadSafety(true);
     ////////////////////////////////////////////////////////////////////////////
 
     // Define derived quantities ///////////////////////////////////////////////
+    num_state_data_types = desc_lst.size();
     // Pressure
-    derive_lst.add("pressure",IndexType::TheCellType(),1,
-                   derpres,the_same_box);
+    derive_lst.add("pressure",IndexType::TheCellType(),1, derpres,the_same_box);
     derive_lst.addComponent("pressure",desc_lst,State_Type,URHO,NCONS);
 
     // Temperature
-    derive_lst.add("temperature", IndexType::TheCellType(), 1,
-                 dertemp,the_same_box);
+    derive_lst.add("temperature",IndexType::TheCellType(),1,dertemp,the_same_box);
     derive_lst.addComponent("temperature", desc_lst, State_Type, URHO,NCONS);
 
     // Velocities
@@ -183,26 +174,5 @@ void CNS::variableSetUp ()
     derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,1);
     derive_lst.addComponent("z_velocity",desc_lst,State_Type,Zmom,1);
 #endif
-    // desc_lst.addDescriptor(Cost_Type, IndexType::TheCellType(), StateDescriptor::Point,
-    //                        0,1, &pc_interp);
-    // desc_lst.setComponent(Cost_Type, 0, "Cost", bc, bndryfunc);
-}
 
-void CNS::variableCleanUp ()
-{
-    delete h_prob_closures;
-    delete h_phys_bc;
-
-#ifdef AMREX_USE_GPU
-    The_Arena()->free(d_prob_closures);
-    The_Arena()->free(d_phys_bc);
-#endif
-    desc_lst.clear();
-    derive_lst.clear();
-
-    VdSdt.clear();
-    VSborder.clear();
-    Vprimsmf.clear();
-    Vnumflxmf.clear();
-    Vpntvflxmf.clear();
 }

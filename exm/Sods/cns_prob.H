@@ -9,7 +9,11 @@
 
 using namespace amrex;
 
+namespace PROB {
 
+////////////////////////////////EQUATIONS///////////////////////////////////////
+// Select the variables to solve/store and write
+// Independent (solved) variables
 #define URHO  0
 #define UMX   1
 #define UMY   2
@@ -17,6 +21,7 @@ using namespace amrex;
 #define UET   4
 #define NCONS 5
 
+// Dependent (derived) variables
 #define QRHO   0
 #define QU     1
 #define QV     2
@@ -25,32 +30,14 @@ using namespace amrex;
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 3
-namespace PROB {
+// fluxes
+// typedef euler_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 
-struct ProbParm
-{
-  Real p_l = 1.0;
-  Real p_r = 0.1;
-  Real rho_l = 1.0;
-  Real rho_r = 0.125;
-  Real u_l = 0.0;
-  Real u_r = 0.0;
-};
-
-///////////////////////////////CLOSURES/////////////////////////////////////////
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
-// user can also define their own closure class and use it here by naming it ProbClosures
-// template <typename Visc, typename Cond, typename Thermo>
-// class closures_derived_user_t : public Cond, public Visc, public Thermo
-// {
-  // private:
-  //
-  // public:
-// };
+// typedef 
 ////////////////////////////////////////////////////////////////////////////////
 
-
+//////////////////////////////DISCRETISATION////////////////////////////////////
+#define NGHOST 3 // TODO: make this an automatic parameter?
 void inline inputs() {
 
   ParmParse pp;
@@ -84,7 +71,31 @@ void inline inputs() {
   // pp.add("amrex.fpe_trap_overflow",1);
 
 }
+////////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////////CLOSURES/////////////////////////////////////////
+typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
+// user can also define their own closure class and use it here by naming it ProbClosures
+// template <typename Visc, typename Cond, typename Thermo>
+// class closures_derived_user_t : public Cond, public Visc, public Thermo
+// {
+  // private:
+  //
+  // public:
+// };
+
+// problem parameters
+struct ProbParm
+{
+  Real p_l = 1.0;
+  Real p_r = 0.1;
+  Real rho_l = 1.0;
+  Real rho_r = 0.125;
+  Real u_l = 0.0;
+  Real u_r = 0.0;
+};
+
+// initial condition
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
   const Real* prob_lo = geomdata.ProbLo();
@@ -110,26 +121,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   state(i,j,k,UET) = et + Real(0.5)*rhot*uxt*uxt;
 }
 
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
-
-      Real dengrad_threshold = 0.5;
-      amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
-      if (drhox > dengrad_threshold) {
-        tagfab(i,j,k) = true;
-        tagfab(i+1,j,k) = true;
-        tagfab(i+2,j,k) = true;
-        tagfab(i+3,j,k) = true;
-      }
-  }
-
-
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm, ProbClosures const& closures, auto const dx) {
-
-}
-
+// boundary conditions
 /**
  * \brief Fill external boundary conditions for ghost cells.
  *
@@ -183,7 +175,28 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
   }
 }
 
+// source term
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm, ProbClosures const& closures, auto const dx) {
+
+}
+////////////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////AMR//////////////////////////////////////////////
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void user_tagging(int i, int j, int k, int nt_level, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
+
+      Real dengrad_threshold = 0.5;
+      amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
+      if (drhox > dengrad_threshold) {
+        tagfab(i,j,k) = true;
+        tagfab(i+1,j,k) = true;
+        tagfab(i+2,j,k) = true;
+        tagfab(i+3,j,k) = true;
+      }
+  }
+////////////////////////////////////////////////////////////////////////////////
+
 } // namespace prob
-
-
 #endif
