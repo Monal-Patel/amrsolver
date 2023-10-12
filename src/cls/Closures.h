@@ -105,7 +105,7 @@ class visc_const_t {
   public:
     Real visc_ref = 1.458e-6; // Viscosity reference value
 
-    AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(Real& T) const {
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
     return visc_ref;}
 };
 
@@ -115,7 +115,7 @@ class visc_suth_t {
     Real visc_ref  = 1.458e-6;
     Real Tvisc_ref = 110.4;
   public:
-    AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(Real& T) const {
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real visc(const Real& T) const {
     return visc_ref*T*sqrt(T)/(Tvisc_ref + T);}
 };
 

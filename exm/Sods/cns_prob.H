@@ -97,7 +97,7 @@ struct ProbParm
 
 // initial condition
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
+void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
@@ -138,15 +138,15 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
  * @sa CnsFillExtDir
  * @sa CnsFillExtDir::operator()
  */
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::Real s_int[NCONS],
-         const amrex::Real s_refl[NCONS], amrex::Real s_ext[NCONS],
-         const int idir, const int sgn, const amrex::Real time,
-         amrex::GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& prob_parm)
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
+void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS],
+         const Real s_refl[NCONS], Real s_ext[NCONS],
+         const int idir, const int sgn, const Real time,
+         GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& prob_parm)
 {
   if (idir == 1) { // ylo or yhi
 
-    amrex::Abort("bcnormal not coded");
+    Abort("bcnormal not coded");
 
     // Real q_ext[NPRIM] = {0.0};
     // no-slip
@@ -155,11 +155,11 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
     // q_ext[QW]    = -s_int[UMZ]/s_int[URHO];
 
     // // dp/dn = 0
-    // amrex::Real eint_int = (s_int[UET] - 0.5*(s_int[UMX]*s_int[UMX] + s_int[UMY]*s_int[UMY] + s_int[UMZ]*s_int[UMZ])/s_int[URHO])/s_int[URHO];
-    // amrex::Real p_int = (parm.eos_gamma - 1.0)*s_int[URHO]*eint_int;
+    // Real eint_int = (s_int[UET] - 0.5*(s_int[UMX]*s_int[UMX] + s_int[UMY]*s_int[UMY] + s_int[UMZ]*s_int[UMZ])/s_int[URHO])/s_int[URHO];
+    // Real p_int = (parm.eos_gamma - 1.0)*s_int[URHO]*eint_int;
     // q_ext[QPRES] = p_int;
     // // T=Twall
-    // amrex::Real T_int = p_int/(parm.Rspec*s_int[URHO]); 
+    // Real T_int = p_int/(parm.Rspec*s_int[URHO]); 
     // q_ext[QT]    = max(prob_parm.Tw  +  dratio*(prob_parm.Tw - T_int),50.0);
     // // rho = eos(P,T)
     // q_ext[QRHO]  = q_ext[QPRES]/(parm.Rspec*q_ext[QT]);
@@ -169,8 +169,8 @@ bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::R
     // s_ext[UMX] = q_ext[QRHO]*q_ext[QU];
     // s_ext[UMY] = q_ext[QRHO]*q_ext[QV];
     // s_ext[UMZ] = q_ext[QRHO]*q_ext[QW];
-    // amrex::Real ekin_ext = 0.5*(q_ext[QU]*q_ext[QU] + q_ext[QV]*q_ext[QV] + q_ext[QW]*q_ext[QW]); 
-    // amrex::Real eint_ext = q_ext[QPRES]/(q_ext[QRHO]*(parm.eos_gamma - 1.0));
+    // Real ekin_ext = 0.5*(q_ext[QU]*q_ext[QU] + q_ext[QV]*q_ext[QV] + q_ext[QW]*q_ext[QW]); 
+    // Real eint_ext = q_ext[QPRES]/(q_ext[QRHO]*(parm.eos_gamma - 1.0));
     // s_ext[UET] = q_ext[QRHO]*(eint_ext + ekin_ext);
   }
 }
@@ -188,7 +188,7 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void user_tagging(int i, int j, int k, int nt_level, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
 
       Real dengrad_threshold = 0.5;
-      amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
+      Real drhox = Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
       if (drhox > dengrad_threshold) {
         tagfab(i,j,k) = true;
         tagfab(i+1,j,k) = true;
