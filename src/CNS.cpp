@@ -1,12 +1,12 @@
 #include <AMReX_MultiFabUtil.H>
 #include <AMReX_ParmParse.H>
-#include <CNS.H>
-#include <CNS_K.H>
+#include <CNS.h>
+#include <CNS_K.h>
 #include <cns_prob.H>
-#include <Central.H>
+#include <Central.h>
 
 #ifdef AMREX_USE_GPIBM
-#include <IBM.H>
+#include <IBM.h>
 #endif
 
 using namespace amrex;
@@ -38,6 +38,13 @@ Vector<MultiFab> CNS::VdSdt;
 Vector<MultiFab> CNS::VSborder;
 Vector<MultiFab> CNS::Vprimsmf;
 Vector<Array<MultiFab,AMREX_SPACEDIM>> CNS::Vnumflxmf,CNS::Vpntvflxmf; 
+
+PROB::ProbClosures* CNS::h_prob_closures = nullptr;
+PROB::ProbClosures* CNS::d_prob_closures = nullptr;
+PROB::ProbParm* CNS::h_prob_parm = nullptr;
+PROB::ProbParm* CNS::d_prob_parm = nullptr;
+BCRec* CNS::h_phys_bc=nullptr;
+BCRec* CNS::d_phys_bc=nullptr;
 
 // needed for CNSBld - derived from LevelBld (abstract class, pure virtual functions must be implemented)
 
@@ -230,7 +237,7 @@ void CNS::post_init(Real stop_time)
   //   Vpntvflxmf[level][idim].setVal(0.0);
   // }
 
-  // TODO: move to Central.H
+  // TODO: move to Central.h
 #if !AMREX_USE_GPU
   Central::coeffs2={Real(1.0), 0.0, 0.0};
   if (Central::order_keep==6) {
@@ -488,6 +495,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     auto const& ibfab = ibdata.array(mfi);
 #endif
     int lev = level;
+    int nt_lev = nStep();
     PROB::ProbParm const *lprobparm = d_prob_parm;
 
     ParallelFor(bx,
@@ -495,9 +503,9 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
     {
 #ifdef AMREX_USE_GPIBM
     // call function from cns_prob
-    user_tagging(i, j, k, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
+    user_tagging(i, j, k, nt_lev, tagfab, sdatafab, ibfab, geomdata,*lprobparm, lev);
 #else
-    user_tagging(i, j, k, tagfab, sdatafab, geomdata ,*lprobparm, lev);
+    user_tagging(i, j, k, nt_lev, tagfab, sdatafab, geomdata ,*lprobparm, lev);
 #endif
     });
   }
@@ -615,6 +623,25 @@ void CNS::printTotal() const
 #ifdef BL_LAZY
                        });
 #endif
+}
+
+void CNS::variableCleanUp ()
+{
+    delete h_prob_closures;
+    delete h_phys_bc;
+
+#ifdef AMREX_USE_GPU
+    The_Arena()->free(d_prob_closures);
+    The_Arena()->free(d_phys_bc);
+#endif
+    desc_lst.clear();
+    derive_lst.clear();
+
+    VdSdt.clear();
+    VSborder.clear();
+    Vprimsmf.clear();
+    Vnumflxmf.clear();
+    Vpntvflxmf.clear();
 }
 
 // Plotting

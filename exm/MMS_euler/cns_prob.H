@@ -6,7 +6,7 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_REAL.H>
 #include <AMReX_GpuMemory.H>
-#include <Closures.H>
+#include <Closures.h>
 
 using namespace amrex;
 
@@ -25,7 +25,7 @@ using namespace amrex;
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 2
+#define NGHOST 3
 
 namespace PROB {
 
@@ -118,7 +118,7 @@ struct ProbParm
 };
 
 ///////////////////////////////CLOSURES/////////////////////////////////////////
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
+typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 // user can also define their own closure class and use it here by naming it ProbClosures
 // template <typename Visc, typename Cond, typename Thermo>
 // class closures_derived_user_t : public Cond, public Visc, public Thermo
@@ -194,7 +194,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& pparm , int level) {
+void user_tagging(int i, int j, int k, int nt_lev, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& pparm , int level) {
 
       Real dengrad_threshold = 0.5;
       amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);

@@ -1,12 +1,12 @@
-#include <CNS.H>
+#include <CNS.h>
 #include <AMReX_FluxRegister.H>
-#include <CNS_hydro_K.H>
+#include <CNS_hydro_K.h>
 #include <cns_prob.H>
-#include <Central.H>
-#include <Riemann.H>
-#include <High_resolution.H>
+#include <Central.h>
+#include <Riemann.h>
+#include <High_resolution.h>
 #ifdef AMREX_USE_GPIBM
-#include <IBM.H>
+#include <IBM.h>
 #endif
 using namespace amrex;
 
@@ -412,7 +412,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
       amrex::ParallelFor(bx, NCONS,
       [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
       {
-      dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1.0_rt - ibMarkers(i,j,k,0));
+      dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
       });
     }
 #endif

@@ -5,7 +5,7 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_AmrLevel.H>
-#include <Closures.H>
+#include <Closures.h>
 
 #define URHO  0
 #define UMX   1
@@ -22,19 +22,20 @@
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 3
+#define NGHOST 4
 
 namespace PROB {
 
 //////////////////////////// Physical modelling ////////////////////////////////
 struct ProbParm
 { 
-  Real p_l = 1.0e5;
-  Real p_r = p_l;
-  Real rho_l = 1.225;
-  Real rho_r = rho_l;
-  Real u_l = 700.0;
-  Real u_r = u_l*0.0;
+  Real p_inf = 1.0e5;
+  Real T_inf = 300.0;
+  Real u_inf = 1200.0;
+
+  Real x0 = 1.0_rt;
+  Real y0 = 2.0_rt;
+  Real z0 = 2.0_rt;
 };
 
 typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
@@ -49,17 +50,16 @@ void inline inputs() {
   // 1 = Inflow             4 = SlipWall
   // 2 = Outflow            5 = NoSlipWall
   // 6 = user defined
-  pp.addarr("cns.lo_bc", std::vector<int>{2,-1,-1});
-  pp.addarr("cns.hi_bc", std::vector<int>{2,-1,-1});
-  pp.add   ("cns.order_rk", -2); // -2, 1, 2 or 3"
-  pp.add   ("cns.stages_rk", 2); // 1, 2 or 3
+  pp.addarr("cns.lo_bc", std::vector<int>{2,0,0});
+  pp.addarr("cns.hi_bc", std::vector<int>{2,0,0});
+  pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
+  pp.add   ("cns.stages_rk", 3); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
-  pp.add   ("cns.flux_euler", 2); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add   ("cns.order_keep", 2); // Order of accuracy=2, 4 or 6"
-  pp.add   ("cns.art_diss", 1); // 0=none, 1=artificial dissipation
-  pp.add   ("cns.nghost",3);
+  pp.add   ("cns.flux_euler", 0); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
+  pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
+  pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
   pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
 
@@ -71,51 +71,131 @@ void inline inputs() {
 
 //////////////////////////// Initial conditions ////////////////////////////////
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
+void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& pparm) {
   using amrex::Real;
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
+  Real P, rho, T, ux;
 
-  Real x = prob_lo[0] + (i+Real(0.5))*dx[0];
-  Real Pt, rhot, uxt;
-  if (x < prob_hi[0]/10) {
-      Pt = prob_parm.p_l;
-      rhot = prob_parm.rho_l;
-      uxt = prob_parm.u_l;
-  } else {
-      Pt = prob_parm.p_r;
-      rhot = prob_parm.rho_r;
-      uxt = prob_parm.u_r;
+  Real x = prob_lo[0] + (i+0.5_rt)*dx[0];
+  Real y = prob_lo[1] + (j+0.5_rt)*dx[1];
+  Real z = prob_lo[2] + (k+0.5_rt)*dx[2];
+  // if (x < prob_hi[0]/8) {
+  //     P = pparm.p_l;
+  //     rho = pparm.rho_l;
+  //     ux = pparm.u_l*0.0_rt;
+  // } else {
+  //     P = pparm.p_l;
+  //     rho = pparm.rho_l;
+  //     ux = pparm.u_l;
+  // }
+
+  // if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.4_rt,2) ){
+  //     P = pparm.p_inf;
+  //     rho = pparm.rho_inf*0.7;
+  //     ux = pparm.u_inf*0.9;
+  // } else {
+  //     P = pparm.p_inf;
+  //     rho = pparm.rho_inf;
+  //     ux = pparm.u_inf;
+  // }
+
+  Real u_small = pparm.u_inf*0.5;
+  Real xstart = 0.2_rt;
+  Real xend   = pparm.x0;
+  Real dis = xstart - xend;
+  Real grad = (pparm.u_inf - u_small)/(dis);
+  if (x < xstart) {
+    ux = pparm.u_inf;
+    T = pparm.T_inf;
+    P = pparm.p_inf;
   }
-  state(i,j,k,URHO ) = rhot;
-  state(i,j,k,UMX  ) = rhot*uxt;
+  else if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.6_rt,2) ) { 
+    Real xx = x - xstart;
+    // ux = pparm.u_inf + grad*xx;
+    ux = u_small;
+    T = pparm.T_inf*3;
+    P = pparm.p_inf;
+  } else {
+    // ux = u_small;
+    ux = pparm.u_inf;
+    T = pparm.T_inf*3;
+    P = pparm.p_inf;
+  }
+
+
+  rho = P/(closures.Rspec*T);
+  state(i,j,k,URHO ) = rho;
+  state(i,j,k,UMX  ) = rho*ux;
   state(i,j,k,UMY  ) = Real(0.0);
   state(i,j,k,UMZ  ) = Real(0.0);
-  Real et = Pt/(closures.gamma-Real(1.0));
-  state(i,j,k,UET) = et + Real(0.5)*rhot*uxt*uxt;
+  Real eint = rho*closures.cv*T;
+  state(i,j,k,UET) = eint + Real(0.5)*rho*ux*ux;
 }
 
 //
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto &ibfab, const auto& geomdata, const ProbParm& prob_parm , int level) {
+void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafab, const auto &ibfab, const auto& geomdata, const ProbParm& pparm , int level) {
 
-      Real dengrad_threshold = 0.5;
-      amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
-      if (drhox > dengrad_threshold) {
+  const Real* dx  = geomdata.CellSize();
+  Real x = (i+0.5_rt)*dx[0];
+  Real y = (j+0.5_rt)*dx[1];
+  Real z = (k+0.5_rt)*dx[2];
+
+  if ( nt==0) {
+    Real dengrad_threshold = 0.3;
+    amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,UMX) - sdatafab(i,j,k,UMX))/sdatafab(i,j,k,UMX);
+    // if (drhox > dengrad_threshold) {
+    //   for (int ii = -1; ii <= 1; ii++) {
+    //     for (int jj = -1; jj <= 1; jj++) {
+    //       for (int kk = -1; kk <= 1; kk++) {
+    //         tagfab(i+ii,j+jj,k+kk) = true;
+    //       }
+    //     }
+    //   }
+    // }
+    if (level==0 ) {
+      if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.50_rt,2) &&  (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) > pow(0.15_rt,2) )){
         tagfab(i,j,k) = true;
       }
-      if (ibfab(i,j,k,1)) {
-        for (int ii = -1; ii <= 1; ii++) {
-          for (int jj = -1; jj <= 1; jj++) {
-            for (int kk = -1; kk <= 1; kk++) {
-              tagfab(i+ii,j+jj,k+kk) = true;
-            }
+    }
+
+
+  }
+  if (level==0 && nt>0) {
+    Real dengrad_threshold = 0.3;
+    amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i,j,k,URHO))/sdatafab(i,j,k,URHO);
+    if (drhox > dengrad_threshold) {
+      tagfab(i,j,k) = true;
+    }
+    if (ibfab(i,j,k,1)) {
+      for (int ii = -1; ii <= 1; ii++) {
+        for (int jj = -1; jj <= 1; jj++) {
+          for (int kk = -1; kk <= 1; kk++) {
+            tagfab(i+ii,j+jj,k+kk) = true;
           }
         }
       }
-      // tagfab(i,j,k) = tagfab(i,j,k) || ibfab(i,j,k,1);
+    }
   }
+  else if (level==1 && nt>0) {
+    // Real dengrad_threshold = 0.1;
+    // amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i,j,k,URHO))/sdatafab(i,j,k,URHO);
+    // if (sdatafab(i,j,k,URHO) > 600) {
+    //   tagfab(i,j,k) = true;
+    // }
+    if (ibfab(i,j,k,1)) {
+      for (int ii = -1; ii <= 1; ii++) {
+        for (int jj = -1; jj <= 1; jj++) {
+          for (int kk = -1; kk <= 1; kk++) {
+            tagfab(i+ii,j+jj,k+kk) = true;
+          }
+        }
+      }
+    }
+  }
+}
 
 //////////////////////////// Boundary conditions ///////////////////////////////
 /**
@@ -129,7 +209,7 @@ void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const
  * @param sgn       high or low boundary (1: low, -1: high).
  * @param time      time.
  * @param geomdata  domain geometry data.
- * @param prob_parm ProbParm data as defined in prob_parm.H and initialised in
+ * @param pparm ProbParm data as defined in pparm.H and initialised in
  * amrex_probinit.
  * @sa CnsFillExtDir
  * @sa CnsFillExtDir::operator()
@@ -138,37 +218,12 @@ AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
 bcnormal(const amrex::Real x[AMREX_SPACEDIM], amrex::Real dratio, const amrex::Real s_int[NCONS],
          const amrex::Real s_refl[NCONS], amrex::Real s_ext[NCONS],
          const int idir, const int sgn, const amrex::Real time,
-         amrex::GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& prob_parm)
+         amrex::GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& pparm)
 {
   // if (idir == 1) { // ylo or yhi
 
     amrex::Abort("bcnormal not coded");
 
-    // Real q_ext[NPRIM] = {0.0};
-    // no-slip
-    // q_ext[QU]    = -s_int[UMX]/s_int[URHO];
-    // q_ext[QV]    = -s_int[UMY]/s_int[URHO];
-    // q_ext[QW]    = -s_int[UMZ]/s_int[URHO];
-
-    // // dp/dn = 0
-    // amrex::Real eint_int = (s_int[UET] - 0.5*(s_int[UMX]*s_int[UMX] + s_int[UMY]*s_int[UMY] + s_int[UMZ]*s_int[UMZ])/s_int[URHO])/s_int[URHO];
-    // amrex::Real p_int = (parm.eos_gamma - 1.0)*s_int[URHO]*eint_int;
-    // q_ext[QPRES] = p_int;
-    // // T=Twall
-    // amrex::Real T_int = p_int/(parm.Rspec*s_int[URHO]); 
-    // q_ext[QT]    = max(prob_parm.Tw  +  dratio*(prob_parm.Tw - T_int),50.0);
-    // // rho = eos(P,T)
-    // q_ext[QRHO]  = q_ext[QPRES]/(parm.Rspec*q_ext[QT]);
-
-    // // convert prims to cons
-    // s_ext[URHO] = q_ext[QRHO];
-    // s_ext[UMX] = q_ext[QRHO]*q_ext[QU];
-    // s_ext[UMY] = q_ext[QRHO]*q_ext[QV];
-    // s_ext[UMZ] = q_ext[QRHO]*q_ext[QW];
-    // amrex::Real ekin_ext = 0.5*(q_ext[QU]*q_ext[QU] + q_ext[QV]*q_ext[QV] + q_ext[QW]*q_ext[QW]); 
-    // amrex::Real eint_ext = q_ext[QPRES]/(q_ext[QRHO]*(parm.eos_gamma - 1.0));
-    // s_ext[UET] = q_ext[QRHO]*(eint_ext + ekin_ext);
-  // }
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE

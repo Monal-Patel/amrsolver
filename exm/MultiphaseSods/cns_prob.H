@@ -26,7 +26,7 @@
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <CNS_index_macros.H>
-#include <Closures.H>
+#include <Closures.h>
 
 using namespace amrex;
 
@@ -137,7 +137,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
+void user_tagging(int i, int j, int k, int nt_level, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
 
       Real dengrad_threshold = 0.5;
       amrex::Real drhox = amrex::Math::abs(sdatafab(i+1,j,k,URHO) - sdatafab(i-1,j,k,URHO))/sdatafab(i,j,k,URHO);
