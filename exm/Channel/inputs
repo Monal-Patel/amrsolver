@@ -14,24 +14,6 @@ geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0     0.0     0.0
 geometry.prob_hi     = 0.08214 0.0136871 0.02738
 
-# >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
-# 0 = Interior           3 = Symmetry
-# 1 = Inflow             4 = SlipWall
-# 2 = Outflow            5 = NoSlipWall
-# 6 = User
-# >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
-cns.lo_bc   = 0  6  0
-cns.hi_bc   = 0  6  0
-cns.order_rk   = 3 # -2, 1, 2 or 3 
-cns.stages_rk  = 3   
-cns.rhs_euler  = 1 # 0=false, 1=true
-cns.rhs_visc   = 1 # 0=false, 1=true
-cns.rhs_source = 1 # 0=false, 1=true
-cns.flux_euler = 1 # 0=riemann solver, 1=KEEP/AD, 2=WENO5
-cns.order_keep = 4 # Order of accuracy=2, 4 or 6
-cns.art_diss   = 0
-cns.nghost     = 2 
-cns.verbose    = 1 # 0=quiet, 1=verbose
 
 # REFINEMENT / REGRIDDING 
 amr.n_cell          = 96 128 64  
@@ -56,4 +38,3 @@ amr.plot_files_output = 1
 amr.plot_file         = plot/plt     # root name of plotfile
 amr.plot_int          = 500      # approximately 1 tau flow
 amr.derive_plot_vars  = pressure temperature x_velocity y_velocity z_velocity
-cns.screen_output     = 50 
