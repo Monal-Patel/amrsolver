@@ -5,7 +5,7 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
-#include <Closures.H>
+#include <Closures.h>
 #include <AMReX_Print.H>
 
 using namespace amrex;
@@ -148,7 +148,7 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void user_tagging(int i, int j, int k, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
+void user_tagging(int i, int j, int k, int nt_lev, auto& tagfab, const auto &sdatafab, const auto& geomdata, const ProbParm& prob_parm , int level) {
 
 // this section is for AMR refinement - fine as is.
       Real dengrad_threshold = 0.5;
