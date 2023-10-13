@@ -25,7 +25,7 @@ using namespace amrex;
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 2
+#define NGHOST 3
 
 namespace PROB {
 
@@ -118,7 +118,7 @@ struct ProbParm
 };
 
 ///////////////////////////////CLOSURES/////////////////////////////////////////
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
+typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 // user can also define their own closure class and use it here by naming it ProbClosures
 // template <typename Visc, typename Cond, typename Thermo>
 // class closures_derived_user_t : public Cond, public Visc, public Thermo

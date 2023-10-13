@@ -11,4 +11,4 @@ USE_GPIBM	= FALSE
 AMREX_NO_PROBINIT =TRUE
 
 include ./Make.package
-include $(AMREX_HOME)/../../src/Make.CNS
+include $(AMR_SOLVER)/src/Make.CNS
