@@ -11,7 +11,7 @@
 #include <AMReX_StateDescriptor.H>
 #include <AMReX_GpuContainers.H>
 // #include <CNS_index_macros.H>
-#include <cns_prob.H>
+#include <prob.h>
 
 // basic CGAL headers
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>

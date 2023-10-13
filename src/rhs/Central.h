@@ -3,7 +3,7 @@
 
 #include <CNS.h>
 #include <AMReX_FArrayBox.H>
-#include <cns_prob.H>
+#include <prob.h>
 
 using namespace amrex;
 

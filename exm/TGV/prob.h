@@ -3,7 +3,6 @@
 
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
-#include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <Closures.h>
 
@@ -61,12 +60,13 @@ void inline inputs() {
   pp.add   ("cns.screen_output", 100000); //
   pp.add   ("cns.verbose", 0); // 0=quiet, 1=verbose
 }
+////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////CLOSURES/////////////////////////////////////////
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
+typedef cls_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 // user can also define their own closure class and use it here by naming it ProbClosures
 // template <typename Visc, typename Cond, typename Thermo>
-// class closures_derived_user_t : public Cond, public Visc, public Thermo
+// class cls_derived_user_t : public Cond, public Visc, public Thermo
 // {
   // private:
   //
@@ -135,14 +135,14 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
 
 // boundary conditions
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS], const Real s_refl[NCONS], Real s_ext[NCONS], const int idir, const int sgn, const Real time, GeometryData const& /*geomdata*/,  ProbClosures const& closures, ProbParm const& pparm)
+void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS], const Real s_refl[NCONS], Real s_ext[NCONS], const int idir, const int sgn, const Real time, GeometryData const& /*geomdata*/,  ProbClosures const& cls, ProbParm const& pparm)
 { 
   Abort("bcnormal not set");
 }
 
 // source term
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& lprobparm, ProbClosures const& closures, auto const dx) {}
+void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& pparm, ProbClosures const& cls, auto const dx) {}
 ////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////AMR//////////////////////////////////////////////

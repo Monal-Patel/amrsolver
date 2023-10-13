@@ -3,7 +3,7 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_PhysBCFunct.H>
 #include <CNS.h>
-#include <cns_prob.H>
+#include <prob.h>
 using namespace amrex;
 
 

@@ -2,7 +2,7 @@
 #include <AMReX_ParmParse.H>
 #include <CNS.h>
 #include <CNS_K.h>
-#include <cns_prob.H>
+#include <prob.h>
 #include <Central.h>
 
 #ifdef AMREX_USE_GPIBM

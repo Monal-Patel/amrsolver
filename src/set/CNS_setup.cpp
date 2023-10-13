@@ -1,5 +1,5 @@
 #include <CNS.h>
-#include <cns_prob.H>
+#include <prob.h>
 #include <CNS_K.h>
 
 using namespace amrex;

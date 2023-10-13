@@ -4,7 +4,7 @@
 #include <AMReX_Amr.H>
 
 #include <CNS.h>
-#include <cns_prob.H>
+#include <prob.h>
 
 #ifdef AMREX_USE_GPIBM
 #include <IBM.h>

@@ -1,7 +1,7 @@
 #include <CNS.h>
 #include <AMReX_FluxRegister.H>
 #include <CNS_hydro_K.h>
-#include <cns_prob.H>
+#include <prob.h>
 #include <Central.h>
 #include <Riemann.h>
 #include <High_resolution.h>
@@ -11,8 +11,7 @@
 using namespace amrex;
 
 
-Real
-CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
+Real CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 {
     BL_PROFILE("CNS::advance()");
 

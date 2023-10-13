@@ -1,1 +1,1 @@
-CEXE_headers += cns_prob.H cns_prob_parm.H
+CEXE_headers += prob.h cns_prob_parm.H

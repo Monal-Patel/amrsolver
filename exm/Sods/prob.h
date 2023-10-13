@@ -3,7 +3,6 @@
 
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
-#include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <Closures.h>
 

@@ -4,7 +4,7 @@
 #include <AMReX_FArrayBox.H>
 #include <limits>
 #include <cmath>
-#include <cns_prob.H>
+#include <prob.h>
 
 using namespace amrex;
 
