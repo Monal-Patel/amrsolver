@@ -1,7 +1,7 @@
 #ifndef IBM_H_
 #define IBM_H_
 
-#define NIMPS 3 // number of image points per ghost point
+#define NIMPS 2 // number of image points per ghost point
 
 #include <AMReX_Amr.H>
 #include <AMReX_AmrLevel.H>
@@ -246,7 +246,7 @@ namespace IBM {
       void computeSurf(int lev);
 
     private:
-      void computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, const Real* prob_lo, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> markersFab, auto const idxCube);
+      void computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, const GpuArray<Real,AMREX_SPACEDIM>& prob_lo, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> markersFab, auto const idxCube);
 
       // AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
       // void extrapolateGP(Array2D<Real,0,NIMPS+1,0,NPRIM-1>& primStateNormal, Real dgp, Real dim);

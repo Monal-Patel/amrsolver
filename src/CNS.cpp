@@ -419,15 +419,15 @@ void CNS::post_timestep(int /* iteration*/)
 void CNS::postCoarseTimeStep (Real time)
 {
 #if AMREX_USE_GPIBM
-  if (ib_move) {
-    IBM::ib.moveGeom();
-    // reallocate variables?
-    // Print() << parent->finestLevel() << std::endl;
-    for (int lev=0; lev <= parent->finestLevel(); lev++) {
-      IBM::ib.computeMarkers(0);
-      IBM::ib.initialiseGPs(0);
-    }
-  }
+  // if (ib_move) {
+  //   IBM::ib.moveGeom();
+  //   // reallocate variables?
+  //   // Print() << parent->finestLevel() << std::endl;
+  //   for (int lev=0; lev <= parent->finestLevel(); lev++) {
+  //     IBM::ib.computeMarkers(0);
+  //     IBM::ib.initialiseGPs(0);
+  //   }
+  // }
 #endif
 }
 // -----------------------------------------------------------------------------

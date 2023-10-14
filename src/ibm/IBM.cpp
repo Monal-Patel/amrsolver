@@ -106,7 +106,7 @@ void IB::destroyMFs (int lev) {
 
   IBMultiFab& mfab = *ibMFa[lev];
   int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
-  const Real* prob_lo = pamr->Geom(lev).data().ProbLo();
+  GpuArray<Real,AMREX_SPACEDIM> prob_lo = pamr->Geom(lev).ProbLoArray();
 
   for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &ibFab = mfab.get(mfi);
@@ -128,12 +128,7 @@ void IB::destroyMFs (int lev) {
       Point gridpoint(x,y,z);
       CGAL::Bounded_side res = inside(gridpoint);
 
-      if (res == CGAL::ON_BOUNDED_SIDE) { 
-          // soild marker
-          ibMarkers(i,j,k,0) = true;}
-      else {
-          ibMarkers(i,j,k,0) = false;
-          }
+      if (int(res) == int(CGAL::ON_BOUNDED_SIDE)) {ibMarkers(i,j,k,0) = true;}
 
       AMREX_ASSERT_WITH_MESSAGE((res != CGAL::ON_BOUNDARY),"Grid point on IB surface");
     }}};
@@ -194,7 +189,7 @@ void IB::initialiseGPs (int lev) {
 
   IBMultiFab& mfab = *ibMFa[lev];
   int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
-  const Real* prob_lo = pamr->Geom(lev).data().ProbLo();
+  GpuArray<Real,AMREX_SPACEDIM> prob_lo = pamr->Geom(lev).ProbLoArray();
 
   for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
     IBM::IBFab &ibFab = mfab.get(mfi);
@@ -336,7 +331,7 @@ void IB::initialiseGPs (int lev) {
 }
 
 
-void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, const Real* prob_lo, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> ibFab, auto const idxCube) {
+void IB::computeIPweights(Array2D<Real,0,NIMPS-1,0,7>&weights, Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>&imp_xyz, Array2D<int,0,NIMPS-1,0,AMREX_SPACEDIM-1>& imp_ijk, const GpuArray<Real,AMREX_SPACEDIM>& prob_lo, GpuArray<Real,AMREX_SPACEDIM>& dxyz, const Array4<bool> ibFab, auto const idxCube) {
 
   for (int iim=0; iim<NIMPS; iim++) {
     int i = imp_ijk(iim,0); int j = imp_ijk(iim,1); int k = imp_ijk(iim,2); 
