@@ -31,6 +31,9 @@
 // #include <boost/unordered_map.hpp>
 #include <boost/property_map/property_map.hpp>
 
+// CGAL header for inout testing
+#include <CGAL/Side_of_triangle_mesh.h>
+
 using namespace amrex;
 
 namespace IBM {
@@ -49,6 +52,7 @@ namespace IBM {
 
   typedef K2::Vector_3 Vector_CGAL;
   typedef boost::graph_traits<Polyhedron>::face_descriptor  face_descriptor;
+  typedef CGAL::Side_of_triangle_mesh<Polyhedron, K2> inside_t;
 
   // typedef Polyhedron::Vertex_iterator      vertexIter;
   // typedef Polyhedron::Face_iterator        faceIter;
@@ -96,6 +100,7 @@ namespace IBM {
       Gpu::ManagedVector<Array1D<int,0,AMREX_SPACEDIM-1>> gp_ijk;
       Gpu::ManagedVector<Array1D<Real,0,AMREX_SPACEDIM-1>> normal,tangent1,tangent2, ib_xyz;
       Gpu::ManagedVector<Real> disGP,disIM; 
+      Gpu::ManagedVector<int> geomIdx; 
 
       Gpu::ManagedVector<Array2D<Real,0,NIMPS-1,0,AMREX_SPACEDIM-1>> imp_xyz;
       Gpu::ManagedVector<Array2D<int, 0,NIMPS-1,0,AMREX_SPACEDIM-1>> imp_ijk;
@@ -107,11 +112,11 @@ namespace IBM {
       Gpu::ManagedVector<Array1D<int,0,AMREX_SPACEDIM-1>> indexCube;
       // = { {0,0,0}, {0,1,0}, {1,1,0}, {1,0,0}, {0,0,1}, {0,1,1}, {1,1,1}, {1,0,1}}; // index cube for image point interpolation
 
-      void resize (int n) {
-        gp_ijk.resize(n); ib_xyz.resize(n);
-        disGP.resize(n); disIM.resize(n); 
-        imp_xyz.resize(n); imp_ijk.resize(n); imp_ipweights.resize(n);
-      }
+      // void resize (int n) {
+      //   gp_ijk.resize(n); ib_xyz.resize(n);
+      //   disGP.resize(n); disIM.resize(n); 
+      //   imp_xyz.resize(n); imp_ijk.resize(n); imp_ipweights.resize(n);
+      // }
   };
 
   // IBFab holds the solid point and ghost point boolean arrays
@@ -181,6 +186,7 @@ namespace IBM {
       int NGHOST_IB = 0; // number of ghost points in IBMultiFab -- set in ib.init(...)
       const int NVAR_IB  = 2; // number of variables in IBMultiFab
       // const int NIMPS = 2; // number of image points per ghost point
+      int NGEOM=1; // number of geometries
 
       // pointer to Amr class instance
       Amr* pamr;
@@ -198,10 +204,12 @@ namespace IBM {
       Vector<MultiFab> lsMFa;
 
       // IB explicit geometry
-      Polyhedron geom;  
+      // Polyhedron geom;  
+      Vector<Polyhedron> VGeom;  
 
       // AABB tree
-      Tree* treePtr;
+      // Tree* treePtr;
+      Vector<Tree*> VtreePtr;
 
 
     // Instead of std::map you may use std::unordered_map, boost::unordered_map
@@ -209,15 +217,21 @@ namespace IBM {
     // CGAL::Unique_hash_map<face_descriptor,Vector> fnormals;
     // boost::unordered_map<vertex_descriptor,Vector> vnormals;
       // face element normals
-      std::map<face_descriptor,Vector_CGAL> fnormals;
+      // std::map<face_descriptor,Vector_CGAL> fnormals;
+      Vector<std::map<face_descriptor,Vector_CGAL>> Vfnormals;
+
       // face state data map
-      std::map<face_descriptor,surfdata> face2state;
+      // std::map<face_descriptor,surfdata> face2state;
       // std::map stores information in a binary tree, it has log(N) complexity for key-value pair insertion and value retrieval for a key.
       // could also fit normals into this -- however might need to modify compute_normals routine
 
       // face displacement map
       // std::map<face_descriptor,Vector_CGAL> fdisplace;
       // Vector or Real[3] don't work
+
+
+      // in out testing function
+      Vector<inside_t*> VInOutFunc;
 
       explicit IB ();
       ~IB ();

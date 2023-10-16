@@ -1,5 +1,4 @@
 #include <IBM.h>
-#include <CGAL/Side_of_triangle_mesh.h>
 #include <AMReX_ParmParse.H>
 
 using namespace amrex;
@@ -54,7 +53,13 @@ void IBMultiFab::copytoRealMF(MultiFab &mf, int ibcomp, int mfcomp) {
 
 // constructor and destructor
 IB::IB (){}
-IB::~IB () { delete treePtr;}
+IB::~IB () { 
+  // clear memory
+  for (int ii=0; ii<IB::NGEOM; ii++) {
+    delete VtreePtr.at(ii);
+    delete VInOutFunc.at(ii);
+  };
+}
 
 // initialise IB
 void IB::init(Amr* pointer_amr, int nghost) {
@@ -102,7 +107,6 @@ void IB::destroyMFs (int lev) {
 
  void IB::computeMarkers (int lev) {
 
-  CGAL::Side_of_triangle_mesh<Polyhedron, K2> inside(IB::geom);
 
   IBMultiFab& mfab = *ibMFa[lev];
   int nhalo = mfab.nGrow(0); // assuming same number of ghost points in all directions
@@ -126,34 +130,23 @@ void IB::destroyMFs (int lev) {
       Real y=prob_lo[1] + (0.5_rt + Real(j))*cellSizes[lev][1];
       Real z=prob_lo[2] + (0.5_rt + Real(k))*cellSizes[lev][2];
       Point gridpoint(x,y,z);
-      CGAL::Bounded_side res = inside(gridpoint);
 
-      if (int(res) == int(CGAL::ON_BOUNDED_SIDE)) {ibMarkers(i,j,k,0) = true;}
+      for (int ii=0; ii<IB::NGEOM; ii++) {
+        // Print() << i << " " << j << " " << k << " " << ii << std::endl;
+        inside_t& inside = *VInOutFunc[ii];
+        CGAL::Bounded_side result = inside(gridpoint);
+        AMREX_ASSERT_WITH_MESSAGE((result != CGAL::ON_BOUNDARY),"Grid point on IB surface");
+        // if point inside any IB geometry, mark as solid, move on to another point. This minimises the number of inout testing (expensive) calls.
+        if (int(result) == int(CGAL::ON_BOUNDED_SIDE)) {
+          ibMarkers(i,j,k,0) = true;
+          break;}
+      }
 
-      AMREX_ASSERT_WITH_MESSAGE((res != CGAL::ON_BOUNDARY),"Grid point on IB surface");
     }}};
 
-    // compute ghs markers ------------------------------
-    // TODO: fix "error: function IBM:IBFab::IBFab(const IBM::IBFab &) (declared implictly cannot be referenced -- it is a deleted function)"
-    // const Box& bxg = mfi.growntilebox(nhalo);
-    // amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    // {
-    //   bool ghost = false;
-    //   if (ibMarkers(i,j,k,0)) {
-    //     for (int l = -1; l<=1; ++l) {
-    //       ghost = ghost || (!ibMarkers(i+l,j,k,0));
-    //       ghost = ghost || (!ibMarkers(i,j+l,k,0));
-    //       ghost = ghost || (!ibMarkers(i,j,k+l,0));
-    //     }
-    //     ibMarkers(i,j,k,1) = ghost; 
-        // ibFab.gpData.ngps += ghost;
-        // ibFab.gpData.idx.push_back(GpuArray<int,3>{i,j,k});
-    //   }
-    // });
-
-
-   ibFab.gpData.ngps=0;
-   int nextra=1;
+    // compute ghost markers
+    ibFab.gpData.ngps=0;
+    int nextra=1;
     for (int k = lo[2] - nextra; k <= hi[2] + nextra; ++k) {
     for (int j = lo[1] - nextra; j <= hi[1] + nextra; ++j) {
     for (int i = lo[0] - nextra; i <= hi[0] + nextra; ++i) {
@@ -166,24 +159,18 @@ void IB::destroyMFs (int lev) {
         }
         ibMarkers(i,j,k,1) = ghost; 
         ibFab.gpData.ngps += ghost;
-        if (ghost) {ibFab.gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});}
+
+        if (ghost) {
+          // store GP index
+          ibFab.gpData.gp_ijk.push_back(Array1D<int,0,AMREX_SPACEDIM-1>{i,j,k});
       }
       else {
         ibMarkers(i,j,k,1) = false;
       }
     }}};
-
-    // DEBUGGING /////////////
-    // auto* idxData = ibFab.gpData.idx.data(); 
-    // amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
-    // {
-    //   printf("ii=%d, i=%d, j=%d, k=%d \n",ii,idxData[ii][0],idxData[ii][1],idxData[ii][2]);
-    // });
-    // exit(0);
-    /////////////////////////
+  }
   }
 }
-
 
 void IB::initialiseGPs (int lev) {
 
@@ -209,6 +196,7 @@ void IB::initialiseGPs (int lev) {
     for (int j = lo[1]; j <= hi[1]; ++j) {
     for (int i = lo[0]; i <= hi[0]; ++i) {
 
+    // for each ghost point
     if (ibMarkers(i,j,k,1)) {
 
       Real x=prob_lo[0] + (0.5_rt + i)*cellSizes[lev][0];
@@ -216,9 +204,27 @@ void IB::initialiseGPs (int lev) {
       Real z=prob_lo[2] + (0.5_rt + k)*cellSizes[lev][2];
       Point gp(x,y,z);
 
+      // find and store geometery index for this GP. This index is used for searching appropriate tree in initialiseGPs to find the closest element and searching all trees.
+
+      // in out test for each geometry
+      int igeom;
+      for (int ii=0; ii<IB::NGEOM; ii++) {
+        inside_t& inside = *VInOutFunc[ii];
+        CGAL::Bounded_side result = inside(gp);
+
+        if (int(result) == int(CGAL::ON_BOUNDED_SIDE)) {
+          igeom = ii;
+          ibFab.gpData.geomIdx.push_back(igeom);
+          // if (ii == 1) {Print() << ii << std::endl;}
+          break;
+        }
+      // TODO: assert geometries do not overlap?
+      }
+
       // closest surface point and face --------------------------
-      Point_and_primitive_id closest_elem = treePtr->closest_point_and_primitive(gp);
-      //*store*
+      Point_and_primitive_id closest_elem = VtreePtr[igeom]->closest_point_and_primitive(gp);
+
+      //store
       gpData.closest_cgal.push_back(closest_elem);
 
       // This closest point (cp) is between the face plane and the gp
@@ -233,7 +239,7 @@ void IB::initialiseGPs (int lev) {
       //           << face->halfedge()->next()->next()->vertex()->point()
       //           << " )" 
       //           << std::endl; 
-      // Print() << "Normal " << fnormals[face] <<std::endl;
+      // Print() << "Normal " << Vfnormals[igeom][face] <<std::endl;
       // Print() << "cp-gp " << cp - gp << std::endl; // should be in the direction of normal
       // Print() << "Plane " << face->plane().a() << " " << face->plane().b() << " "  << face->plane().c() << " " << face->plane().d() << std::endl;
 
@@ -245,7 +251,7 @@ void IB::initialiseGPs (int lev) {
 
       //*store*
       gpData.disGP.push_back(disGP);
-      Array1D<Real,0,AMREX_SPACEDIM-1> norm = {fnormals[face][0],fnormals[face][1],fnormals[face][2]};
+      Array1D<Real,0,AMREX_SPACEDIM-1> norm = {Vfnormals[igeom][face][0],Vfnormals[igeom][face][1],Vfnormals[igeom][face][2]};
 
       Point p1 = face->halfedge()->vertex()->point();
       Point p2 = face->halfedge()->next()->vertex()->point();
@@ -278,7 +284,7 @@ void IB::initialiseGPs (int lev) {
       //     i,j  (1) ----------------------      i+1,j  (4)
       for (int jj=0; jj<NIMPS; jj++) {
         for (int kk=0; kk<AMREX_SPACEDIM; kk++) {
-          imp_xyz(jj,kk) = cp[kk] + Real(jj+1)*disIM[lev]*fnormals[face][kk];
+          imp_xyz(jj,kk) = cp[kk] + Real(jj+1)*disIM[lev]*Vfnormals[igeom][face][kk];
           imp_ijk(jj,kk) = floor((imp_xyz(jj,kk) - prob_lo[kk])/cellSizes[lev][kk] - 0.5_rt);
         }
  
@@ -590,95 +596,114 @@ void IB::compute_plane_equations( Polyhedron::Facet& f) {
 void IB::readGeom() {
 
   ParmParse pp;
-  std::string filename;
-  pp.get("ib.filename",filename);
+  Vector<std::string> Vfilename;
+  pp.getarr("ib.filename",Vfilename);
+
+  IB::NGEOM = Vfilename.size();
+  VGeom.resize(NGEOM);
+  VtreePtr.resize(NGEOM);
+  Vfnormals.resize(NGEOM);
+  VInOutFunc.resize(NGEOM);
 
   namespace PMP = CGAL::Polygon_mesh_processing;
-
-  if(!PMP::IO::read_polygon_mesh(filename, IB::geom) || CGAL::is_empty(IB::geom) || !CGAL::is_triangle_mesh(IB::geom))
-  {
-    std::cerr << "Invalid geometry filename" << std::endl;
-    exit(1);
-  }
   Print() << "----------------------------------" << std::endl;
-  Print() << "Geometry " << filename << " read"<< std::endl;
-  Print() << "----------------------------------" << std::endl;
-  Print() << "Is geometry only made of triangles? " << geom.is_pure_triangle() << std::endl;
-  Print() << "Number of facets " << geom.size_of_facets() << std::endl;
+  for (int i=0; i<NGEOM; i++) {
+    Print() << "----------------------------------" << std::endl;
+    if(!PMP::IO::read_polygon_mesh(Vfilename[i], IB::VGeom[i]))
+    {
+      std::cerr << "Invalid geometry filename" << std::endl;
+      exit(1);
+    }
+    Print() << "Geometry (i=" << i << ") " << Vfilename[i] << " read"<< std::endl;
+    Print() << "Is geometry only made of triangles? " << VGeom[i].is_pure_triangle() << std::endl;
+    Print() << "Number of facets " << VGeom[i].size_of_facets() << std::endl;
 
   // constructs AABB tree and computes internal KD-tree
   // data structure to accelerate distance queries
-  treePtr = new Tree (faces(geom).first, faces(geom).second, geom);
-  Print() << "AABB tree constructed" << std::endl;
+    VtreePtr[i] = new Tree (faces(VGeom[i]).first, faces(VGeom[i]).second, VGeom[i]);
+    Print() << "AABB tree constructed" << std::endl;
 
-  PMP::compute_face_normals(geom, boost::make_assoc_property_map(fnormals));
-  Print() << "Face normals computed" << std::endl;
+    PMP::compute_face_normals(VGeom[i], boost::make_assoc_property_map(Vfnormals[i]));
+    Print() << "Face normals computed" << std::endl;
 
-  // plane class also computes orthogonal direction to the face. However, the orthogonal vector is not normalised.
-  std::for_each( geom.facets_begin(), geom.facets_end(), compute_plane_equations);
-  
-  // create face to displacement map //
-  // auto temp = boost::make_assoc_property_map(fdisplace);
-  // for(face_descriptor f : faces(geom))
-  // {
-  //   Vector_CGAL vec;
-  //   put(temp, f, vec);
-  //   // std::cout << "face plane " << f->plane() << "\n";
-  // }
+    // plane class also computes orthogonal direction to the face. However, the orthogonal vector is not normalised.
+    std::for_each( VGeom[i].facets_begin(), VGeom[i].facets_end(), compute_plane_equations);
+    Print() << "Plane equations per face computed" << std::endl;
 
-  // create face to surfdata map //
-  auto map = boost::make_assoc_property_map(face2state);
-  for(face_descriptor f : faces(geom))
-  {
-    surfdata data;
-    put(map, f, data);
-    // std::cout << "face plane" << f->plane() << "\n";
+    // make inside/outside function for each geometry
+    for (int ii=0; ii<IB::NGEOM; ii++) {
+      VInOutFunc[ii] = new inside_t(IB::VGeom[ii]);
+    }
+    Print() << "In out testing function constructed" << std::endl;
+
+    // create face to displacement map //
+    // auto temp = boost::make_assoc_property_map(fdisplace);
+    // for(face_descriptor f : faces(geom))
+    // {
+    //   Vector_CGAL vec;
+    //   put(temp, f, vec);
+    //   // std::cout << "face plane " << f->plane() << "\n";
+    // }
+
+    // create face to surfdata map //
+    // auto map = boost::make_assoc_property_map(face2state);
+    // for(face_descriptor f : faces(geom))
+    // {
+    //   surfdata data;
+    //   put(map, f, data);
+    //   // std::cout << "face plane" << f->plane() << "\n";
+    // }
   }
+  Print() << "----------------------------------" << std::endl;
+  Print() << "----------------------------------" << std::endl;
+
+  //  || CGAL::is_empty(IB::VGeom[i]) || !CGAL::is_triangle_mesh(IB::geom)
+
 }
 
-void IB::moveGeom() {
-  // Displace verticies //
-  // For each vertex its position p is translated by the displacement vector (di) for each ith face. Each vertex has nfaces, for a triangular closed mesh this equals the number of edges at a vertex. This is called degree of the vertex by CGGAL.
-  for (Polyhedron::Facet_handle fh : geom.facet_handles())
-  {
-    // Print() << "New face" << " \n";
-    Polyhedron::Halfedge_handle start = fh->halfedge(), h = start;
-    do {
-      int nfaces = h->vertex()->degree();
-      CGAL::Point_3 p = h->vertex()->point();
-      // std::cout << "Vertex degree = " << nfaces  << "\n";
-      // std::cout << "Vertex before = " << p << "\n";
-      face_descriptor f = fh->halfedge()->face();
-      Array<Real,AMREX_SPACEDIM> dis = face2state[f].displace; 
+// void IB::moveGeom() {
+//   // Displace verticies //
+//   // For each vertex its position p is translated by the displacement vector (di) for each ith face. Each vertex has nfaces, for a triangular closed mesh this equals the number of edges at a vertex. This is called degree of the vertex by CGGAL.
+//   for (Polyhedron::Facet_handle fh : geom.facet_handles())
+//   {
+//     // Print() << "New face" << " \n";
+//     Polyhedron::Halfedge_handle start = fh->halfedge(), h = start;
+//     do {
+//       int nfaces = h->vertex()->degree();
+//       CGAL::Point_3 p = h->vertex()->point();
+//       // std::cout << "Vertex degree = " << nfaces  << "\n";
+//       // std::cout << "Vertex before = " << p << "\n";
+//       face_descriptor f = fh->halfedge()->face();
+//       Array<Real,AMREX_SPACEDIM> dis = face2state[f].displace; 
       
-      CGAL::Vector_3<K2> di(dis[0]/nfaces,dis[1]/nfaces,dis[2]/nfaces);
-      CGAL::Aff_transformation_3<K2> translate(CGAL::TRANSLATION,di);
-      p = p.transform(translate);
+//       CGAL::Vector_3<K2> di(dis[0]/nfaces,dis[1]/nfaces,dis[2]/nfaces);
+//       CGAL::Aff_transformation_3<K2> translate(CGAL::TRANSLATION,di);
+//       p = p.transform(translate);
 
-      // std::cout << "Vertex after = " << p << "\n";
+//       // std::cout << "Vertex after = " << p << "\n";
 
-      h = h->next();
-    } while(h!=start);
-  }
+//       h = h->next();
+//     } while(h!=start);
+//   }
 
-  // apply boundary conditions //
-  // using a map of boundary nodes?
+//   // apply boundary conditions //
+//   // using a map of boundary nodes?
   
 
-  // Misc geometry things //
-  // rebuild tree
-  treePtr->rebuild(faces(geom).first,faces(geom).second,geom);
-  Print() << "Tree rebuilt" << std::endl;
+//   // Misc geometry things //
+//   // rebuild tree
+//   treePtr->rebuild(faces(geom).first,faces(geom).second,geom);
+//   Print() << "Tree rebuilt" << std::endl;
 
-  CGAL::Polygon_mesh_processing::compute_face_normals(geom, boost::make_assoc_property_map(fnormals));
-  Print() << "Face normals recomputed" << std::endl;
+//   CGAL::Polygon_mesh_processing::compute_face_normals(geom, boost::make_assoc_property_map(fnormals));
+//   Print() << "Face normals recomputed" << std::endl;
 
-  // plane class also computes orthogonal direction to the face. However, the orthogonal vector is not normalised.
-  std::for_each( geom.facets_begin(), geom.facets_end(),compute_plane_equations);
-  Print() << "Plane equations recomputed" << std::endl;
+//   // plane class also computes orthogonal direction to the face. However, the orthogonal vector is not normalised.
+//   std::for_each( geom.facets_begin(), geom.facets_end(),compute_plane_equations);
+//   Print() << "Plane equations recomputed" << std::endl;
 
-  // Geometry fair?
-}
+//   // Geometry fair?
+// }
 
 void IB::computeSurf(int lev) {
 
