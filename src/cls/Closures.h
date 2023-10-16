@@ -170,7 +170,7 @@ class cond_suth_t {
 
 ////////////////////////////////CLOSURES/////////////////////////////////
 template <typename Visc, typename Cond, typename Thermo>
-class closures_derived_base_t : public Cond, public Visc, public Thermo
+class closures_derived_t : public Cond, public Visc, public Thermo
 {
   private:
   public:

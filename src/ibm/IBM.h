@@ -1,7 +1,6 @@
 #ifndef IBM_H_
 #define IBM_H_
 
-#define NIMPS 2 // number of image points per ghost point
 
 #include <AMReX_Amr.H>
 #include <AMReX_AmrLevel.H>

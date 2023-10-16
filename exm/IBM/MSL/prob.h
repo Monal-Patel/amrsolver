@@ -22,7 +22,8 @@
 #define QPRES  5
 #define NPRIM  6
 
-#define NGHOST 4
+#define NGHOST 3
+#define NIMPS 3 // number of image points per ghost point
 
 namespace PROB {
 
@@ -38,7 +39,7 @@ struct ProbParm
   Real z0 = 0.25_rt;
 };
 
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t, ProbParm> ProbClosures;
+typedef closures_derived_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 
 //////////////////////////// Numerical modelling ///////////////////////////////
 void inline inputs() {
@@ -58,9 +59,9 @@ void inline inputs() {
   pp.add   ("cns.rhs_visc", 0); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
   pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add   ("cns.order_keep", 2); // Order of accuracy=2, 4 or 6"
-  pp.add   ("cns.art_diss", 1); // 0=none, 1=artificial dissipation
-  pp.add   ("cns.screen_output", 1); // 0=quiet, 1=verbose
+  pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
+  pp.add   ("cns.art_diss",1); // 0=none, 1=artificial dissipation
+  pp.add   ("cns.screen_output", 2); // 0=quiet, 1=verbose
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
 
   // ibm
@@ -101,8 +102,8 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   //     ux = pparm.u_inf;
   // }
 
-  Real u_small = pparm.u_inf*0.8;
-  Real xstart = 0.01_rt;
+  Real u_small = pparm.u_inf;
+  Real xstart = 0.005_rt;
   Real xend   = pparm.x0;
   Real dis = xstart - xend;
   Real grad = (pparm.u_inf - u_small)/(dis);
@@ -111,15 +112,15 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
     T = pparm.T_inf;
     P = pparm.p_inf;
   }
-  else if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.1_rt,2) ) { 
+  else if (x < 0.05) { 
     Real xx = x - xstart;
     // ux = pparm.u_inf + grad*xx;
-    ux = u_small;
+    ux = u_small*0.66;
     T = pparm.T_inf*3;
     P = pparm.p_inf;
   } else {
     // ux = u_small;
-    ux = pparm.u_inf;
+    ux = pparm.u_inf*0.3;
     T = pparm.T_inf*3;
     P = pparm.p_inf;
   }
@@ -157,7 +158,7 @@ void user_tagging(int i, int j, int k, int nt, auto& tagfab, const auto &sdatafa
     //   }
     // }
     if (level==0 ) {
-      if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.10_rt,2) &&  (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) > pow(0.01_rt,2) )){
+      if (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) < pow(0.08_rt,2) &&  (pow(x-pparm.x0,2) + pow(y-pparm.y0,2) + pow(z-pparm.z0,2) > pow(0.01_rt,2) )){
         tagfab(i,j,k) = true;
       }
     }
