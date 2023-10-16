@@ -3,7 +3,7 @@
 #include <CNS.h>
 #include <CNS_K.h>
 #include <prob.h>
-#include <Central.h>
+#include <CentralKEEP.h>
 
 #ifdef AMREX_USE_GPIBM
 #include <IBM.h>
@@ -12,9 +12,9 @@
 using namespace amrex;
 
 #if !AMREX_USE_GPU
-GpuArray<Real,3> Central::coeffs,Central::coeffs2;  
+GpuArray<Real,3> CentralKEEP::coeffs,CentralKEEP::coeffs2;  
 #endif
-int Central::order_keep;
+int CentralKEEP::order_keep;
 
 
 bool CNS::rhs_euler=false;
@@ -107,7 +107,7 @@ void CNS::read_params()
     amrex::Abort("Need to specify Euler flux type,flux_euler");}
   
   if (flux_euler==1) {
-    if (!pp.query("order_keep",Central::order_keep)) {
+    if (!pp.query("order_keep",CentralKEEP::order_keep)) {
       amrex::Abort("Need to specify KEEP scheme order of accuracy, order_keep = {2, 4 or 6}");
     }
 
@@ -239,22 +239,17 @@ void CNS::post_init(Real stop_time)
 
   // TODO: move to Central.h
 #if !AMREX_USE_GPU
-  Central::coeffs2={Real(1.0), 0.0, 0.0};
-  if (Central::order_keep==6) {
-    Central::coeffs={Real(6.0)/4, Real(-6.0)/20, Real(2.0)/60}; 
+  CentralKEEP::coeffs2={Real(1.0), 0.0, 0.0};
+  if (CentralKEEP::order_keep==6) {
+    CentralKEEP::coeffs={Real(6.0)/4, Real(-6.0)/20, Real(2.0)/60}; 
   }
-  else if (Central::order_keep==4) {
-    Central::coeffs={Real(4.0)/3, Real(-2.0)/12, 0.0};
+  else if (CentralKEEP::order_keep==4) {
+    CentralKEEP::coeffs={Real(4.0)/3, Real(-2.0)/12, 0.0};
   }
   else {
-    Central::coeffs={Real(1.0), 0.0, 0.0};
+    CentralKEEP::coeffs={Real(1.0), 0.0, 0.0};
   }
 #endif
-  // Central::coeffs = (GpuArray<Real,3>*)The_Arena()->alloc(sizeof(GpuArray<Real,3>));
-  // (*Central::coeffs)[0]=Real(4.0)/3;
-  // (*Central::coeffs)[1]=Real(-2.0)/12;
-  // (*Central::coeffs)[2]=0.0;
-
 }
 // -----------------------------------------------------------------------------
 

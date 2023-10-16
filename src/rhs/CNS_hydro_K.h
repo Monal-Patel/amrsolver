@@ -263,9 +263,115 @@ void ViscousNumericalFluxes(int i, int j, int k, int n, const auto& pfx, const a
 
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void ViscousFluxGP(auto const ijk, const Array4<bool>& markers, auto const& prims, const GpuArray<Real,AMREX_SPACEDIM>& dxinv, const PROB::ProbClosures& closures){
+void ViscousFluxGP(int i, int j, int k, const Array4<bool>& markers, auto const& prims, const auto& fx, const auto& fy, const auto& fz, const GpuArray<Real,AMREX_SPACEDIM>& dxinv, const PROB::ProbClosures& closures){
 
+  Real ux, dudx, dvdx, dwdx, dTdx;
+  Real uy, dudy, dvdy, dwdy, dTdy;
+  Real uz, dudz, dvdz, dwdz, dTdz;
+  Real mu = closures.visc(prims(i,j,k,QT)); 
+  Real lambda = closures.cond(prims(i,j,k,QT));
+  Real r1_3  = Real(1.0)/Real(3.0);
+
+  // x direction //
+  ux = prims(i,j,k,QU);
+  if (markers(i+1,j,k,0)) { //the point to the right is solid then one-sided derivative to left
+    dudx = ( 1.5_rt*prims(i,j,k,QU) - 2.0_rt*prims(i-1,j,k,QU) + 0.5_rt*prims(i-2,j,k,QU) )*dxinv[0];
+    dvdx = ( 1.5_rt*prims(i,j,k,QV) - 2.0_rt*prims(i-1,j,k,QV) + 0.5_rt*prims(i-2,j,k,QV) )*dxinv[0];
+    dwdx = ( 1.5_rt*prims(i,j,k,QW) - 2.0_rt*prims(i-1,j,k,QW) + 0.5_rt*prims(i-2,j,k,QW) )*dxinv[0];
+    dTdx = ( 1.5_rt*prims(i,j,k,QT) - 2.0_rt*prims(i-1,j,k,QT) + 0.5_rt*prims(i-2,j,k,QT) )*dxinv[0];
+  }
+  else if (markers(i-1,j,k,0)) { //the point to the left is solid then one-sided derivative to right
+    dudx = ( -1.5_rt*prims(i,j,k,QU) + 2.0_rt*prims(i+1,j,k,QU) - 0.5_rt*prims(i+2,j,k,QU) )*dxinv[1];
+    dvdx = ( -1.5_rt*prims(i,j,k,QV) + 2.0_rt*prims(i+1,j,k,QV) - 0.5_rt*prims(i+2,j,k,QV) )*dxinv[1];
+    dwdx = ( -1.5_rt*prims(i,j,k,QW) + 2.0_rt*prims(i+1,j,k,QW) - 0.5_rt*prims(i+2,j,k,QW) )*dxinv[1];
+    dTdx = ( -1.5_rt*prims(i,j,k,QT) + 2.0_rt*prims(i+1,j,k,QT) - 0.5_rt*prims(i+2,j,k,QT) )*dxinv[1];
+  }
+  else {
+    dudx = (prims(i+1,j,k,QU) - prims(i-1,j,k,QU))*0.5_rt*dxinv[0];
+    dvdx = (prims(i+1,j,k,QV) - prims(i-1,j,k,QV))*0.5_rt*dxinv[0];
+    dwdx = (prims(i+1,j,k,QW) - prims(i-1,j,k,QW))*0.5_rt*dxinv[0];
+    dTdx = (prims(i+1,j,k,QT) - prims(i-1,j,k,QT))*0.5_rt*dxinv[0];
+  }
   
+  // y direction //
+  uy = prims(i,j,k,QV);
+  if (markers(i,j+1,k,0)) { //the point to the top is solid then one-sided derivative to bottom
+    dudy = ( 1.5_rt*prims(i,j,k,QU) - 2.0_rt*prims(i,j-1,k,QU) + 0.5_rt*prims(i,j-2,k,QU) )*dxinv[1];
+    dvdy = ( 1.5_rt*prims(i,j,k,QV) - 2.0_rt*prims(i,j-1,k,QV) + 0.5_rt*prims(i,j-2,k,QV) )*dxinv[1];
+    dwdy = ( 1.5_rt*prims(i,j,k,QW) - 2.0_rt*prims(i,j-1,k,QW) + 0.5_rt*prims(i,j-2,k,QW) )*dxinv[1];
+    dTdy = ( 1.5_rt*prims(i,j,k,QT) - 2.0_rt*prims(i,j-1,k,QT) + 0.5_rt*prims(i,j-2,k,QT) )*dxinv[1];
+  }
+  else if (markers(i,j-1,k,0)) { //the point to the bottom is solid then one-sided derivative to top
+    dudy = (-1.5_rt*prims(i,j,k,QU) + 2.0_rt*prims(i,j+1,k,QU) - 0.5_rt*prims(i,j+2,k,QU) )*dxinv[1];
+    dvdy = (-1.5_rt*prims(i,j,k,QV) + 2.0_rt*prims(i,j+1,k,QV) - 0.5_rt*prims(i,j+2,k,QV) )*dxinv[1];
+    dwdy = (-1.5_rt*prims(i,j,k,QW) + 2.0_rt*prims(i,j+1,k,QW) - 0.5_rt*prims(i,j+2,k,QW) )*dxinv[1];
+    dTdy = (-1.5_rt*prims(i,j,k,QT) + 2.0_rt*prims(i,j+1,k,QT) - 0.5_rt*prims(i,j+2,k,QT) )*dxinv[1];
+  }
+  else {
+    dudy = (prims(i,j+1,k,QU) - prims(i,j-1,k,QU))*0.5_rt*dxinv[1];
+    dvdy = (prims(i,j+1,k,QV) - prims(i,j-1,k,QV))*0.5_rt*dxinv[1];
+    dwdy = (prims(i,j+1,k,QW) - prims(i,j-1,k,QW))*0.5_rt*dxinv[1];
+    dTdy = (prims(i,j+1,k,QT) - prims(i,j-1,k,QT))*0.5_rt*dxinv[1];
+  }
+
+  // z direction
+  uz = prims(i,j,k,QW);
+  if (markers(i,j,k-1,0)) { //the point into the screen is solid then one-sided derivative out of the screen
+    dudz = ( -1.5_rt*prims(i,j,k,QU) + 2.0_rt*prims(i,j,k+1,QU) - 0.5_rt*prims(i,j,k+2,QU) )*dxinv[2];
+    dvdz = ( -1.5_rt*prims(i,j,k,QV) + 2.0_rt*prims(i,j,k+1,QV) - 0.5_rt*prims(i,j,k+2,QV) )*dxinv[2];
+    dwdz = ( -1.5_rt*prims(i,j,k,QW) + 2.0_rt*prims(i,j,k+1,QW) - 0.5_rt*prims(i,j,k+2,QW) )*dxinv[2];
+    dTdz = ( -1.5_rt*prims(i,j,k,QT) + 2.0_rt*prims(i,j,k+1,QT) - 0.5_rt*prims(i,j,k+2,QT) )*dxinv[2];
+  }
+
+  if (markers(i,j,k+1,0)) { //the point out of the screen is solid then one-sided derivative into the screen
+    dudz = ( 1.5_rt*prims(i,j,k,QU) - 2.0_rt*prims(i,j,k-1,QU) + 0.5_rt*prims(i,j,k-2,QU) )*dxinv[2];
+    dvdz = ( 1.5_rt*prims(i,j,k,QV) - 2.0_rt*prims(i,j,k-1,QV) + 0.5_rt*prims(i,j,k-2,QV) )*dxinv[2];
+    dwdz = ( 1.5_rt*prims(i,j,k,QW) - 2.0_rt*prims(i,j,k-1,QW) + 0.5_rt*prims(i,j,k-2,QW) )*dxinv[2];
+    dTdz = ( 1.5_rt*prims(i,j,k,QT) - 2.0_rt*prims(i,j,k-1,QT) + 0.5_rt*prims(i,j,k-2,QT) )*dxinv[2];
+  }
+  else {
+    Real uz   =  prims(i,j,k,QW);
+    Real dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*0.5_rt*dxinv[2];
+    Real dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*0.5_rt*dxinv[2];
+    Real dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*0.5_rt*dxinv[2];
+    Real dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*0.5_rt*dxinv[2];
+  }
+
+
+  // divergence
+  Real div  = dudx + dvdy + dwdz;
+
+  // viscous fluxes
+  Real tauxx = Real(2.0)*mu*(dudx - r1_3*div);
+  Real tauxy = mu*(dudy + dvdx);
+  Real tauxz = mu*(dudz + dwdx);
+
+  // tauxy = tauyx
+  Real tauyy = Real(2.0)*mu*(dvdy - r1_3*div);
+  Real tauyz = mu*(dvdz + dwdy);
+
+  // tauzx = tauxz;
+  // tauzy = tauyz;
+  Real tauzz = Real(2.0)*mu*(dwdz - r1_3*div);
+
+  // assemble fluxes on LHS
+  fx(i,j,k,URHO)= Real(0.0);
+  fx(i,j,k,UMX) = -tauxx;
+  fx(i,j,k,UMY) = -tauxy;
+  fx(i,j,k,UMZ) = -tauxz;
+  fx(i,j,k,UET) = -lambda*dTdx - tauxx*ux - tauxy*uy - tauxz*uz ;
+
+  fy(i,j,k,URHO)= Real(0.0);
+  fy(i,j,k,UMX) = -tauxy;
+  fy(i,j,k,UMY) = -tauyy;
+  fy(i,j,k,UMZ) = -tauyz;
+  fy(i,j,k,UET) = -lambda*dTdy - tauxy*ux - tauyy*uy - tauyz*uz;
+
+  fz(i,j,k,URHO)= Real(0.0);
+  fz(i,j,k,UMX) = -tauxz;
+  fz(i,j,k,UMY) = -tauyz;
+  fz(i,j,k,UMZ) = -tauzz;
+  fz(i,j,k,UET) = -lambda*dTdz - tauxz*ux - tauyz*uy - tauzz*uz;
 
 };
 

@@ -1,5 +1,5 @@
-#ifndef Central_H_
-#define Central_H_
+#ifndef CentralKEEP_H_
+#define CentralKEEP_H_
 
 #include <CNS.h>
 #include <AMReX_FArrayBox.H>
@@ -7,7 +7,7 @@
 
 using namespace amrex;
 
-namespace Central {
+namespace CentralKEEP {
 
   //2 * standard finite difference coefficients
 #if !AMREX_USE_GPU

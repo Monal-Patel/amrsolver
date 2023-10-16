@@ -2,7 +2,7 @@
 #include <AMReX_FluxRegister.H>
 #include <CNS_hydro_K.h>
 #include <prob.h>
-#include <Central.h>
+#include <CentralKEEP.h>
 #include <Riemann.h>
 #include <High_resolution.h>
 #ifdef AMREX_USE_GPIBM
@@ -220,13 +220,13 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   // TODO: Introduce pointer functions or visit/variant
   if(rhs_euler) {
     if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
-    else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
+    else if (flux_euler==1) {CentralKEEP::FluxKEEP(statemf,primsmf,numflxmf);}
     else {Riemann::Flux(statemf,primsmf,numflxmf);}
 
     // Euler flux corrections (overwrite numflxmf) //
     // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
-    if (flux_euler==1 && !(Central::order_keep==2)) {
-      Central::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
+    if (flux_euler==1 && !(CentralKEEP::order_keep==2)) {
+      CentralKEEP::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
     }
     // Order reduction near IBM
 
@@ -340,7 +340,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
       auto const gp_ijk   = ibFab.gpData.gp_ijk.data();
       amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
       {
-        ViscousFluxGP(gp_ijk[ii],markers,prims,dxinv,lclosures);
+        ViscousFluxGP(gp_ijk[ii](0),gp_ijk[ii](1),gp_ijk[ii](2),markers,prims,pfabfx,pfabfy,pfabfz,dxinv,lclosures);
       });
 #endif
 
@@ -353,20 +353,22 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   }
 
   // Re-fluxing ////////////////////////////////////////////////////////////////
-  if (fr_as_crse) {
-      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-          const Real scale = -dt*dA;
-          fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
-      }
-  }
-  if (fr_as_fine) {
-      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-          const Real scale = dt*dA;
-          fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
-      }
-  }
+  // if (do_reflux) {
+  // if (fr_as_crse) {
+  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+  //         const Real scale = -dt*dA;
+  //         fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
+  //     }
+  // }
+  // if (fr_as_fine) {
+  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+  //         const Real scale = dt*dA;
+  //         fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
+  //     }
+  // }
+  // }
   //////////////////////////////////////////////////////////////////////////////
 
   // Assemble RHS fluxes ///////////////////////////////////////////////////////
