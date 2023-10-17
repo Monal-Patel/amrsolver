@@ -46,7 +46,7 @@ void inline inputs() {
   ParmParse pp;
 
   pp.addarr("cns.lo_bc", std::vector<int>{0,1,0});
-  pp.addarr("cns.hi_bc", std::vector<int>{0,6,0});
+  pp.addarr("cns.hi_bc", std::vector<int>{0,1,0});
   pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
   pp.add   ("cns.stages_rk", 3); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
@@ -119,15 +119,12 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
 
   Real delta = 0.5*(ly - 2*pparm.h); //ib plate dy
   Real yw;
-  if (y > pparm.h + delta) {
-    yw = 2*(pparm.h+delta)-y;
-    }
-  else {
-    yw = y-delta;
-  }
 
-  yw   = std::max(y - delta,0.0);
-  yw   = std::min(yw,ly - delta);
+  yw   = std::min(2*pparm.h + delta,y);
+  yw   = std::max(yw,delta);
+  yw   = yw - delta;
+
+  if (yw > pparm.h) {yw = 2*pparm.h - yw;}
   // Laminar velocity and constant temperature
   // Real ux = 1.5*pparm.ub*(1 - (1/std::pow(pparm.h,2))*std::pow((y-pparm.h),2));
   // Real ux = 0.0_rt;
@@ -158,10 +155,10 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
   Real rand_num = (Real)rand()/ RAND_MAX;
 #endif
 
-  Real A       = 100*2.5;
-  Real u_prime = 0.0;//rand_num*A*cos(2*pi*x*nx/lx)*sin(pi*y*ny/ly)*cos(2*pi*z*nz/lz);
-  Real v_prime = 0.0;//rand_num*-A*sin(2*pi*x*nx/lx)*cos(pi*y*ny/ly)*sin(2*pi*z*nz/lz);
-  Real w_prime = 0.0;//rand_num*-A*sin(2*pi*x*nx/lx)*cos(pi*y*ny/ly)*sin(2*pi*z*nz/lz);
+  Real A       = 50*2.5;
+  Real u_prime = rand_num*A*cos(2*pi*x*nx/lx)*sin(pi*y*ny/ly)*cos(2*pi*z*nz/lz);
+  Real v_prime = rand_num*-A*sin(2*pi*x*nx/lx)*cos(pi*y*ny/ly)*sin(2*pi*z*nz/lz);
+  Real w_prime = rand_num*-A*sin(2*pi*x*nx/lx)*cos(pi*y*ny/ly)*sin(2*pi*z*nz/lz);
 
   Real rho =  pparm.Pw/(cls.Rspec*T);
   state(i,j,k,URHO ) = rho;
@@ -178,35 +175,36 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS], const Real s_refl[NCONS], Real s_ext[NCONS], const int idir, const int sgn, const Real time, GeometryData const& /*geomdata*/,  ProbClosures const& cls, ProbParm const& pparm)
 {
-  if (idir == 1) { // ylo or yhi
+  // if (idir == 1) { // ylo or yhi
 
     // if (sgn<0) {Abort("bcnormal: sgn<0");}
 
-    Real q_ext[NPRIM] = {0.0};
-    // no-slip
-    q_ext[QU]    = -s_int[UMX]/s_int[URHO];
-    q_ext[QV]    = -s_int[UMY]/s_int[URHO];
-    q_ext[QW]    = -s_int[UMZ]/s_int[URHO];
+    Abort("bcnormal not specified");
+    // Real q_ext[NPRIM] = {0.0};
+    // // no-slip
+    // q_ext[QU]    = -s_int[UMX]/s_int[URHO];
+    // q_ext[QV]    = -s_int[UMY]/s_int[URHO];
+    // q_ext[QW]    = -s_int[UMZ]/s_int[URHO];
 
-    // dp/dn = 0
-    amrex::Real eint_int = (s_int[UET] - 0.5*(s_int[UMX]*s_int[UMX] + s_int[UMY]*s_int[UMY] + s_int[UMZ]*s_int[UMZ])/s_int[URHO])/s_int[URHO];
-    amrex::Real p_int = (cls.gamma - 1.0)*s_int[URHO]*eint_int;
-    q_ext[QPRES] = p_int;
-    // T=Twall
-    amrex::Real T_int = p_int/(cls.Rspec*s_int[URHO]); 
-    q_ext[QT]    = max(pparm.Tw  +  dratio*(pparm.Tw - T_int),50.0);
-    // rho = eos(P,T)
-    q_ext[QRHO]  = q_ext[QPRES]/(cls.Rspec*q_ext[QT]);
+    // // dp/dn = 0
+    // amrex::Real eint_int = (s_int[UET] - 0.5*(s_int[UMX]*s_int[UMX] + s_int[UMY]*s_int[UMY] + s_int[UMZ]*s_int[UMZ])/s_int[URHO])/s_int[URHO];
+    // amrex::Real p_int = (cls.gamma - 1.0)*s_int[URHO]*eint_int;
+    // q_ext[QPRES] = p_int;
+    // // T=Twall
+    // amrex::Real T_int = p_int/(cls.Rspec*s_int[URHO]); 
+    // q_ext[QT]    = max(pparm.Tw  +  dratio*(pparm.Tw - T_int),50.0);
+    // // rho = eos(P,T)
+    // q_ext[QRHO]  = q_ext[QPRES]/(cls.Rspec*q_ext[QT]);
 
-    // convert prims to cons
-    s_ext[URHO] = q_ext[QRHO];
-    s_ext[UMX] = q_ext[QRHO]*q_ext[QU];
-    s_ext[UMY] = q_ext[QRHO]*q_ext[QV];
-    s_ext[UMZ] = q_ext[QRHO]*q_ext[QW];
-    amrex::Real ekin_ext = 0.5*(q_ext[QU]*q_ext[QU] + q_ext[QV]*q_ext[QV] + q_ext[QW]*q_ext[QW]); 
-    amrex::Real eint_ext = q_ext[QPRES]/(q_ext[QRHO]*(cls.gamma - 1.0));
-    s_ext[UET] = q_ext[QRHO]*(eint_ext + ekin_ext);
-  }
+    // // convert prims to cons
+    // s_ext[URHO] = q_ext[QRHO];
+    // s_ext[UMX] = q_ext[QRHO]*q_ext[QU];
+    // s_ext[UMY] = q_ext[QRHO]*q_ext[QV];
+    // s_ext[UMZ] = q_ext[QRHO]*q_ext[QW];
+    // amrex::Real ekin_ext = 0.5*(q_ext[QU]*q_ext[QU] + q_ext[QV]*q_ext[QV] + q_ext[QW]*q_ext[QW]); 
+    // amrex::Real eint_ext = q_ext[QPRES]/(q_ext[QRHO]*(cls.gamma - 1.0));
+    // s_ext[UET] = q_ext[QRHO]*(eint_ext + ekin_ext);
+  // }
 }
 
 AMREX_GPU_DEVICE inline

@@ -12,16 +12,17 @@ cfl = 0.9
 geometry.is_periodic = 1 0 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0     0.0     0.0
-geometry.prob_hi     = 0.08214 0.01390096093 0.02738
+geometry.prob_hi     = 0.08214 0.0141147 0.02738
 
 # dy  = 0.00010693046
-# 2.5dy = 0.00021386093
+# 4dy = 0.0004276
 
 
-ib.filename = channel_flow_plate_bot_coarse.stl
+ib.filename = channel_flow_plate_top.stl channel_flow_plate_bot.stl
 
 # REFINEMENT / REGRIDDING 
-amr.n_cell          = 96 130 64  
+#amr.n_cell          = 96 132 64  
+amr.n_cell          = 192 264 128  
 amr.max_level       = 0       # maximum level number allowed
 amr.ref_ratio       = 2 2 2 2 # refinement ratio
 amr.regrid_int      = 2 2 2 2 # how often to regrid
@@ -41,5 +42,5 @@ amr.check_int               = 50000    # number of timesteps between checkpoints
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plot/plt     # root name of plotfile
-amr.plot_int          = 1 #500      # approximately 1 tau flow
+amr.plot_int          = 50      # approximately 1 tau flow
 amr.derive_plot_vars  = pressure temperature x_velocity y_velocity z_velocity
