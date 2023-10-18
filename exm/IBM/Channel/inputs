@@ -9,7 +9,7 @@ stop_time = 1.0
 cfl = 0.9
 
 # computational domain 
-geometry.is_periodic = 1 0 1
+geometry.is_periodic = 1 1 1
 geometry.coord_sys   = 0  # 0 => cart, 1 => RZ  2=>spherical
 geometry.prob_lo     = 0.0     0.0     0.0
 geometry.prob_hi     = 0.08214 0.0141147 0.02738
@@ -42,5 +42,5 @@ amr.check_int               = 50000    # number of timesteps between checkpoints
 # PLOTFILES
 amr.plot_files_output = 1
 amr.plot_file         = plot/plt     # root name of plotfile
-amr.plot_int          = 50      # approximately 1 tau flow
+amr.plot_int          = 500      # approximately 1 tau flow
 amr.derive_plot_vars  = pressure temperature x_velocity y_velocity z_velocity

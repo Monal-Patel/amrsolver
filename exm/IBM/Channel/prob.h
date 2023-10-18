@@ -3,7 +3,6 @@
 
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
-// #include <AMReX_PROB_AMR_F.H>
 #include <AMReX_ParmParse.H>
 #include <Closures.h>
 
@@ -53,7 +52,7 @@ void inline inputs() {
   pp.add   ("cns.rhs_visc", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 1); // 0=false, 1=true
   pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
+  pp.add   ("cns.order_keep", 2); // Order of accuracy=2, 4 or 6"
   pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
   pp.add   ("cns.screen_output", 50); //
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
@@ -74,6 +73,10 @@ typedef closures_derived_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t
   //
   // public:
 // };
+
+// constexpr int wlsq_interp= 3;
+// could define a static int to select the options
+// in closures.h --> use static ifs. Check speed for this.The branching should be at compile time, so should not affect speed.
 
 // problem parameters
 struct ProbParm
@@ -103,7 +106,7 @@ struct ProbParm
 };
 
 AMREX_GPU_DEVICE inline
-void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData const& geomdata, ProbClosures const& cls, const ProbParm& pparm) {
+void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData const& geomdata, ProbClosures const& pcls, const ProbParm& pparm) {
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
@@ -155,17 +158,17 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
   Real rand_num = (Real)rand()/ RAND_MAX;
 #endif
 
-  Real A       = 50*2.5;
+  Real A       = 100*2.5;
   Real u_prime = rand_num*A*cos(2*pi*x*nx/lx)*sin(pi*y*ny/ly)*cos(2*pi*z*nz/lz);
   Real v_prime = rand_num*-A*sin(2*pi*x*nx/lx)*cos(pi*y*ny/ly)*sin(2*pi*z*nz/lz);
   Real w_prime = rand_num*-A*sin(2*pi*x*nx/lx)*cos(pi*y*ny/ly)*sin(2*pi*z*nz/lz);
 
-  Real rho =  pparm.Pw/(cls.Rspec*T);
+  Real rho =  pparm.Pw/(pcls.Rspec*T);
   state(i,j,k,URHO ) = rho;
   state(i,j,k,UMX  ) = rho*(ux+u_prime);
   state(i,j,k,UMY  ) = rho*v_prime;
   state(i,j,k,UMZ  ) = rho*w_prime;
-  state(i,j,k,UET  ) = rho*cls.cv*T + Real(0.5)*rho*(ux*ux + u_prime*u_prime + v_prime*v_prime + w_prime*w_prime);
+  state(i,j,k,UET  ) = rho*pcls.cv*T + Real(0.5)*rho*(ux*ux + u_prime*u_prime + v_prime*v_prime + w_prime*w_prime);
 
   // Print() << "T = " << T << std::endl;
   // Print() << "rho = " << rho << std::endl;
@@ -173,7 +176,7 @@ void prob_initdata (int i, int j, int k, Array4<Real> const& state, GeometryData
 }
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS], const Real s_refl[NCONS], Real s_ext[NCONS], const int idir, const int sgn, const Real time, GeometryData const& /*geomdata*/,  ProbClosures const& cls, ProbParm const& pparm)
+void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS], const Real s_refl[NCONS], Real s_ext[NCONS], const int idir, const int sgn, const Real time, GeometryData const& /*geomdata*/,  ProbClosures const& pcls, ProbParm const& pparm)
 {
   // if (idir == 1) { // ylo or yhi
 
@@ -188,13 +191,13 @@ void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS]
 
     // // dp/dn = 0
     // amrex::Real eint_int = (s_int[UET] - 0.5*(s_int[UMX]*s_int[UMX] + s_int[UMY]*s_int[UMY] + s_int[UMZ]*s_int[UMZ])/s_int[URHO])/s_int[URHO];
-    // amrex::Real p_int = (cls.gamma - 1.0)*s_int[URHO]*eint_int;
+    // amrex::Real p_int = (pcls.gamma - 1.0)*s_int[URHO]*eint_int;
     // q_ext[QPRES] = p_int;
     // // T=Twall
-    // amrex::Real T_int = p_int/(cls.Rspec*s_int[URHO]); 
+    // amrex::Real T_int = p_int/(pcls.Rspec*s_int[URHO]); 
     // q_ext[QT]    = max(pparm.Tw  +  dratio*(pparm.Tw - T_int),50.0);
     // // rho = eos(P,T)
-    // q_ext[QRHO]  = q_ext[QPRES]/(cls.Rspec*q_ext[QT]);
+    // q_ext[QRHO]  = q_ext[QPRES]/(pcls.Rspec*q_ext[QT]);
 
     // // convert prims to cons
     // s_ext[URHO] = q_ext[QRHO];
@@ -202,13 +205,13 @@ void bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS]
     // s_ext[UMY] = q_ext[QRHO]*q_ext[QV];
     // s_ext[UMZ] = q_ext[QRHO]*q_ext[QW];
     // amrex::Real ekin_ext = 0.5*(q_ext[QU]*q_ext[QU] + q_ext[QV]*q_ext[QV] + q_ext[QW]*q_ext[QW]); 
-    // amrex::Real eint_ext = q_ext[QPRES]/(q_ext[QRHO]*(cls.gamma - 1.0));
+    // amrex::Real eint_ext = q_ext[QPRES]/(q_ext[QRHO]*(pcls.gamma - 1.0));
     // s_ext[UET] = q_ext[QRHO]*(eint_ext + ekin_ext);
   // }
 }
 
 AMREX_GPU_DEVICE inline
-void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& pparm, ProbClosures const& cls, auto const dx) {
+void user_source(int i, int j, int k, const auto& state, const auto& rhs, const ProbParm& pparm, ProbClosures const& pcls, auto const dx) {
   rhs(i,j,k,UMX) +=  state(i,j,k,URHO)*pparm.fx;
   rhs(i,j,k,UET) +=  state(i,j,k,UMX )*pparm.fx;
 }

@@ -260,8 +260,20 @@ void ViscousNumericalFluxes(int i, int j, int k, int n, const auto& pfx, const a
 
 }
 
-
-
+/// 
+/// \brief Viscous fluxes at ghost point
+/// \param i index
+/// \param markers solid 
+/// \sa CnsFillExtDir
+/// 
+/// c1 = 
+/// ```
+/// {rst}
+/// Assuming the reconstructed state :math:`p^\text{th}`
+/// order of accuracy for the reconstructed state.
+/// 
+/// :math:`\frac{\partial f}{\partial x}\bigg|_i=`
+/// ```
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
 void ViscousFluxGP(int i, int j, int k, const Array4<bool>& markers, auto const& prims, const auto& fx, const auto& fy, const auto& fz, const GpuArray<Real,AMREX_SPACEDIM>& dxinv, const PROB::ProbClosures& closures){
 
@@ -330,11 +342,11 @@ void ViscousFluxGP(int i, int j, int k, const Array4<bool>& markers, auto const&
     dTdz = ( 1.5_rt*prims(i,j,k,QT) - 2.0_rt*prims(i,j,k-1,QT) + 0.5_rt*prims(i,j,k-2,QT) )*dxinv[2];
   }
   else {
-    Real uz   =  prims(i,j,k,QW);
-    Real dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*0.5_rt*dxinv[2];
-    Real dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*0.5_rt*dxinv[2];
-    Real dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*0.5_rt*dxinv[2];
-    Real dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*0.5_rt*dxinv[2];
+    uz   =  prims(i,j,k,QW);
+    dudz = (prims(i,j,k+1,QU) - prims(i,j,k-1,QU))*0.5_rt*dxinv[2];
+    dvdz = (prims(i,j,k+1,QV) - prims(i,j,k-1,QV))*0.5_rt*dxinv[2];
+    dwdz = (prims(i,j,k+1,QW) - prims(i,j,k-1,QW))*0.5_rt*dxinv[2];
+    dTdz = (prims(i,j,k+1,QT) - prims(i,j,k-1,QT))*0.5_rt*dxinv[2];
   }
 
 
