@@ -142,6 +142,7 @@ public:
     static bool dt_dynamic;
     static int nstep_screen_output;
     static int flux_euler;
+    static int dist_linear;
     static int art_diss;
     static int order_rk;
     static int stages_rk;

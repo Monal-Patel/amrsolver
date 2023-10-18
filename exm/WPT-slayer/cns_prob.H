@@ -127,17 +127,6 @@ void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state
   // density profile assuming perfect gas
   rhot = Pt/(closures.Rspec*Tt);
 
-  // sod problem setup
-  // if (x < prob_hi[0]/2) {
-  //     Pt = prob_parm.p_l;
-  //     rhot = prob_parm.rho_l;
-  //     uxt = prob_parm.u_l;
-  // } else {
-  //     Pt = prob_parm.p_r;
-  //     rhot = prob_parm.rho_r;
-  //     uxt = prob_parm.u_r;
-  // }
-
   state(i,j,k,URHO ) = rhot;
   state(i,j,k,UMX  ) = rhot*uxt;
   state(i,j,k,UMY  ) = Real(0.0);

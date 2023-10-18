@@ -26,6 +26,7 @@ bool CNS::ib_move=false;
 bool CNS::plot_surf=false;
 int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
+int  CNS::dist_linear=0;
 int  CNS::art_diss=0; 
 int  CNS::order_rk=2;
 int  CNS::stages_rk=2;
