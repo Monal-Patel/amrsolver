@@ -29,10 +29,7 @@ namespace PROB {
 #define QPRES  5
 #define NPRIM  6
 
-// fluxes
-// typedef euler_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
-
-constexpr int do_pde = 1; // 0=CNS, 1=NS-NLDE
+constexpr int do_pde = 0; // 0=CNS, 1=NS-NLDE
 ////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////DISCRETISATION////////////////////////////////////

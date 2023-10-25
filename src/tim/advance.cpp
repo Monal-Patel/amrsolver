@@ -223,9 +223,11 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   // TODO: Introduce pointer functions or visit/variant
   if(rhs_euler) {
     if constexpr (PROB::do_pde==1) {NLDE::eflux(level,statemf,primsmf,numflxmf);}
-    if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
-    else if (flux_euler==1) {CentralKEEP::FluxKEEP(statemf,primsmf,numflxmf);}
-    else {Riemann::Flux(statemf,primsmf,numflxmf);}
+    else { 
+      if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
+      else if (flux_euler==1) {CentralKEEP::FluxKEEP(statemf,primsmf,numflxmf);}
+      else {Riemann::Flux(statemf,primsmf,numflxmf);}
+    }
 
     // Euler flux corrections (overwrite numflxmf) //
     // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
