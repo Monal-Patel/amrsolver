@@ -13,6 +13,8 @@
 **/.ipynb_checkpoints/
 **/results
 
+/src/.temp
+
 /wrk/
 
 /lib/cgal/build/*
