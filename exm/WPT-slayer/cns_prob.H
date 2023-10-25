@@ -76,8 +76,8 @@ void inline inputs() {
   // 1 = Inflow             4 = SlipWall
   // 2 = Outflow            5 = NoSlipWall
   // 6 = user defined
-  pp.addarr("cns.lo_bc", std::vector<int>{2,-1,-1});
-  pp.addarr("cns.hi_bc", std::vector<int>{2,-1,-1});
+  pp.addarr("cns.lo_bc", std::vector<int>{2,2,2});
+  pp.addarr("cns.hi_bc", std::vector<int>{2,2,2});
   pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
   pp.add   ("cns.stages_rk", 3); // 1, 2 or 3
   pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
@@ -91,6 +91,7 @@ void inline inputs() {
 
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE
 void prob_initdata (int i, int j, int k, amrex::Array4<amrex::Real> const& state, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
+  // this initializes disturbance now, not mean flow.
   const Real* prob_lo = geomdata.ProbLo();
   const Real* prob_hi = geomdata.ProbHi();
   const Real* dx      = geomdata.CellSize();
