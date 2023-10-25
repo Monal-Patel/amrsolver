@@ -1,8 +1,8 @@
 #include <CNS.h>
 #include <AMReX_FluxRegister.H>
 #include <CNS_hydro_K.h>
-#include <cns_prob.H>
-#include <Central.h>
+#include <prob.h>
+#include <CentralKEEP.h>
 #include <Riemann.h>
 #include <High_resolution.h>
 #include <NLDE.h>
@@ -12,8 +12,7 @@
 using namespace amrex;
 
 
-Real
-CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
+Real CNS::advance (Real time, Real dt, int /*iteration*/, int /*ncycle*/)
 {
     BL_PROFILE("CNS::advance()");
 
@@ -225,13 +224,13 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   if(rhs_euler) {
     if (flux_euler==3) {NLDE::eflux(level,statemf,primsmf,numflxmf);}
     if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
-    else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
+    else if (flux_euler==1) {CentralKEEP::FluxKEEP(statemf,primsmf,numflxmf);}
     else {Riemann::Flux(statemf,primsmf,numflxmf);}
 
     // Euler flux corrections (overwrite numflxmf) //
     // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
-    if (flux_euler==1 && !(Central::order_keep==2)) {
-      Central::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
+    if (flux_euler==1 && !(CentralKEEP::order_keep==2)) {
+      CentralKEEP::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
     }
     // Order reduction near IBM
 
@@ -280,32 +279,37 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   // Although conservative FD (finite difference) derivatives of viscous fluxes are not requried in the boundary layer, standard FD are likely sufficient. However, considering grid and flow discontinuities (coarse-interface flux-refluxing and viscous derivatives near shocks), conservative FD derivatives are preferred.
   if (rhs_visc) {
     Array<MultiFab,AMREX_SPACEDIM>& pntvflxmf = Vpntvflxmf[level];
-    // loop over all fabs
+#if AMREX_USE_GPIBM
+    IBM::IBMultiFab& ibMultiFab = *IBM::ib.ibMFa[level];
+#endif
+    //for each fab
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        const Box& bx  = mfi.tilebox();
-        const Box& bxpflx  = mfi.growntilebox(1);
-        const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
+      const Box& bxpflx  = mfi.growntilebox(1);
+      auto const& prims  = primsmf.array(mfi);
 
-        auto const& prims    = primsmf.array(mfi);
+      AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
+                  auto const& pfabfy  = pntvflxmf[1].array(mfi);,
+                  auto const& pfabfz  = pntvflxmf[2].array(mfi););
 
-        AMREX_D_TERM(auto const& pfabfx = pntvflxmf[0].array(mfi);,
-                    auto const& pfabfy  = pntvflxmf[1].array(mfi);,
-                    auto const& pfabfz  = pntvflxmf[2].array(mfi););
+      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                  auto const& nfabfy  = numflxmf[1].array(mfi);,
+                  auto const& nfabfz  = numflxmf[2].array(mfi););
 
-        AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                    auto const& nfabfy  = numflxmf[1].array(mfi);,
-                    auto const& nfabfz  = numflxmf[2].array(mfi););
+      // compute u,v,w,T derivatives and compute physical viscous fluxes
+      amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        ViscousFluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
+      });
 
-        // compute u,v,w,T derivatives and compute physical viscous fluxes
-        amrex::ParallelFor(bxpflx,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            viscfluxes(i, j, k, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
-        });
+      // Physical boundary viscous flux corrections 
+      // (overwrite pfabfx, pfabfy, pfabfz)
+      // TODO:: generalise to wall boundary in x and z directions
+      const Box& bx  = mfi.tilebox();
+      //xlo
+      //xhi
 
-        // Viscous flux corrections (overwrite pfabfx, pfabfy, pfabfz)
-        // TODO:: generalise to wall boundary in y and z directions
-
-        if(geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
+      //ylo
+      if(geom.Domain().smallEnd(1)==bx.smallEnd(1)) {
         if ((*h_phys_bc).lo(1)==6) {
           int jj = bx.smallEnd(1)-1;
           IntVect small = {bxpflx.smallEnd(0), jj, bxpflx.smallEnd(2)};
@@ -313,11 +317,12 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
           Box bxboundary(small,big);
 
           amrex::ParallelFor(bxboundary,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-              viscfluxes_wall(i, j, k, 0, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
+              ViscousWallFluxes(i, j, k, 0, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
           });
         }
-        }
-        if(geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
+      }
+      //yhi
+      if(geom.Domain().bigEnd(1)==bx.bigEnd(1)) {
         if ((*h_phys_bc).hi(1)==6) {
           int jj = bx.bigEnd(1) + 1;
           IntVect small = {bxpflx.smallEnd(0), jj, bxpflx.smallEnd(2)};
@@ -325,67 +330,68 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
           Box bxboundary(small,big);
 
           amrex::ParallelFor(bxboundary,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-              viscfluxes_wall(i, j, k, 1, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
+              ViscousWallFluxes(i, j, k, 1, prims, pfabfx, pfabfy, pfabfz, dxinv, lclosures);
           });
         }
-        }
-
-        // else if (l_phys_bc.lo(2)==6) {
-
-        // }
-        // else if (l_phys_bc.hi(2)==6) {
-
-        // }
-        // else if (l_phys_bc.lo(0)==6) {
-
-        // }
-        // else if (l_phys_bc.hi(0)==6) {
-
-
-        // TODO :: IBM GP visc flux correction
-        // ib.viscfluxcorrection(level, numflxmf, pntvflxmf, dx, dt, time, lclosures);
-        
-        // compute numerical viscous fluxes (add to numflxmf)
-        amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-            visc_numericalfluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
-        });
       }
+      //zlo
+      //zhi
+
+#if AMREX_USE_GPIBM
+      //IBM GP viscous flux correction
+      auto const& ibFab = ibMultiFab.get(mfi);
+      auto const& markers = ibMultiFab.array(mfi);
+      auto const gp_ijk   = ibFab.gpData.gp_ijk.data();
+      amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
+      {
+        ViscousFluxGP(gp_ijk[ii](0),gp_ijk[ii](1),gp_ijk[ii](2),markers,prims,pfabfx,pfabfy,pfabfz,dxinv,lclosures);
+      });
+#endif
+
+      // compute numerical viscous fluxes (add to numflxmf)
+      const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
+      amrex::ParallelFor(bxnodal, NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+        ViscousNumericalFluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx, nfabfy, nfabfz);
+      });
+    }
   }
 
   // Re-fluxing ////////////////////////////////////////////////////////////////
-  if (fr_as_crse) {
-      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-          const Real scale = -dt*dA;
-          fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
-      }
-  }
-  if (fr_as_fine) {
-      for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-          const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
-          const Real scale = dt*dA;
-          fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
-      }
-  }
+  // if (do_reflux) {
+  // if (fr_as_crse) {
+  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+  //         const Real scale = -dt*dA;
+  //         fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale, FluxRegister::ADD);
+  //     }
+  // }
+  // if (fr_as_fine) {
+  //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+  //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ? dx[0]*dx[2] : dx[0]*dx[1]);
+  //         const Real scale = dt*dA;
+  //         fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
+  //     }
+  // }
+  // }
   //////////////////////////////////////////////////////////////////////////////
 
   // Assemble RHS fluxes ///////////////////////////////////////////////////////
   Gpu::streamSynchronize(); // ensure all fluxes computed before assembly
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
-      const Box& bx   = mfi.tilebox();
-      auto const& dsdtfab = dSdt.array(mfi);
-      AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                   auto const& nfabfy = numflxmf[1].array(mfi);,
-                   auto const& nfabfz = numflxmf[2].array(mfi););
+    const Box& bx   = mfi.tilebox();
+    auto const& dsdtfab = dSdt.array(mfi);
+    AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                  auto const& nfabfy = numflxmf[1].array(mfi);,
+                  auto const& nfabfz = numflxmf[2].array(mfi););
 
-      // add euler and viscous derivatives to rhs
-      amrex::ParallelFor(bx, NCONS,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-      {
-      dsdtfab(i,j,k,n) = dxinv[0]*(nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
-      +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
-      +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
-      });
+    // add euler and viscous derivatives to rhs
+    amrex::ParallelFor(bx, NCONS,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    dsdtfab(i,j,k,n) = dxinv[0]*(nfabfx(i,j,k,n) - nfabfx(i+1,j,k,n))
+    +           dxinv[1] *(nfabfy(i,j,k,n) - nfabfy(i,j+1,k,n))
+    +           dxinv[2] *(nfabfz(i,j,k,n) - nfabfz(i,j,k+1,n));
+    });
   }
 
 
@@ -394,31 +400,31 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   // Add source term to RHS ////////////////////////////////////////////////////
   if (rhs_source) {
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
-        const Box& bx   = mfi.tilebox();
-        auto const& dsdtfab = dSdt.array(mfi);
-        auto const& statefab = statemf.array(mfi);
+      const Box& bx   = mfi.tilebox();
+      auto const& dsdtfab = dSdt.array(mfi);
+      auto const& statefab = statemf.array(mfi);
 
-        amrex::ParallelFor(bx,
-        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        { user_source(i,j,k,statefab,dsdtfab,lprobparm,lclosures,dx); });
+      amrex::ParallelFor(bx,
+      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+      { user_source(i,j,k,statefab,dsdtfab,lprobparm,lclosures,dx); });
     }
   }
   //////////////////////////////////////////////////////////////////////////////
 
   // Set solid point RHS to 0 //////////////////////////////////////////////////
 #if AMREX_USE_GPIBM
-      IBM::IBMultiFab& mfab = *IBM::ib.ibMFa[level];
-    for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
-      const Box& bx   = mfi.tilebox();
-      auto const& dsdtfab = dSdt.array(mfi);
-      IBM::IBFab &fab = mfab.get(mfi);
-      Array4<bool> ibMarkers = fab.array();
-      amrex::ParallelFor(bx, NCONS,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
-      {
-      dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
-      });
-    }
+  IBM::IBMultiFab& mfab = *IBM::ib.ibMFa[level];
+  for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
+    const Box& bx   = mfi.tilebox();
+    auto const& dsdtfab = dSdt.array(mfi);
+    IBM::IBFab &fab = mfab.get(mfi);
+    Array4<bool> ibMarkers = fab.array();
+    amrex::ParallelFor(bx, NCONS,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
+    {
+    dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));
+    });
+  }
 #endif
   //////////////////////////////////////////////////////////////////////////////
 
