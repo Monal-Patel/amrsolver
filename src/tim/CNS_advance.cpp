@@ -5,6 +5,7 @@
 #include <Central.h>
 #include <Riemann.h>
 #include <High_resolution.h>
+#include <NLDE.h>
 #ifdef AMREX_USE_GPIBM
 #include <IBM.h>
 #endif
@@ -197,15 +198,17 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   MultiFab& primsmf  = Vprimsmf[level];
   Array<MultiFab,AMREX_SPACEDIM>& numflxmf = Vnumflxmf[level];
 
-  // TODO move to cns hydro
-  for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
+  if (flux_euler==3) {
+    NLDE::cons2prim(level, statemf, primsmf, lclosures);
+  }
+  else{
+    for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
       auto const& statefab = statemf.array(mfi);
       auto const& prims    = primsmf.array(mfi);
-      const Box& bx        = mfi.tilebox();
       const Box& bxg       = mfi.growntilebox(NGHOST);
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      { cons2prim(i, j, k, statefab, prims, lclosures);});
+      { cons2prim(i, j, k, statefab, prims, lclosures);});}
   }
   //////////////////////////////////////////////////////////////////////////////
   Gpu::streamSynchronize(); // ensure primitive variables mf computed before starting mfiter
@@ -220,6 +223,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   //Euler Fluxes ///////////////////////////////////////////////////////////////
   // TODO: Introduce pointer functions or visit/variant
   if(rhs_euler) {
+    if (flux_euler==3) {NLDE::eflux(level,statemf,primsmf,numflxmf);}
     if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
     else if (flux_euler==1) {Central::FluxKEEP(statemf,primsmf,numflxmf);}
     else {Riemann::Flux(statemf,primsmf,numflxmf);}

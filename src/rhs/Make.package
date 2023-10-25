@@ -1,1 +1,1 @@
-CEXE_headers += CNS_HYRDO_K.h Central.h Riemann.h High_resolution.h
+CEXE_headers += CNS_HYRDO_K.h Central.h Riemann.h High_resolution.h NLDE.h

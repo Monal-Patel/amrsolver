@@ -169,11 +169,13 @@ class cond_suth_t {
 ////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////CLOSURES/////////////////////////////////
-template <typename Visc, typename Cond, typename Thermo>
-class closures_derived_base_t : public Cond, public Visc, public Thermo
+template <typename Visc, typename Cond, typename Thermo, typename...others>
+class closures_derived_base_t : public Cond, public Visc, public Thermo, public others...
 {
   private:
   public:
+
+    // static const int size = sizeof...(Args);
     // IdealPerfectGas(/* args */);
     // ~IdealPerfectGas();
   Real Cshock = 1.0;

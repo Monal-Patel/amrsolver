@@ -4,6 +4,7 @@
 #include <CNS_K.h>
 #include <cns_prob.H>
 #include <Central.h>
+#include <NLDE.h>
 
 #ifdef AMREX_USE_GPIBM
 #include <IBM.h>
@@ -68,6 +69,8 @@ CNS::CNS(Amr &papa,
   int nlevs = parent->finestLevel() + 1;
   VdSdt.resize(nlevs); VSborder.resize(nlevs); Vprimsmf.resize(nlevs);
   Vnumflxmf.resize(nlevs); Vpntvflxmf.resize(nlevs);
+
+  if (flux_euler==3) {NLDE::allocVMF(nlevs);}
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.buildMFs(grids, dmap, level);
@@ -221,22 +224,6 @@ void CNS::post_init(Real stop_time)
   if (verbose) {
   printTotal();
   }
-
-  // // allocate multifabs
-  // // time advancing helper multifabs
-  // VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
-  // VdSdt[level].setVal(0.0);
-  // VSborder[level].define(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
-  // VSborder[level].setVal(0.0);
-  // Vprimsmf[level].define(grids, dmap, NPRIM, NGHOST,MFInfo(),Factory());
-  // Vprimsmf[level].setVal(0.0);
-  // for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-  //   // Vnumflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-  //   Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory()); // see Vnumflxmf definition in post_regrid() for explanation
-  //   Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-  //   Vnumflxmf[level][idim].setVal(0.0);
-  //   Vpntvflxmf[level][idim].setVal(0.0);
-  // }
 
   // TODO: move to Central.h
 #if !AMREX_USE_GPU
@@ -470,6 +457,8 @@ void CNS::post_regrid(int lbase, int new_finest)
       Vnumflxmf[level][idim].setVal(0.0);
       Vpntvflxmf[level][idim].setVal(0.0);
     }
+
+    if (flux_euler==3) {NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory());}
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
