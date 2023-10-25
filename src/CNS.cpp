@@ -70,7 +70,7 @@ CNS::CNS(Amr &papa,
   VdSdt.resize(nlevs); VSborder.resize(nlevs); Vprimsmf.resize(nlevs);
   Vnumflxmf.resize(nlevs); Vpntvflxmf.resize(nlevs);
 
-  if (flux_euler==3) {NLDE::allocVMF(nlevs);}
+  if constexpr (PROB::do_pde==1) {NLDE::allocVMF(nlevs);}
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.buildMFs(grids, dmap, level);
@@ -453,7 +453,7 @@ void CNS::post_regrid(int lbase, int new_finest)
       Vpntvflxmf[level][idim].setVal(0.0);
     }
 
-    if (flux_euler==3) {NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory());}
+    if constexpr (PROB::do_pde==1) {NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory());}
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,

@@ -197,7 +197,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   MultiFab& primsmf  = Vprimsmf[level];
   Array<MultiFab,AMREX_SPACEDIM>& numflxmf = Vnumflxmf[level];
 
-  if (flux_euler==3) {
+  if constexpr (PROB::do_pde==1) {
     NLDE::cons2prim(level, statemf, primsmf, lclosures);
   }
   else{
@@ -222,7 +222,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   //Euler Fluxes ///////////////////////////////////////////////////////////////
   // TODO: Introduce pointer functions or visit/variant
   if(rhs_euler) {
-    if (flux_euler==3) {NLDE::eflux(level,statemf,primsmf,numflxmf);}
+    if constexpr (PROB::do_pde==1) {NLDE::eflux(level,statemf,primsmf,numflxmf);}
     if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
     else if (flux_euler==1) {CentralKEEP::FluxKEEP(statemf,primsmf,numflxmf);}
     else {Riemann::Flux(statemf,primsmf,numflxmf);}
