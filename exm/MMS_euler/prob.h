@@ -117,6 +117,7 @@ struct ProbParm
 
 };
 
+constexpr int do_pde=0;
 ///////////////////////////////CLOSURES/////////////////////////////////////////
 typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 // user can also define their own closure class and use it here by naming it ProbClosures

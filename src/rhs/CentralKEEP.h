@@ -3,18 +3,19 @@
 
 #include <CNS.h>
 #include <AMReX_FArrayBox.H>
+#include <AMReX_GpuContainers.H>
 #include <prob.h>
 
 using namespace amrex;
 
 namespace CentralKEEP {
 
+  // Could have a CentralKEEP class and declare an extern instance of it here.Then define it in CNS.cpp? 
+  // Maybe better to have a 'flux' instance of type 'scheme' in CNS.cpp?
+
+  inline int order_keep;
   //2 * standard finite difference coefficients
-#if !AMREX_USE_GPU
-  extern GpuArray<Real,3> coeffs;
-  extern GpuArray<Real,3> coeffs2;
-#endif
-  extern int order_keep;
+  inline Gpu::ManagedVector<Array1D<Real,0,2>> Vcoeffs{{1.0 , 0.0, 0.0}, {4.0/3, -2.0/12, 0.0}, {6.0/4, -6.0/20, 2.0/60}};
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
   Real fDiv(Real f,Real fl) {
@@ -38,12 +39,14 @@ namespace CentralKEEP {
   // Computes fluxes at i-1/2, j-1/2 and k-1/2
   // Computational cost can be reduced by computing and storing flux averages between l and m points
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void KEEP(int i, int j, int k ,int halfsten, const GpuArray<Real,3>& coeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, PROB::ProbClosures const& closures) {
+  void KEEP(int i, int j, int k ,int halfsten, const auto& Vcoeffs, const auto& prims,const auto& nfabfx,const auto& nfabfy, const auto& nfabfz, PROB::ProbClosures const& closures) {
 
     int i1, i2, j1, j2, k1, k2;
     Real rho1, ux1, uy1, uz1, ie1, p1;
     Real rho2, ux2, uy2, uz2, ie2, p2;
     Real massflx,ke;
+
+    Array1D<Real,0,2>& coeffs = Vcoeffs[halfsten-1]; // get coefficients array for current scheme
 
     // For computational efficiency here, prims(i,j,k,:) could be simplified to prims(:) to avoid accessing the large array repeatedly. Same principle could be applied to nfabfx, nfabfy and nfabfz.
 
@@ -76,11 +79,11 @@ namespace CentralKEEP {
         massflx = fgQuad(rho1,rho2,ux1,ux2);
         ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
 
-        nfabfx(i,j,k,URHO) += coeffs[l-1]*massflx;
-        nfabfx(i,j,k,UMX ) += coeffs[l-1]*(fghCubic(rho1,rho2,ux1,ux2,ux1,ux2) +fDiv(p1,p2));
-        nfabfx(i,j,k,UMY ) += coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uy1,uy2);
-        nfabfx(i,j,k,UMZ ) += coeffs[l-1]*fghCubic(rho1,rho2,ux1,ux2,uz1,uz2);
-        nfabfx(i,j,k,UET ) += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,ux1,ux2,ie1,ie2) + fgDiv(p1,p2,ux1,ux2));
+        nfabfx(i,j,k,URHO) += coeffs(l-1)*massflx;
+        nfabfx(i,j,k,UMX ) += coeffs(l-1)*(fghCubic(rho1,rho2,ux1,ux2,ux1,ux2) +fDiv(p1,p2));
+        nfabfx(i,j,k,UMY ) += coeffs(l-1)*fghCubic(rho1,rho2,ux1,ux2,uy1,uy2);
+        nfabfx(i,j,k,UMZ ) += coeffs(l-1)*fghCubic(rho1,rho2,ux1,ux2,uz1,uz2);
+        nfabfx(i,j,k,UET ) += coeffs(l-1)*(massflx*ke + fghCubic(rho1,rho2,ux1,ux2,ie1,ie2) + fgDiv(p1,p2,ux1,ux2));
       }
     }
     
@@ -105,11 +108,11 @@ namespace CentralKEEP {
 
         massflx = fgQuad(rho1,rho2,uy1,uy2);
         ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
-        nfabfy(i,j,k,URHO) += coeffs[l-1]*massflx;
-        nfabfy(i,j,k,UMX ) += coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
-        nfabfy(i,j,k,UMY ) += coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2)+ fDiv(p1,p2));
-        nfabfy(i,j,k,UMZ ) += coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
-        nfabfy(i,j,k,UET ) += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
+        nfabfy(i,j,k,URHO) += coeffs(l-1)*massflx;
+        nfabfy(i,j,k,UMX ) += coeffs(l-1)*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
+        nfabfy(i,j,k,UMY ) += coeffs(l-1)*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2)+ fDiv(p1,p2));
+        nfabfy(i,j,k,UMZ ) += coeffs(l-1)*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
+        nfabfy(i,j,k,UET ) += coeffs(l-1)*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
       }
     }
 
@@ -134,24 +137,27 @@ namespace CentralKEEP {
 
         massflx = fgQuad(rho1,rho2,uz1,uz2);
         ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
-        nfabfz(i,j,k,URHO) += coeffs[l-1]*massflx;
-        nfabfz(i,j,k,UMX)  += coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,ux1,ux2);
-        nfabfz(i,j,k,UMY)  += coeffs[l-1]*fghCubic(rho1,rho2,uz1,uz2,uy1,uy2);
-        nfabfz(i,j,k,UMZ)  += coeffs[l-1]*(fghCubic(rho1,rho2,uz1,uz2,uz1,uz2) + fDiv(p1,p2));
-        nfabfz(i,j,k,UET)  += coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uz1,uz2,ie1,ie2)+ fgDiv(p1,p2,uz1,uz2));
+        nfabfz(i,j,k,URHO) += coeffs(l-1)*massflx;
+        nfabfz(i,j,k,UMX)  += coeffs(l-1)*fghCubic(rho1,rho2,uz1,uz2,ux1,ux2);
+        nfabfz(i,j,k,UMY)  += coeffs(l-1)*fghCubic(rho1,rho2,uz1,uz2,uy1,uy2);
+        nfabfz(i,j,k,UMZ)  += coeffs(l-1)*(fghCubic(rho1,rho2,uz1,uz2,uz1,uz2) + fDiv(p1,p2));
+        nfabfz(i,j,k,UET)  += coeffs(l-1)*(massflx*ke + fghCubic(rho1,rho2,uz1,uz2,ie1,ie2)+ fgDiv(p1,p2,uz1,uz2));
       }
     }
 
   }
+
   ///////////
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void KEEPy(int i, int j, int k ,int halfsten, const GpuArray<Real,3> coeffs, const auto& prims, const auto& nfabfy, PROB::ProbClosures const& parm) {
+  void KEEPy(int i, int j, int k ,int halfsten, const auto& Vcoeffs, const auto& prims, const auto& nfabfy, PROB::ProbClosures const& parm) {
 
     GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+
     int j1, j2;
     Real rho1, ux1, uy1, uz1, ie1, p1;
     Real rho2, ux2, uy2, uz2, ie2, p2;
     Real massflx,ke;
+    Array1D<Real,0,2>& coeffs = Vcoeffs[halfsten-1]; // get coefficients array for current scheme
 
     // flux at j-1/2
     for (int l=1; l<=halfsten; l++) {
@@ -174,11 +180,11 @@ namespace CentralKEEP {
 
         massflx = fgQuad(rho1,rho2,uy1,uy2);
         ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
-        flx[URHO] = flx[URHO] + coeffs[l-1]*massflx;
-        flx[UMX]  = flx[UMX]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
-        flx[UMY]  = flx[UMY]  + coeffs[l-1]*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2) + fDiv(p1,p2));
-        flx[UMZ]  = flx[UMZ]  + coeffs[l-1]*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
-        flx[UET]  = flx[UET]  + coeffs[l-1]*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
+        flx[URHO] = flx[URHO] + coeffs(l-1)*massflx;
+        flx[UMX]  = flx[UMX]  + coeffs(l-1)*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
+        flx[UMY]  = flx[UMY]  + coeffs(l-1)*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2) + fDiv(p1,p2));
+        flx[UMZ]  = flx[UMZ]  + coeffs(l-1)*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
+        flx[UET]  = flx[UET]  + coeffs(l-1)*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
       }
     }
     for (int n=0; n<NCONS; n++) {nfabfy(i,j,k,n) = flx[n];}
@@ -189,24 +195,7 @@ namespace CentralKEEP {
   AMREX_FORCE_INLINE void FluxKEEP(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
     PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
-    int halfsten = order_keep/2;
-  // TODO: define coeffs outside of this routine and only once
-#if AMREX_USE_GPU
-  GpuArray<Real,3> coeffs;
-  if (order_keep==6) {
-    coeffs[0]=Real(6.0)/4; coeffs[1]=Real(-6.0)/20; coeffs[2]=Real(2.0)/60; 
-  }
-  else if (order_keep==4) { 
-    coeffs[0]=Real(4.0)/3; coeffs[1]=Real(-2.0)/12; coeffs[2]=0.0;
-    }
-  else { coeffs[0]=Real(1.0);coeffs[1]=0.0; coeffs[2]=0.0; }
-#endif
-    ///////////////
-    // GpuArray<Real,3>* coeffs; 
-    // coeffs = (GpuArray<Real,3>*)The_Arena()->alloc(sizeof(GpuArray<Real,3>));
-    // (*coeffs)[0]=Real(4.0)/3;
-    // (*coeffs)[1]=Real(-2.0)/12;
-    // (*coeffs)[2]=0.0;
+    auto const pVcoeffs = Vcoeffs.data();
 
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -221,11 +210,9 @@ namespace CentralKEEP {
       ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-        KEEP(i,j,k,halfsten,coeffs,prims,nfabfx,nfabfy,nfabfz,lclosures);
+        KEEP(i,j,k,order_keep/2,pVcoeffs,prims,nfabfx,nfabfy,nfabfz,lclosures);
       });
     }
-
-    // The_Arena()->free(coeffs);
   }
 
   // TODO: In post_init select the boundaries and planes to reduce order/treat specially -- function to generate box arrays of planes with associated order of numericalscheme to be applied.
@@ -233,12 +220,7 @@ namespace CentralKEEP {
 
     BCRec& l_phys_bc = *CNS::d_phys_bc;
     PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
-#if AMREX_USE_GPU
-    GpuArray<Real,3> coeffs2;
-    coeffs2[0]=Real(1.0);
-    coeffs2[1]=0.0;
-    coeffs2[2]=0.0;
-#endif
+    auto const pVcoeffs = Vcoeffs.data();
     /////////////// 
 
     for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
@@ -259,8 +241,7 @@ namespace CentralKEEP {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lclosures);
-            // printf("2nd ord %d %d %d \n",i,j,k);
+            KEEPy(i,j,k,1,pVcoeffs,prims,nfabfy,lclosures);
           });
         }
       }
@@ -276,14 +257,11 @@ namespace CentralKEEP {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,coeffs2,prims,nfabfy,lclosures);
-            // printf("2nd ord %d %d %d \n",i,j,k);
+            KEEPy(i,j,k,1,pVcoeffs,prims,nfabfy,lclosures);
           });
         }
       }
     }
-
-    // The_Arena()->free(coeffs2);
   }
 
 }

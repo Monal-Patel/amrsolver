@@ -12,12 +12,6 @@
 
 using namespace amrex;
 
-#if !AMREX_USE_GPU
-GpuArray<Real,3> CentralKEEP::coeffs,CentralKEEP::coeffs2;  
-#endif
-int CentralKEEP::order_keep;
-
-
 bool CNS::rhs_euler=false;
 bool CNS::rhs_visc=false;
 bool CNS::rhs_source=false;
@@ -31,8 +25,8 @@ int  CNS::dist_linear=0;
 int  CNS::art_diss=0; 
 int  CNS::order_rk=2;
 int  CNS::stages_rk=2;
-int  CNS::do_reflux = 1;
-int  CNS::refine_max_dengrad_lev = -1;
+int  CNS::do_reflux=1;
+int  CNS::refine_max_dengrad_lev=-1;
 Real CNS::cfl = 0.0_rt;
 Real CNS::dt_constant = 0.0_rt;
 Real CNS::refine_dengrad = 1.0e10;
@@ -74,8 +68,6 @@ CNS::CNS(Amr &papa,
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.buildMFs(grids, dmap, level);
-  // IBM::ib.computeMarkers(level);
-  // IBM::ib.initialiseGPs(level);
 #endif
 
   buildMetrics();
@@ -224,20 +216,6 @@ void CNS::post_init(Real stop_time)
   if (verbose) {
   printTotal();
   }
-
-  // TODO: move to Central.h
-#if !AMREX_USE_GPU
-  CentralKEEP::coeffs2={Real(1.0), 0.0, 0.0};
-  if (CentralKEEP::order_keep==6) {
-    CentralKEEP::coeffs={Real(6.0)/4, Real(-6.0)/20, Real(2.0)/60}; 
-  }
-  else if (CentralKEEP::order_keep==4) {
-    CentralKEEP::coeffs={Real(4.0)/3, Real(-2.0)/12, 0.0};
-  }
-  else {
-    CentralKEEP::coeffs={Real(1.0), 0.0, 0.0};
-  }
-#endif
 }
 // -----------------------------------------------------------------------------
 
