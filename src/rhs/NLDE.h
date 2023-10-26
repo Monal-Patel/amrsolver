@@ -1,5 +1,7 @@
-
 #include <AMReX_Vector.H>
+#include <AMReX_Geometry.H>
+#include <Closures.h>
+#include <cns_prob.H>
 
 namespace NLDE {
   // vector of baseflow multifabs
@@ -11,8 +13,8 @@ namespace NLDE {
 
 
   // baseflow interpolation
-  // current implementaiton is hard-coded analytical solution to supersonic shear layer
-  inline void interpolate_baseflow() {
+  // current baseflow implementaiton uses hard-coded analytical solution to supersonic shear layer
+  inline void interpolate_baseflow(int i, int j, int k, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
   
   MultiFab& basemf = Vbaseflow[lev];
 
@@ -24,43 +26,39 @@ namespace NLDE {
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { 
-      // ***fill basefab(i,j,k,QRHO) = () --> indices for variables are in problem file
-      // ***copied below from cns_prob.H 
-      // ***need to check variables are available or include more header info
+        const Real* prob_lo = geomdata.ProbLo();
+        const Real* prob_hi = geomdata.ProbHi();
+        const Real* dx      = geomdata.CellSize();      
 
-      //  const Real* prob_lo = geomdata.ProbLo();
-      //  const Real* prob_hi = geomdata.ProbHi();
-      //  const Real* dx      = geomdata.CellSize();      
+        Real x = prob_lo[0] + (i+Real(0.5))*dx[0];
+        Real y = prob_lo[1] + (j+Real(0.5))*dx[1];
+        Real Pt, rhot, uxt, uyt, Tt, u1t, u2t, T1t, T2t;
 
-      //  Real x = prob_lo[0] + (i+Real(0.5))*dx[0];
-      //  Real y = prob_lo[1] + (j+Real(0.5))*dx[1];
-      //  Real Pt, rhot, uxt, uyt, Tt, u1t, u2t, T1t, T2t;
+        // mean pressure is uniform
+        Pt = prob_parm.P1;
 
-      //  // mean pressure is uniform
-      //  Pt = prob_parm.P1;
-
-      //  // analytical expression for velocity distribution
-      //  u1t = prob_parm.U1;
-      //  u2t = prob_parm.U2;
-      //  uxt = Real(0.5)*((u1t+u2t)+(u1t-u2t)*tanh(Real(2.0)*y/prob_parm.dw));
+        // analytical expression for velocity distribution
+        u1t = prob_parm.U1;
+        u2t = prob_parm.U2;
+        uxt = Real(0.5)*((u1t+u2t)+(u1t-u2t)*tanh(Real(2.0)*y/prob_parm.dw));
       
-      //  // ananlytical expression for temperature distribution
-      //  T1t = prob_parm.T1;
-      //  T2t = prob_parm.T2;
-      //  Tt = T1t*(T2t/T1t)*((1-(uxt/u1t))/(1-(u2t/u1t)))
-      //      +T1t*(((uxt/u1t)-(u2t/u1t))/(1-(u2t/u1t)))
-      //      +T1t*Real(0.5)*(closures.gamma-Real(1.0))*prob_parm.M1*prob_parm.M1*(1-(uxt/u1t))*((uxt/u1t)-(u2t/u1t));
+        // ananlytical expression for temperature distribution
+        T1t = prob_parm.T1;
+        T2t = prob_parm.T2;
+        Tt = T1t*(T2t/T1t)*((1-(uxt/u1t))/(1-(u2t/u1t)))
+            +T1t*(((uxt/u1t)-(u2t/u1t))/(1-(u2t/u1t)))
+            +T1t*Real(0.5)*(closures.gamma-Real(1.0))*prob_parm.M1*prob_parm.M1*(1-(uxt/u1t))*((uxt/u1t)-(u2t/u1t));
   
-      //  // density profile assuming perfect gas
-      //  rhot = Pt/(closures.Rspec*Tt);
+        // density profile assuming perfect gas
+        rhot = Pt/(closures.Rspec*Tt);
       
-      //  state(i,j,k,URHO ) = rhot;
-      //  state(i,j,k,UMX  ) = rhot*uxt;
-      //  state(i,j,k,UMY  ) = Real(0.0);
-      //  state(i,j,k,UMZ  ) = Real(0.0);
-      //  Real et = Pt/(closures.gamma-Real(1.0));
-      //  state(i,j,k,UET) = et + Real(0.5)*rhot*uxt*uxt;
-  
+        // baseflow primitive variables
+        basefab(i,j,k,QRHO) = rhot;
+        basefab(i,j,k,QU) = uxt;
+          basefab(i,j,k,QV) = Real(0.0);
+          basefab(i,j,k,QW) = Real(0.0);
+          basefab(i,j,k,QT) = Tt;
+          basefab(i,j,k,QPRES) = Pt;  
       });
     }
   }
