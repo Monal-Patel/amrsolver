@@ -15,7 +15,7 @@ namespace CentralKEEP {
 
   inline int order_keep;
   //2 * standard finite difference coefficients
-  inline Gpu::ManagedVector<Array1D<Real,0,2>> Vcoeffs{{1.0 , 0.0, 0.0}, {4.0/3, -2.0/12, 0.0}, {6.0/4, -6.0/20, 2.0/60}};
+  inline Gpu::ManagedVector<Array1D<Real,0,2>> Vcoeffs;
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
   Real fDiv(Real f,Real fl) {
@@ -196,6 +196,7 @@ namespace CentralKEEP {
 
     PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
     auto const pVcoeffs = Vcoeffs.data();
+    int order = order_keep; // redefined here so can be captured by lambda
 
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
@@ -210,7 +211,7 @@ namespace CentralKEEP {
       ParallelFor(bxnodal,  
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       {
-        KEEP(i,j,k,order_keep/2,pVcoeffs,prims,nfabfx,nfabfy,nfabfz,lclosures);
+        KEEP(i,j,k,order/2,pVcoeffs,prims,nfabfx,nfabfy,nfabfz,lclosures);
       });
     }
   }

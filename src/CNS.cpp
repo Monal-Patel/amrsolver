@@ -108,7 +108,11 @@ void CNS::read_params()
     }
 
     if (!pp.query("art_diss",art_diss)) {
-      amrex::Abort("Need to specify artificial dissipation, art_diss = {1=on 0=off}");}
+      amrex::Abort("Need to specify artificial dissipation, art_diss = {1=on 0=off}");};
+
+    CentralKEEP::Vcoeffs.push_back(Array1D<Real,0,2>{1.0 , 0.0, 0.0 });
+    CentralKEEP::Vcoeffs.push_back(Array1D<Real,0,2>{4.0/3, -2.0/12, 0.0});
+    CentralKEEP::Vcoeffs.push_back(Array1D<Real,0,2>{6.0/4, -6.0/20, 2.0/60});
   }
 
   if (!pp.query("order_rk",order_rk)) {
