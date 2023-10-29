@@ -14,18 +14,20 @@ namespace NLDE {
 
   // baseflow interpolation
   // current baseflow implementaiton uses hard-coded analytical solution to supersonic shear layer
-  inline void interpolate_baseflow(int i, int j, int k, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
+  inline void interpolate_baseflow(int lev, amrex::GeometryData const& geomdata, ProbClosures const& closures, ProbParm const& prob_parm) {
   
   MultiFab& basemf = Vbaseflow[lev];
 
-   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
-      auto const& statefab = statemf.array(mfi);
-      auto const& primsfab = primsmf.array(mfi);
+   for (MFIter mfi(basemf, false); mfi.isValid(); ++mfi) {
+      //auto const& statefab = consmf.array(mfi);
+      //auto const& primsfab = primsmf.array(mfi);
       auto const& basefab  = basemf.array(mfi);
       const Box& bxg       = mfi.growntilebox(NGHOST);
       amrex::ParallelFor(bxg,
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { 
+        // make sure geomdata.Problo/ProbHi/CellSize is OK on GPU, otherwise try...
+        // GpuArray<Real,AMREX_SPACEDIM> prob_lo = pamr->Geom(lev).ProbLoArray();
         const Real* prob_lo = geomdata.ProbLo();
         const Real* prob_hi = geomdata.ProbHi();
         const Real* dx      = geomdata.CellSize();      
@@ -55,32 +57,35 @@ namespace NLDE {
         // baseflow primitive variables
         basefab(i,j,k,QRHO) = rhot;
         basefab(i,j,k,QU) = uxt;
-          basefab(i,j,k,QV) = Real(0.0);
-          basefab(i,j,k,QW) = Real(0.0);
-          basefab(i,j,k,QT) = Tt;
-          basefab(i,j,k,QPRES) = Pt;  
+        basefab(i,j,k,QV) = Real(0.0);
+        basefab(i,j,k,QW) = Real(0.0);
+        basefab(i,j,k,QT) = Tt;
+        basefab(i,j,k,QPRES) = Pt;  
       });
     }
   }
 
 
-  inline void post_regrid(const int& lev,const BoxArray& grids, const DistributionMapping& dmap, const MFInfo& info, const FabFactory<FArrayBox>& factory) {
+  inline void post_regrid(const int& lev,const BoxArray& grids, const DistributionMapping& dmap, const MFInfo& info, 
+                          const FabFactory<FArrayBox>& factory, amrex::GeometryData const& geomdata, 
+                          ProbClosures const& closures, ProbParm const& prob_parm) {
     // reallocate MF
     Vbaseflow[lev].clear();
     Vbaseflow[lev].define(grids,dmap,NCONS,0,info,factory);
     Vbaseflow[lev].setVal(0.0);
 
     // interpolate_baseflow();
+    interpolate_baseflow(lev, geomdata, closures, prob_parm)
   }
 
 
-  // convert primitive variables to conserved variables
-  inline void cons2prim(const int& lev, const MultiFab& statemf, MultiFab& primsmf ,const PROB::ProbClosures& cls) {
+  // convert conservative variables to primitive variables
+  inline void cons2prim(const int& lev, const MultiFab& consmf, MultiFab& primsmf ,const PROB::ProbClosures& cls) {
 
   MultiFab& basemf = Vbaseflow[lev];
 
-   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
-      auto const& statefab = statemf.array(mfi);
+   for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi) {
+      auto const& consfab = consmf.array(mfi);
       auto const& primsfab = primsmf.array(mfi);
       auto const& basefab  = basemf.array(mfi);
       const Box& bxg       = mfi.growntilebox(NGHOST);
@@ -88,6 +93,13 @@ namespace NLDE {
       [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
       { 
         Abort("NLDE cons2prim implement");
+        primsfab(i,j,k,QRHO) = consfab(i,j,k,URHO)
+        primsfab(i,j,k,QU) = UMX/URHO
+        primsfab(i,j,k,QV) = UMY/URHO
+        primsfab(i,j,k,QW) = UMZ/URHO
+        primsfab(i,j,k,QT) = UET/
+        primsfab(i,j,k,QPRES) = URHO
+
         // fill primsfab(i,j,k,QRHO) = () --> indices for variables are in problem file
         // TROUBLESHOOT: check manually at a point initialized state 
         
@@ -393,7 +405,7 @@ namespace NLDE {
 
 
   // euler flux computation function
-  AMREX_FORCE_INLINE void eflux(const int& lev, const MultiFab& statemf, const MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void eflux(const int& lev, const MultiFab& consmf, const MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
 
   MultiFab& basemf = Vbaseflow[lev];
@@ -401,21 +413,21 @@ namespace NLDE {
   // make multifab for variables
   Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
   for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-    pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST);
+    pntflxmf[idim].define( consmf.boxArray(), consmf.DistributionMap(), NCONS, NGHOST);
     }
 
   // store eigenvalues max(u+c,u,u-c) in all directions
   MultiFab lambdamf;
-  lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
+  lambdamf.define( consmf.boxArray(), consmf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
 
   // loop over all fabs
   PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
-    for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
+    for (MFIter mfi(consmf, false); mfi.isValid(); ++mfi)
     {
       const Box& bxg     = mfi.growntilebox(NGHOST);
       const Box& bxnodal = mfi.nodaltilebox(); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
 
-      auto const& statefab = statemf.array(mfi);
+      auto const& statefab = consmf.array(mfi);
       AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);, // nfabfx is numerical flux (i.e., computed fluxes at i,j,k cell cell centers)
                    auto const& nfabfy = numflxmf[1].array(mfi);,
                    auto const& nfabfz = numflxmf[2].array(mfi););
@@ -452,7 +464,7 @@ namespace NLDE {
 
 
   // similarly, viscous fluxes
-  AMREX_FORCE_INLINE void vflux(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void vflux(MultiFab& consmf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
   }
 

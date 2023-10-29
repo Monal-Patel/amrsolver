@@ -458,7 +458,11 @@ void CNS::post_regrid(int lbase, int new_finest)
       Vpntvflxmf[level][idim].setVal(0.0);
     }
 
-    if (flux_euler==3) {NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory());}
+    if (flux_euler==3) {
+      const auto geomdata = geom.data();
+      PROB::ProbClosures const *lclosures = d_prob_closures;
+      PROB::ProbParm const *lprobparm = d_prob_parm;
+      NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory(),geomdata,*lclosures,*lprobparm);}
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
