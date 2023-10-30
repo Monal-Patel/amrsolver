@@ -5,6 +5,9 @@
 #include <AMReX_FArrayBox.H>
 #include <AMReX_GpuContainers.H>
 #include <prob.h>
+#ifdef AMREX_USE_GPIBM
+#include <IBM.h>
+#endif
 
 using namespace amrex;
 
@@ -149,50 +152,58 @@ namespace CentralKEEP {
 
   ///////////
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void KEEPy(int i, int j, int k ,int halfsten, const auto& Vcoeffs, const auto& prims, const auto& nfabfy, PROB::ProbClosures const& parm) {
+  void KEEPdir(int i, int j, int k, int dir ,int halfsten, const auto& Vcoeffs, const auto& prims, const auto& nflux, PROB::ProbClosures const& parm) {
 
-    GpuArray<Real,NCONS> flx; for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+    GpuArray<Real,NCONS> flx; 
+    for (int n=0; n<NCONS; n++) {flx[n]=0.0;};
+    GpuArray<int,3> vdir={int(dir==0),int(dir==1),int(dir==2)};
 
-    int j1, j2;
-    Real rho1, ux1, uy1, uz1, ie1, p1;
-    Real rho2, ux2, uy2, uz2, ie2, p2;
+    int i1, j1, i2, j2, k1, k2;
+    Real rho1, ux1, uy1, uz1, uu1, ie1, p1;
+    Real rho2, ux2, uy2, uz2, uu2, ie2, p2;
     Real massflx,ke;
     Array1D<Real,0,2>& coeffs = Vcoeffs[halfsten-1]; // get coefficients array for current scheme
 
-    // flux at j-1/2
+    // flux at i/j/k-1/2
     for (int l=1; l<=halfsten; l++) {
       for (int m=0; m<=l-1; m++) {
-        j1 = j + m;
-        rho1 = prims(i,j1,k,QRHO);
-        ux1  = prims(i,j1,k,QU);
-        uy1  = prims(i,j1,k,QV);
-        uz1  = prims(i,j1,k,QW);
-        ie1  = parm.cv*prims(i,j1,k,QT);
-        p1   = prims(i,j1,k,QPRES);
+        i1 = i + m*vdir[0];
+        j1 = j + m*vdir[1];
+        k1 = k + m*vdir[2];
+        rho1 = prims(i1,j1,k1,QRHO);
+        ux1  = prims(i1,j1,k1,QU);
+        uy1  = prims(i1,j1,k1,QV);
+        uz1  = prims(i1,j1,k1,QW);
+        uu1  = prims(i1,j1,k1,QU + dir);
+        ie1  = parm.cv*prims(i1,j1,k1,QT);
+        p1   = prims(i1,j1,k1,QPRES);
 
-        j2   = j + m - l;
-        rho2 = prims(i,j2,k,QRHO);
-        ux2  = prims(i,j2,k,QU);
-        uy2  = prims(i,j2,k,QV);
-        uz2  = prims(i,j2,k,QW);
-        ie2  = parm.cv*prims(i,j2,k,QT);
-        p2   = prims(i,j2,k,QPRES);
+        i2   = i + (m - l)*vdir[0];
+        j2   = j + (m - l)*vdir[1];
+        k2   = k + (m - l)*vdir[2];
+        rho2 = prims(i2,j2,k2,QRHO);
+        ux2  = prims(i2,j2,k2,QU);
+        uy2  = prims(i2,j2,k2,QV);
+        uz2  = prims(i2,j2,k2,QW);
+        ie2  = parm.cv*prims(i2,j2,k2,QT);
+        p2   = prims(i2,j2,k2,QPRES);
+        uu2  = prims(i2,j2,k2,QU + dir);
 
-        massflx = fgQuad(rho1,rho2,uy1,uy2);
+        massflx = fgQuad(rho1,rho2,uu1,uu2);
         ke      = 0.5_rt*(ux1*ux2 + uy1*uy2 + uz1*uz2);
         flx[URHO] = flx[URHO] + coeffs(l-1)*massflx;
-        flx[UMX]  = flx[UMX]  + coeffs(l-1)*fghCubic(rho1,rho2,uy1,uy2,ux1,ux2);
-        flx[UMY]  = flx[UMY]  + coeffs(l-1)*(fghCubic(rho1,rho2,uy1,uy2,uy1,uy2) + fDiv(p1,p2));
-        flx[UMZ]  = flx[UMZ]  + coeffs(l-1)*fghCubic(rho1,rho2,uy1,uy2,uz1,uz2);
-        flx[UET]  = flx[UET]  + coeffs(l-1)*(massflx*ke + fghCubic(rho1,rho2,uy1,uy2,ie1,ie2)+ fgDiv(p1,p2,uy1,uy2));
+        flx[UMX]  = flx[UMX]  + coeffs(l-1)*fghCubic(rho1,rho2,uu1,uu2,ux1,ux2);
+        flx[UMY]  = flx[UMY]  + coeffs(l-1)*(fghCubic(rho1,rho2,uu1,uu2,uy1,uy2) + fDiv(p1,p2));
+        flx[UMZ]  = flx[UMZ]  + coeffs(l-1)*fghCubic(rho1,rho2,uu1,uu2,uz1,uz2);
+        flx[UET]  = flx[UET]  + coeffs(l-1)*(massflx*ke + fghCubic(rho1,rho2,uu1,uu2,ie1,ie2)+ fgDiv(p1,p2,uu1,uu2));
       }
     }
-    for (int n=0; n<NCONS; n++) {nfabfy(i,j,k,n) = flx[n];}
+    for (int n=0; n<NCONS; n++) {nflux(i,j,k,n) = flx[n];}
   
   }
 
 
-  AMREX_FORCE_INLINE void FluxKEEP(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void eflux(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
 
     PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
     auto const pVcoeffs = Vcoeffs.data();
@@ -242,7 +253,7 @@ namespace CentralKEEP {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,pVcoeffs,prims,nfabfy,lclosures);
+            KEEPdir(i,j,k,1,1,pVcoeffs,prims,nfabfy,lclosures);
           });
         }
       }
@@ -258,13 +269,65 @@ namespace CentralKEEP {
           ParallelFor(bxboundary, 
           [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
           {
-            KEEPy(i,j,k,1,pVcoeffs,prims,nfabfy,lclosures);
+            KEEPdir(i,j,k,1,1,pVcoeffs,prims,nfabfy,lclosures);
           });
         }
       }
     }
   }
 
-}
 
+#if AMREX_USE_GPIBM
+AMREX_FORCE_INLINE void ibm_flux_correction(MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf, IBM::IBMultiFab& ibmf) {
+
+  PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
+  auto const pVcoeffs = Vcoeffs.data();
+  int order = order_keep; // redefined here so can be captured by lambda
+
+  for (MFIter mfi(primsmf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+  {
+    auto const& ibFab   = ibmf.get(mfi);
+    auto const& markers = ibmf.array(mfi);
+    auto const gp_ijk   = ibFab.gpData.gp_ijk.data();
+    auto const& prims    = primsmf.array(mfi);
+    AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
+                  auto const& nfabfy = numflxmf[1].array(mfi);,
+                  auto const& nfabfz = numflxmf[2].array(mfi););
+
+    int halfsten = 1; // 2nd order
+    ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii) noexcept
+    {
+      int i = gp_ijk[ii](0);
+      int j = gp_ijk[ii](1);
+      int k = gp_ijk[ii](2);
+
+      if (!markers(i+1,j,k,0)) { //the point to the right is fluid then compute fi-1/2 at i+1
+        KEEPdir(i+1,j,k,0,halfsten,pVcoeffs,prims,nfabfx,lclosures);
+      }
+
+      if (!markers(i-1,j,k,0)) { //the point to the left is fluid then compute fi-1/2 at i
+        KEEPdir(i,j,k,0,halfsten,pVcoeffs,prims,nfabfx,lclosures);
+      }
+
+      if (!markers(i,j+1,k,0)) { //the point to the top is fluid then compute fj-1/2 at j+1
+        KEEPdir(i,j+1,k,1,halfsten,pVcoeffs,prims,nfabfy,lclosures);
+      }
+
+      if (!markers(i,j-1,k,0)) { //the point to the down is fluid then compute fj-1/2 at j
+        KEEPdir(i,j,k,1,halfsten,pVcoeffs,prims,nfabfy,lclosures);
+      }
+
+      if (!markers(i,j,k+1,0)) { //the point to the front is fluid then compute fk-1/2 at k
+        KEEPdir(i,j,k+1,2,halfsten,pVcoeffs,prims,nfabfz,lclosures);
+      }
+
+      if (!markers(i,j,k-1,0)) { //the point to the back is fluid then compute fk-1/2 at k+1
+        KEEPdir(i,j,k,2,halfsten,pVcoeffs,prims,nfabfy,lclosures);
+      }
+
+    });
+  }
+}
+#endif
+}
 #endif

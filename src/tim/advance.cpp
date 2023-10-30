@@ -220,12 +220,11 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   //////////////////////////////////////////////////////////////////////////////
 
   //Euler Fluxes ///////////////////////////////////////////////////////////////
-  // TODO: Introduce pointer functions or visit/variant
   if(rhs_euler) {
     if constexpr (PROB::do_pde==1) {NLDE::eflux(level,statemf,primsmf,numflxmf);}
     else { 
       if (flux_euler==2) {HiRes::FluxWENO(statemf,primsmf,numflxmf);  }
-      else if (flux_euler==1) {CentralKEEP::FluxKEEP(statemf,primsmf,numflxmf);}
+      else if (flux_euler==1) {CentralKEEP::eflux(statemf,primsmf,numflxmf);}
       else {Riemann::Flux(statemf,primsmf,numflxmf);}
     }
 
@@ -233,8 +232,14 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
     // Recompute fluxes on planes adjacent to physical boundaries (Order reduction)
     if (flux_euler==1 && !(CentralKEEP::order_keep==2)) {
       CentralKEEP::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
+      // Order reduction near IBM
+#if AMREX_USE_GPIBM
+    IBM::IBMultiFab& ibmf = *IBM::ib.ibMFa[level];
+    CentralKEEP::ibm_flux_correction(primsmf,numflxmf,ibmf);
+#endif
     }
-    // Order reduction near IBM
+
+
 
     // Artificial dissipation (adding to numflxmf)
     // JST artificial dissipation shock capturing

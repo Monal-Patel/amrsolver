@@ -33,7 +33,7 @@ namespace PROB {
 // fluxes
 // typedef euler_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 
-// typedef 
+constexpr int do_pde = 0;
 ////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////DISCRETISATION////////////////////////////////////
@@ -52,7 +52,7 @@ void inline inputs() {
   pp.add   ("cns.rhs_visc", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 1); // 0=false, 1=true
   pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add   ("cns.order_keep", 2); // Order of accuracy=2, 4 or 6"
+  pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
   pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
   pp.add   ("cns.screen_output", 50); //
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
@@ -64,7 +64,7 @@ void inline inputs() {
 ////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////CLOSURES/////////////////////////////////////////
-typedef closures_derived_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
+typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 // user can also define their own closure class and use it here by naming it ProbClosures
 // template <typename Visc, typename Cond, typename Thermo>
 // class closures_derived_user_t : public Cond, public Visc, public Thermo
