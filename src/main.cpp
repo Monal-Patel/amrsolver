@@ -52,7 +52,7 @@ int main (int argc, char* argv[]) {
         Real timer_init = amrex::second();
         Amr amr(getLevelBld());
 #ifdef AMREX_USE_GPIBM
-        IBM::ib.init(&amr, NGHOST); // this needs to happen after amr instance and before amr.init
+        IBM::ibm.init(&amr, NGHOST); // this needs to happen after amr instance and before amr.init
 #endif
         amr.init(start_time,stop_time);
 

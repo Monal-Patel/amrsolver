@@ -17,8 +17,6 @@ bool CNS::rhs_visc=false;
 bool CNS::rhs_source=false;
 bool CNS::verbose = true;
 bool CNS::dt_dynamic=false;
-bool CNS::ib_move=false;
-bool CNS::plot_surf=false;
 int  CNS::nstep_screen_output=10;
 int  CNS::flux_euler=0;
 int  CNS::dist_linear=0;
@@ -67,7 +65,7 @@ CNS::CNS(Amr &papa,
   if constexpr (PROB::do_pde==1) {NLDE::allocVMF(nlevs);}
 
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.buildMFs(grids, dmap, level);
+  IBM::ibm.buildMFs(grids, dmap, level);
 #endif
 
   buildMetrics();
@@ -136,12 +134,12 @@ void CNS::read_params()
   }
 
 #if AMREX_USE_GPIBM
-  ParmParse ppib("ib");
-  if(!ppib.query("move",ib_move)) {
-    amrex::Abort("ib.move not specified (0=false, 1=true)");
+  ParmParse ppibm("ibm");
+  if(!ppibm.query("move",ibm_move)) {
+    amrex::Abort("ibm.move not specified (0=false, 1=true)");
   }
-  if(!ppib.query("plot_surf",plot_surf)) {
-    amrex::Abort("ib.plot_surf not specified (0=false, 1=true)");
+  if(!ppibm.query("plot",ibm_plot)) {
+    amrex::Abort("ibm.plot not specified (0=false, 1=true)");
   }
 #endif
 
@@ -384,13 +382,13 @@ void CNS::post_timestep(int /* iteration*/)
 void CNS::postCoarseTimeStep (Real time)
 {
 #if AMREX_USE_GPIBM
-  // if (ib_move) {
-  //   IBM::ib.moveGeom();
+  // if (ibm_move) {
+  //   IBM::ibmmoveGeom();
   //   // reallocate variables?
   //   // Print() << parent->finestLevel() << std::endl;
   //   for (int lev=0; lev <= parent->finestLevel(); lev++) {
-  //     IBM::ib.computeMarkers(0);
-  //     IBM::ib.initialiseGPs(0);
+  //     IBM::ibmcomputeMarkers(0);
+  //     IBM::ibminitialiseGPs(0);
   //   }
   // }
 #endif
@@ -403,10 +401,10 @@ void CNS::post_regrid(int lbase, int new_finest)
 {
 
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.destroyMFs(level);
-  IBM::ib.buildMFs(grids, dmap, level);
-  IBM::ib.computeMarkers(level);
-  IBM::ib.initialiseGPs(level);
+  IBM::ibm.destroyMFs(level);
+  IBM::ibm.buildMFs(grids, dmap, level);
+  IBM::ibm.computeMarkers(level);
+  IBM::ibm.initialiseGPs(level);
 #endif
 
     // Destroy and re-allocate multifabs
@@ -451,7 +449,7 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
 
 #ifdef AMREX_USE_GPIBM
     // call function from cns_prob
-    IBM::IBMultiFab& ibdata = (*IBM::ib.ibMFa[level]);
+    IBM::IBMultiFab& ibdata = (*IBM::ibm.ibMFa[level]);
 #endif
   for (MFIter mfi(tags,TilingIfNotGPU()); mfi.isValid(); ++mfi)
   {
@@ -824,7 +822,7 @@ void CNS::writePlotFile(const std::string& dir, std::ostream& os, VisMF::How how
 //----------------------------------------------------------------------modified
 #ifdef AMREX_USE_GPIBM
   plotMF.setVal(0.0_rt, cnt, 2, nGrow);
-  IBM::ib.ibMFa[level]->copytoRealMF(plotMF, 0, cnt);
+  IBM::ibm.ibMFa[level]->copytoRealMF(plotMF, 0, cnt);
 #endif
   //------------------------------------------------------------------------------
 
@@ -851,16 +849,16 @@ void CNS::writePlotFilePost (const std::string& dir,
                                     std::ostream&      os) {
 
 #if AMREX_USE_GPIBM
-  // write geometry -- each proc holds same geom, even with ib_move, so no communication is required.
-  // if (plot_surf) {
+  // write geometry -- each proc holds same geom, even with ibm_move, so no communication is required.
+  // if (plot) {
   // Print() << "Writing surface data" << std::endl;
-  // if (ioproc=0) ib.writeGeom()
+  // if (ioproc=0) ibmwriteGeom()
 
-  // IBM::ib.computeSurf(this->level); // computed at each level. From low to high.
+  // IBM::ibmcomputeSurf(this->level); // computed at each level. From low to high.
   // Print() << "Computed surface data" << std::endl;
 
   // Print() << "Writing surface data" << std::endl;
-  // if (ioproc=0) ib.writeSurf()
+  // if (ioproc=0) ibmwriteSurf()
   // }
 #endif
 }

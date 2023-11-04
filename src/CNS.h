@@ -149,8 +149,8 @@ public:
     static bool rhs_euler;
     static bool rhs_visc;
     static bool rhs_source;
-    static bool ib_move;
-    static bool plot_surf;
+    inline static bool ibm_move=false;
+    inline static bool ibm_plot=false;
 
     static Vector<MultiFab> VdSdt;
     static Vector<MultiFab> VSborder;

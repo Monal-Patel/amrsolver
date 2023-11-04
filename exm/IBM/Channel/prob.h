@@ -34,11 +34,14 @@ namespace PROB {
 // typedef euler_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 
 constexpr int do_pde = 0;
+constexpr double distance_ip=0.1; // distance between image points (factor of mesh hypotenuse)
+constexpr int do_ibwm=0; // 0=false, 1=true
+constexpr int nimps = 3; // number of image points per ghost point
+
 ////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////DISCRETISATION////////////////////////////////////
-#define NGHOST 3 // TODO: make this an automatic parameter?
-#define NIMPS 3 // number of image points per ghost point
+#define NGHOST 2 // TODO: make this an automatic parameter?
 
 // Numerical operators
 void inline inputs() {
@@ -57,8 +60,8 @@ void inline inputs() {
   pp.add   ("cns.screen_output", 50); //
   pp.add   ("cns.verbose", 1); // 0=quiet, 1=verbose
 
-  pp.add   ("ib.move",0); // 0=false, 1=true
-  pp.add   ("ib.plot_surf",0); // 0=false, 1=true
+  pp.add   ("ibm.move",0); // 0=false, 1=true
+  pp.add   ("ibm.plot",0); // 0=false, 1=true
 }
 
 ////////////////////////////////////////////////////////////////////////////////

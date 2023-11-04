@@ -215,7 +215,8 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   // Immersed boundaries ///////////////////////////////////////////////////////
   // Compute on CPU always
 #ifdef AMREX_USE_GPIBM
-  IBM::ib.computeGPs(level, statemf, primsmf, lclosures);
+  IBM::IBMultiFab& ibmf = *IBM::ibm.ibMFa[level];
+  IBM::ibm.computeGPs(level, statemf, primsmf, ibmf, lclosures);
 #endif
   //////////////////////////////////////////////////////////////////////////////
 
@@ -234,7 +235,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
       CentralKEEP::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
       // Order reduction near IBM
 #if AMREX_USE_GPIBM
-    IBM::IBMultiFab& ibmf = *IBM::ib.ibMFa[level];
+    IBM::IBMultiFab& ibmf = *IBM::ibm.ibMFa[level];
     CentralKEEP::ibm_flux_correction(primsmf,numflxmf,ibmf);
 #endif
     }
@@ -287,7 +288,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   if (rhs_visc) {
     Array<MultiFab,AMREX_SPACEDIM>& pntvflxmf = Vpntvflxmf[level];
 #if AMREX_USE_GPIBM
-    IBM::IBMultiFab& ibMultiFab = *IBM::ib.ibMFa[level];
+    IBM::IBMultiFab& ibMultiFab = *IBM::ibm.ibMFa[level];
 #endif
     //for each fab
     for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi)
@@ -420,7 +421,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
 
   // Set solid point RHS to 0 //////////////////////////////////////////////////
 #if AMREX_USE_GPIBM
-  IBM::IBMultiFab& mfab = *IBM::ib.ibMFa[level];
+  IBM::IBMultiFab& mfab = *IBM::ibm.ibMFa[level];
   for (MFIter mfi(statemf, TilingIfNotGPU()); mfi.isValid(); ++mfi){
     const Box& bx   = mfi.tilebox();
     auto const& dsdtfab = dSdt.array(mfi);
