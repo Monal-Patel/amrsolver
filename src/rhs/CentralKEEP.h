@@ -317,12 +317,12 @@ AMREX_FORCE_INLINE void ibm_flux_correction(MultiFab& primsmf, Array<MultiFab,AM
         KEEPdir(i,j,k,1,halfsten,pVcoeffs,prims,nfabfy,lclosures);
       }
 
-      if (!markers(i,j,k+1,0)) { //the point to the front is fluid then compute fk-1/2 at k
+      if (!markers(i,j,k+1,0)) { //the point to the front is fluid then compute fk-1/2 at k+1
         KEEPdir(i,j,k+1,2,halfsten,pVcoeffs,prims,nfabfz,lclosures);
       }
 
-      if (!markers(i,j,k-1,0)) { //the point to the back is fluid then compute fk-1/2 at k+1
-        KEEPdir(i,j,k,2,halfsten,pVcoeffs,prims,nfabfy,lclosures);
+      if (!markers(i,j,k-1,0)) { //the point to the back is fluid then compute fk-1/2 at k
+        KEEPdir(i,j,k,2,halfsten,pVcoeffs,prims,nfabfz,lclosures);
       }
 
     });
