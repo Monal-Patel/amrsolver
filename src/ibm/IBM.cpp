@@ -100,6 +100,7 @@ void ibm_t::destroyMFs (int lev) {
     }}};
 
     // compute ghost markers
+    // TODO: move this to initialiseGPs
     ibFab.gpData.ngps=0;
     int nextra=1;
     for (int k = lo[2] - nextra; k <= hi[2] + nextra; ++k) {
@@ -264,11 +265,10 @@ void ibm_t::initialiseGPs (int lev) {
       gpData.imp_ip_ijk.push_back(ip_ijk);
 
       //  if (k==35) {
-      //   int jj = 0;
-      //   Print() << "--- " << std::endl;
+        // int jj = 0;
+        // Print() << "--- " << std::endl;
       //   Print() << "gp array idx " << gpData.normal.size() - 1 << std::endl;
       //   Print() << "bxg " << bxg << std::endl;
-      //   Print() << "gp_ijk " << i << " " << j << " " << k << std::endl;
       //   Print() << "im_ijk " << imp_ijk(jj,0) << " " << imp_ijk(jj,1) << " " << imp_ijk(jj,2) << std::endl;
       //   Print() << "gp_xyz " << x << " " << y << " " << z << std::endl;
       //   Print() << "ib_xyz " << cp[0] << " " << cp[1] << " " << cp[2] << std::endl;
@@ -281,8 +281,10 @@ void ibm_t::initialiseGPs (int lev) {
       //   Print() << "dx diag " << temp << std::endl;
       //   Print() << "disIM "  << disIM[lev] << std::endl;
       //   Print() << "disGP " << disGP << std::endl;
-      //   Print() << "weights " << ipweights(jj,0) << " " << ipweights(jj,1) << " " << ipweights(jj,2) << " " << ipweights(jj,3) << " " << ipweights(jj,4) << " " << ipweights(jj,5) << " " << ipweights(jj,6) << " " << ipweights(jj,7) << std::endl;
-      //   }
+      // Print() << "gp_ijk " << i << " " << j << " " << k << std::endl;
+      // for (int iip=0; iip<8; iip++) {
+      //   Print() << "ip " << iip << "  ijk " << ip_ijk(jj,iip,0) << " " << ip_ijk(jj,iip,1) << " " << ip_ijk(jj,iip,2) << "      weight " << " " << ipweights(jj,iip) << std::endl;
+      // }
 
       }
     }
@@ -290,12 +292,6 @@ void ibm_t::initialiseGPs (int lev) {
     }
   }
 }
-
-
-
-
-
-
 
 
 void ibm_t::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, IBMultiFab& ibmf, const closures& cls) {
@@ -335,6 +331,8 @@ void ibm_t::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, IBMultiFab
       }
       copy->computeIB(primsNormal,cls);
       copy->extrapolate(primsNormal, disGP[ii], disIM[ii]);
+      // thermodynamic consistency
+      primsNormal(0,QRHO)  = primsNormal(0,QPRES)/(primsNormal(0,QT)*cls.Rspec);
 
       // only transform velocity back to global coordinates for gp only
       int idx=0;
@@ -344,13 +342,10 @@ void ibm_t::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, IBMultiFab
       // primsNormal(0,QPRES) = max(primsNormal(0,QPRES),1.0);
       // primsNormal(0,QT)    = max(primsNormal(0,QT),50.0);
 
-      // thermodynamic consistency
-      primsNormal(0,QRHO)  = primsNormal(0,QPRES)/(primsNormal(0,QT)*cls.Rspec);
-
       // insert primitive variables into primsFab
       int i=gp_ijk[ii](0); int j=gp_ijk[ii](1); int k = gp_ijk[ii](2);
-      for (int kk=0; kk<NPRIM; kk++) {
-        prims(i,j,k,kk) = primsNormal(0,kk);
+      for (int nn=0; nn<NPRIM; nn++) {
+        prims(i,j,k,nn) = primsNormal(0,nn);
       }
 
       // AMREX_ASSERT_WITH_MESSAGE( prims(i,j,k,QPRES)>50,"P<50 at GP");

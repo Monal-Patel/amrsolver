@@ -10,6 +10,7 @@ COMP     = gcc
 
 USE_GPIBM= TRUE
 AMREX_NO_PROBINIT=TRUE
+CUDA_ARCH = 8.0 # for zaratan
 
 include ./Make.package
 include $(AMR_SOLVER)/src/Make.CNS

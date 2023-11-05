@@ -330,7 +330,7 @@ namespace IBM {
       primsNormal(1,QV) = 0.0_rt; //primsNormal(2,QV); // ut1
       primsNormal(1,QW) = 0.0_rt; //primsNormal(2,QW); // ut2
       // zerograd temperature and pressure
-      primsNormal(1,QPRES) = primsNormal(2,QPRES);
+      primsNormal(1,QPRES) = 2.0_rt*(2.0_rt*primsNormal(2,QPRES) - 0.5_rt*primsNormal(3,QPRES))/3.0_rt;
       primsNormal(1,QT)    = 500.0_rt; //primsNormal(2,QT);
       // ensure thermodynamic consistency
       primsNormal(1,QRHO)  = primsNormal(1,QPRES)/(primsNormal(1,QT)*cls.Rspec); 

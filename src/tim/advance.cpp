@@ -213,7 +213,6 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
   Gpu::streamSynchronize(); // ensure primitive variables mf computed before starting mfiter
   
   // Immersed boundaries ///////////////////////////////////////////////////////
-  // Compute on CPU always
 #ifdef AMREX_USE_GPIBM
   IBM::IBMultiFab& ibmf = *IBM::ibm.ibMFa[level];
   IBM::ibm.computeGPs(level, statemf, primsmf, ibmf, lclosures);
@@ -235,8 +234,8 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
       CentralKEEP::Flux_2nd_Order_KEEP(geom,primsmf,numflxmf);
       // Order reduction near IBM
 #if AMREX_USE_GPIBM
-    IBM::IBMultiFab& ibmf = *IBM::ibm.ibMFa[level];
-    CentralKEEP::ibm_flux_correction(primsmf,numflxmf,ibmf);
+      IBM::IBMultiFab& ibmf = *IBM::ibm.ibMFa[level];
+      CentralKEEP::ibm_flux_correction(primsmf,numflxmf,ibmf);
 #endif
     }
 
@@ -347,7 +346,7 @@ void CNS::compute_rhs (MultiFab& statemf, MultiFab& dSdt, Real dt,
 
 #if AMREX_USE_GPIBM
       //IBM GP viscous flux correction
-      auto const& ibFab = ibMultiFab.get(mfi);
+      auto const& ibFab   = ibMultiFab.get(mfi);
       auto const& markers = ibMultiFab.array(mfi);
       auto const gp_ijk   = ibFab.gpData.gp_ijk.data();
       amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)

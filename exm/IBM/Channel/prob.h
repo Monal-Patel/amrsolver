@@ -35,7 +35,6 @@ namespace PROB {
 
 constexpr int do_pde = 0;
 constexpr double distance_ip=0.1; // distance between image points (factor of mesh hypotenuse)
-constexpr int do_ibwm=0; // 0=false, 1=true
 constexpr int nimps = 3; // number of image points per ghost point
 
 ////////////////////////////////////////////////////////////////////////////////
