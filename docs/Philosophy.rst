@@ -11,6 +11,7 @@ Development philosophy
 
 * https://lefticus.gitbooks.io/cpp-best-practices/content/
 * Minimise memory use. Currently, 4*cons fields (S1,S2,Sborder,dudt) + prims fields stored currently (+ temporary fabarrays for flux computations, however, these are insignificant compared to whole field). Low storage arbitary stage order SSPRK (optimal) time integration.
+* Clang-Format with google style
 
 =====================
 2. Testing

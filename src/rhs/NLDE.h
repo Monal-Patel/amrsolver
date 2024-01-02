@@ -2,44 +2,41 @@
 #include <AMReX_Vector.H>
 
 namespace NLDE {
-  // vector of baseflow multifabs
-  inline Vector<MultiFab> Vbaseflow;
+// vector of baseflow multifabs
+inline Vector<MultiFab> Vbaseflow;
 
+// allocate baseflow multifabs
+inline void allocVMF(int& nlevs) { Vbaseflow.resize(nlevs); }
 
-  // allocate baseflow multifabs
-  inline void allocVMF(int& nlevs) {Vbaseflow.resize(nlevs);}
+// baseflow interpolation
+// inline void interpolate_baseflow() {
+// }
 
+inline void post_regrid(const int& lev, const BoxArray& grids,
+                        const DistributionMapping& dmap, const MFInfo& info,
+                        const FabFactory<FArrayBox>& factory) {
+  // reallocate MF
+  Vbaseflow[lev].clear();
+  Vbaseflow[lev].define(grids, dmap, NCONS, 0, info, factory);
+  Vbaseflow[lev].setVal(0.0);
 
-  // baseflow interpolation
-  // inline void interpolate_baseflow() {
-  // }
+  // interpolate_baseflow();
+}
 
+// convert primitive variables to conserved variables
+inline void cons2prim(const Box& bxg, const Array4<const Real>& u,
+                      const Array4<Real>& q, const PROB::ProbClosures& cls) {
+  amrex::ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    Abort("NLDE cons2prim to implement");
+  });
+}
 
-  inline void post_regrid(const int& lev,const BoxArray& grids, const DistributionMapping& dmap, const MFInfo& info, const FabFactory<FArrayBox>& factory) {
-    // reallocate MF
-    Vbaseflow[lev].clear();
-    Vbaseflow[lev].define(grids,dmap,NCONS,0,info,factory);
-    Vbaseflow[lev].setVal(0.0);
-
-    // interpolate_baseflow();
-  }
-
-
-  // convert primitive variables to conserved variables
-  inline void cons2prim (const Box& bxg, const Array4<const Real>& u, const Array4<Real>& q, const PROB::ProbClosures& cls) {
-
-    amrex::ParallelFor(bxg,
-    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-    { 
-      Abort("NLDE cons2prim to implement");
-    });
-  }
-
-
-  // computes Euler fluxes of linear disturbances from conserved variable vector and maxeigen value
-  AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
-  void eflux_linear(int i, int j, int k, auto const& base,auto const& cons, auto const& fx, auto const& fy, auto const& fz, auto const& lambda ,const PROB::ProbClosures& cls) {
-
+// computes Euler fluxes of linear disturbances from conserved variable vector
+// and maxeigen value
+AMREX_GPU_DEVICE AMREX_FORCE_INLINE void eflux_linear(
+    int i, int j, int k, auto const& base, auto const& cons, auto const& fx,
+    auto const& fy, auto const& fz, auto const& lambda,
+    const PROB::ProbClosures& cls) {
   Abort("NLDE Euler fluxes not implemented yet");
 
   // disturbance fluxes from eqn 15
@@ -75,15 +72,18 @@ namespace NLDE {
   //   fz(i,j,k,UMZ)   = momz*uz + P;
   //   fz(i,j,k,UET)   = (rhoet + P)*uz;
 
-  //   Real cs=sqrt(closures.gamma*P*rhoinv); 
-  //   lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux)); 
-  //   lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy)); 
-  //   lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
-  }
+  //   Real cs=sqrt(closures.gamma*P*rhoinv);
+  //   lambda(i,j,k,0) = std::abs(max(ux+cs,ux-cs,ux));
+  //   lambda(i,j,k,1) = std::abs(max(uy+cs,uy-cs,uy));
+  //   lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz));
+}
 
-  // euler flux computation function
-  AMREX_FORCE_INLINE void eflux( const Box& bxg, const Array4<const Real>& consfab, const Array4<Real>& primfab, const Array4<Real>& pflx, const Array4<Real>&nflx, const PROB::ProbClosures& cls) {
-
+// euler flux computation function
+AMREX_FORCE_INLINE void eflux(const Box& bxg, const Array4<const Real>& consfab,
+                              const Array4<Real>& primfab,
+                              const Array4<Real>& pflx,
+                              const Array4<Real>& nflx,
+                              const PROB::ProbClosures& cls) {
   // loop over all fabs
   // if statement for linear disturance flux calculation (dist_linear)
   // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -94,17 +94,15 @@ namespace NLDE {
   //     cons2char(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lclosures);
   // });
 
-  // ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-  //       numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); 
+  // ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int
+  // k, int n) noexcept {
+  //       numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy,
+  //       pfabfz, lambda ,nfabfx, nfabfy, nfabfz);
   // });
-
-  }
-
-
-  // similarly, viscous fluxes
-  AMREX_FORCE_INLINE void vflux(MultiFab& statemf,  MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
-
-  }
-
-
 }
+
+// similarly, viscous fluxes
+AMREX_FORCE_INLINE void vflux(MultiFab& statemf, MultiFab& primsmf,
+                              Array<MultiFab, AMREX_SPACEDIM>& numflxmf) {}
+
+}  // namespace NLDE
