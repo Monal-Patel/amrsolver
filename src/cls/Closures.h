@@ -2,6 +2,25 @@
 
 using namespace amrex;
 
+// Independent (solved) variables
+#define URHO  0
+#define UMX   1
+#define UMY   2
+#define UMZ   3
+#define UET   4
+#define NCONS 5
+
+// Dependent (derived) variables
+#define QRHO   0
+#define QU     1
+#define QV     2
+#define QW     3
+#define QT     4
+#define QPRES  5
+#define NPRIM  6
+
+//
+#define NGHOST 3 // TODO: make this an automatic parameter?
 
 ////////////////////////////////THERMODYNAMICS/////////////////////////////////
 class EosBase
@@ -55,20 +74,6 @@ public:
 //   ~ThermodynamicsBase();
 // };
 
-class FluidState
-{
-private:
-  // cons
-  // prims
-
-public:
-  // FluidState(/* args */);
-  // ~FluidState();
-
-  //cons2prims
-  //prims2cons
-};
-
 class calorifically_perfect_gas_t 
 {
   public:
@@ -79,6 +84,47 @@ class calorifically_perfect_gas_t
   Real cv = Ru / (mw * (gamma-Real(1.0)));
   Real cp = gamma * Ru / (mw * (gamma-Real(1.0)));
   Real Rspec = Ru/mw;
+
+
+  // operates 
+  void prims2cons() {
+
+  };
+
+  void cons2prims() {
+
+  };
+
+  // can move this to closures derived tyoe (closures_dt)
+  // prims to cons
+  // - We want to call it from thermodynamics class
+  // - cls is stored on cpu and gpu
+  void inline cons2prims (const MFIter& mfi, const Array4<Real>& cons, const Array4<Real>& prims) const 
+  {
+    const Box& bxg       = mfi.growntilebox(NGHOST);
+
+    amrex::ParallelFor(bxg,
+    [=,*this] AMREX_GPU_DEVICE (int i, int j, int k) { 
+
+    Real rho = cons(i,j,k,URHO);
+    // Print() << "cons2prim"<< i << j << k << rho << std::endl;
+    rho = max(1e-40,rho);
+    Real rhoinv = Real(1.0)/rho;
+    Real ux = cons(i,j,k,UMX)*rhoinv;
+    Real uy = cons(i,j,k,UMY)*rhoinv;
+    Real uz = cons(i,j,k,UMZ)*rhoinv;
+    Real rhoke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
+    Real rhoei = (cons(i,j,k,UET) - rhoke);
+    Real p = (this->gamma-Real(1.0))*rhoei;
+
+    prims(i,j,k,QRHO)  = rho;
+    prims(i,j,k,QU)    = ux;
+    prims(i,j,k,QV)    = uy;
+    prims(i,j,k,QW)    = uz;
+    prims(i,j,k,QPRES) = p;
+    prims(i,j,k,QT) = p/(rho*(this->Rspec));
+    });
+  }
 };
 
 
@@ -170,14 +216,11 @@ class cond_suth_t {
 
 ////////////////////////////////CLOSURES/////////////////////////////////
 template <typename Visc, typename Cond, typename Thermo, typename...others>
-class closures_derived_base_t : public Cond, public Visc, public Thermo, public others...
+class closures_dt : public Cond, public Visc, public Thermo, public others...
 {
   private:
   public:
 
-    // static const int size = sizeof...(Args);
-    // IdealPerfectGas(/* args */);
-    // ~IdealPerfectGas();
   Real Cshock = 1.0;
   Real Cdamp  = 0.01;
 
@@ -199,6 +242,4 @@ class closures_derived_base_t : public Cond, public Visc, public Thermo, public 
 //     Multiphase(/* args */);
 //     ~Multiphase();
 //   public:
-
-
 // };

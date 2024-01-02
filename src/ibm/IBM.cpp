@@ -549,41 +549,27 @@ void ComputeGPState(int ii, auto const gp_ijk, auto const imp_ijk, auto const we
   conFab(i,j,k,UET) = primStateNormal(0,QPRES)/(closures.gamma-1.0_rt) + primStateNormal(0,QRHO)*ek;
 }
 
+void IB::computeGPs(const Array4<const Real>& cons, const Array4<Real>& prims,  const IBFab& ibFab, const PROB::ProbClosures& cls) {
 
-void IB::computeGPs( int lev, MultiFab& consmf, MultiFab& primsmf, const PROB::ProbClosures& closures) {
+  // for GP data
+  auto const gp_ijk = ibFab.gpData.gp_ijk.data();
+  auto const imp_ijk= ibFab.gpData.imp_ijk.data();
+  auto const ipweights = ibFab.gpData.imp_ipweights.data();
+  auto const idxCube = ibFab.gpData.indexCube.data();
+  auto const disGP = ibFab.gpData.disGP.data();
+  auto const disIM = ibFab.gpData.disIM.data();
+  auto const norm = ibFab.gpData.normal.data();
+  auto const tan1 = ibFab.gpData.tangent1.data();
+  auto const tan2 = ibFab.gpData.tangent2.data();
 
-  IBMultiFab& mfab = *ibMFa[lev];
-
-  // for each fab in multifab (at a given level)
-  for (MFIter mfi(mfab,false); mfi.isValid(); ++mfi) {
-
-    // for GP data
-    auto& ibFab = mfab.get(mfi);
-
-    // field arrays
-    auto const& conFabArr  = consmf.array(mfi); // this is a const becuase .array() returns a const but we can still modify conFab as consmf input argument is not const
-    auto const& primFabArr = primsmf.array(mfi);
-    auto const& ibFabArr = mfab.array(mfi);
-
-    auto const gp_ijk = ibFab.gpData.gp_ijk.data();
-    auto const imp_ijk= ibFab.gpData.imp_ijk.data();
-    auto const ipweights = ibFab.gpData.imp_ipweights.data();
-    auto const idxCube = ibFab.gpData.indexCube.data();
-    auto const disGP = ibFab.gpData.disGP.data();
-    auto const disIM = ibFab.gpData.disIM.data();
-    auto const norm = ibFab.gpData.normal.data();
-    auto const tan1 = ibFab.gpData.tangent1.data();
-    auto const tan2 = ibFab.gpData.tangent2.data();
-
-    // if (WM) or can use templates
-    //  ComputeGPStateWM() 
-    // else
-    amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
-    {
-      ComputeGPState(ii,gp_ijk[ii],imp_ijk[ii],ipweights[ii],norm[ii],tan1[ii],tan2[ii],disGP[ii],disIM[ii],ibFabArr,primFabArr,conFabArr,idxCube,closures);
-    });
-    
-  }
+  // if (WM) or can use templates
+  //  ComputeGPStateWM() 
+  // else
+  amrex::ParallelFor(ibFab.gpData.ngps, [=] AMREX_GPU_DEVICE (int ii)
+  {
+    ComputeGPState(ii,gp_ijk[ii],imp_ijk[ii],ipweights[ii],norm[ii],tan1[ii],tan2[ii],disGP[ii],disIM[ii],ibFabArr,cons,prims,idxCube,cls);
+  });
+  
 }
 
 void IB::compute_plane_equations( Polyhedron::Facet& f) {

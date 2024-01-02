@@ -1,10 +1,11 @@
-#ifndef CNS_PROB_H
-#define CNS_PROB_H
+#ifndef PROB_H
+#define PROB_H
 
 #include <AMReX_Geometry.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_ParmParse.H>
 #include <Closures.h>
+#include <RHS.h>
 
 using namespace amrex;
 
@@ -12,28 +13,17 @@ namespace PROB {
 
 ////////////////////////////////EQUATIONS///////////////////////////////////////
 // Select the variables to solve/store and write
-// Independent (solved) variables
-#define URHO  0
-#define UMX   1
-#define UMY   2
-#define UMZ   3
-#define UET   4
-#define NCONS 5
 
-// Dependent (derived) variables
-#define QRHO   0
-#define QU     1
-#define QV     2
-#define QW     3
-#define QT     4
-#define QPRES  5
-#define NPRIM  6
-
-constexpr int do_pde = 0; // 0=CNS, 1=CNS-NLDE
+// constexpr int do_pde = 0; // 0=CNS, 1=CNS-NLDE
+// constexpr int do_euler=0; //-1=NLDE; 0=none; 1=KEEP; 2=WENO5; 3=HLLC
+//constexpr int do_ibm = 0; // 0=false, 1=true !! IBM activated in the makefile, preprocessor flag
+constexpr int do_wm  = 0; // 0=false, 1=true
 ////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////DISCRETISATION////////////////////////////////////
-#define NGHOST 3 // TODO: make this an automatic parameter?
+typedef closures_dt <visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
+typedef rhs_dt <keep_euler_t<false,false,6,ProbClosures>, no_diffusive_t, no_source_t> ProbRHS;
+
 
 // Numerical operators
 void inline inputs() {
@@ -48,10 +38,10 @@ void inline inputs() {
   pp.addarr("cns.hi_bc", std::vector<int>{1,1,1});
   pp.add   ("cns.order_rk", 3); // -2, 1, 2 or 3"
   pp.add   ("cns.stages_rk", 4); // 1, 2 or 3
-  pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
-  pp.add   ("cns.rhs_visc", 1); // 0=false, 1=true
+  // pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
+  // pp.add   ("cns.rhs_visc", 1); // 0=false, 1=true
   pp.add   ("cns.rhs_source", 0); // 0=false, 1=true
-  pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
+  // pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
   pp.add   ("cns.order_keep", 4); // Order of accuracy=2, 4 or 6"
   pp.add   ("cns.art_diss", 0); // 0=none, 1=artificial dissipation
   pp.add   ("cns.screen_output", 100000); //
@@ -60,7 +50,6 @@ void inline inputs() {
 ////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////CLOSURES/////////////////////////////////////////
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
 // user can also define their own closure class and use it here by naming it ProbClosures
 // template <typename Visc, typename Cond, typename Thermo>
 // class cls_derived_user_t : public Cond, public Visc, public Thermo

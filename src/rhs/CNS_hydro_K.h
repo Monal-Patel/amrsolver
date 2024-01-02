@@ -12,26 +12,30 @@ using namespace amrex;
 // flux = flux variables
 
 
-AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cons2prim (int i, int j, int k, const Array4<const Real>& u, Array4<Real> const& q, const PROB::ProbClosures& closures) noexcept
-{
-    Real rho = u(i,j,k,URHO);
-    // Print() << "cons2prim"<< i << j << k << rho << std::endl;
-    rho = max(1e-40,rho);
-    Real rhoinv = Real(1.0)/rho;
-    Real ux = u(i,j,k,UMX)*rhoinv;
-    Real uy = u(i,j,k,UMY)*rhoinv;
-    Real uz = u(i,j,k,UMZ)*rhoinv;
-    Real rhoke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
-    Real rhoei = (u(i,j,k,UET) - rhoke);
-    Real p = (closures.gamma-Real(1.0))*rhoei;
+// void cons2prim (const Box& bxg, const Array4<const Real>& u, Array4<Real> const& q, const PROB::ProbClosures& closures) noexcept
+// {
+//     amrex::ParallelFor(bxg,
+//     [=] AMREX_GPU_DEVICE (int i, int j, int k) { 
 
-    q(i,j,k,QRHO)  = rho;
-    q(i,j,k,QU)    = ux;
-    q(i,j,k,QV)    = uy;
-    q(i,j,k,QW)    = uz;
-    q(i,j,k,QPRES) = p;
-    q(i,j,k,QT) = p/(rho*closures.Rspec);
-}
+//     Real rho = u(i,j,k,URHO);
+//     // Print() << "cons2prim"<< i << j << k << rho << std::endl;
+//     rho = max(1e-40,rho);
+//     Real rhoinv = Real(1.0)/rho;
+//     Real ux = u(i,j,k,UMX)*rhoinv;
+//     Real uy = u(i,j,k,UMY)*rhoinv;
+//     Real uz = u(i,j,k,UMZ)*rhoinv;
+//     Real rhoke = Real(0.5)*rho*(ux*ux + uy*uy + uz*uz);
+//     Real rhoei = (u(i,j,k,UET) - rhoke);
+//     Real p = (closures.gamma-Real(1.0))*rhoei;
+
+//     q(i,j,k,QRHO)  = rho;
+//     q(i,j,k,QU)    = ux;
+//     q(i,j,k,QV)    = uy;
+//     q(i,j,k,QW)    = uz;
+//     q(i,j,k,QPRES) = p;
+//     q(i,j,k,QT) = p/(rho*closures.Rspec);
+//     });
+// }
 
 
 

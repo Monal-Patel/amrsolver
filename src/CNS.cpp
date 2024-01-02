@@ -3,8 +3,7 @@
 #include <CNS.h>
 #include <CNS_K.h>
 #include <prob.h>
-#include <CentralKEEP.h>
-#include <NLDE.h>
+// #include <NLDE.h>
 
 #ifdef AMREX_USE_GPIBM
 #include <IBM.h>
@@ -12,7 +11,7 @@
 
 using namespace amrex;
 
-bool CNS::rhs_euler=false;
+// bool CNS::rhs_euler=false;
 bool CNS::rhs_visc=false;
 bool CNS::rhs_source=false;
 bool CNS::verbose = true;
@@ -20,7 +19,7 @@ bool CNS::dt_dynamic=false;
 bool CNS::ib_move=false;
 bool CNS::plot_surf=false;
 int  CNS::nstep_screen_output=10;
-int  CNS::flux_euler=0;
+// int  CNS::flux_euler=0;
 int  CNS::dist_linear=0;
 int  CNS::art_diss=0; 
 int  CNS::order_rk=2;
@@ -64,7 +63,7 @@ CNS::CNS(Amr &papa,
   VdSdt.resize(nlevs); VSborder.resize(nlevs); Vprimsmf.resize(nlevs);
   Vnumflxmf.resize(nlevs); Vpntvflxmf.resize(nlevs);
 
-  if constexpr (PROB::do_pde==1) {NLDE::allocVMF(nlevs);}
+  // if constexpr (PROB::do_euler==-1) {NLDE::allocVMF(nlevs);}
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.buildMFs(grids, dmap, level);
@@ -94,26 +93,23 @@ void CNS::read_params()
     h_phys_bc->setHi(i, hi_bc[i]);
   }
 
-  pp.query("rhs_euler", rhs_euler);
+  // pp.query("rhs_euler", rhs_euler);
   pp.query("rhs_visc" , rhs_visc);
   pp.query("rhs_source",rhs_source);
   pp.query("do_reflux", do_reflux);
 
-  if (!pp.query("flux_euler",flux_euler)) {
-    amrex::Abort("Need to specify Euler flux type,flux_euler");}
+  // if (!pp.query("flux_euler",flux_euler)) {
+  //   amrex::Abort("Need to specify Euler flux type,flux_euler");}
   
-  if (flux_euler==1) {
-    if (!pp.query("order_keep",CentralKEEP::order_keep)) {
-      amrex::Abort("Need to specify KEEP scheme order of accuracy, order_keep = {2, 4 or 6}");
-    }
+  // if (flux_euler==1) {
+  //   if (!pp.query("order_keep",CentralKEEP::order_keep)) {
+  //     amrex::Abort("Need to specify KEEP scheme order of accuracy, order_keep = {2, 4 or 6}");
+  //   }
 
-    if (!pp.query("art_diss",art_diss)) {
-      amrex::Abort("Need to specify artificial dissipation, art_diss = {1=on 0=off}");};
+  //   if (!pp.query("art_diss",art_diss)) {
+  //     amrex::Abort("Need to specify artificial dissipation, art_diss = {1=on 0=off}");};
 
-    CentralKEEP::Vcoeffs.push_back(Array1D<Real,0,2>{1.0 , 0.0, 0.0 });
-    CentralKEEP::Vcoeffs.push_back(Array1D<Real,0,2>{4.0/3, -2.0/12, 0.0});
-    CentralKEEP::Vcoeffs.push_back(Array1D<Real,0,2>{6.0/4, -6.0/20, 2.0/60});
-  }
+  // }
 
   if (!pp.query("order_rk",order_rk)) {
     amrex::Abort("Need to specify SSPRK scheme order of accuracy, order_rk={-2, 1, 2, 3}");
@@ -413,10 +409,10 @@ void CNS::post_regrid(int lbase, int new_finest)
     VdSdt[level].clear();
     VSborder[level].clear();
     Vprimsmf[level].clear();
-    for (int i = 0; i < AMREX_SPACEDIM; ++i) {
-        Vnumflxmf[level][i].clear();
-        Vpntvflxmf[level][i].clear();
-    }
+    // for (int i = 0; i < AMREX_SPACEDIM; ++i) {
+        // Vnumflxmf[level][i].clear();
+        // Vpntvflxmf[level][i].clear();
+    // }
 
     VdSdt[level].define(grids,dmap,NCONS,0,MFInfo(),Factory());
     VdSdt[level].setVal(0.0);
@@ -426,16 +422,16 @@ void CNS::post_regrid(int lbase, int new_finest)
     Vprimsmf[level].setVal(0.0);
 
     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory());
+      // Vnumflxmf[level][idim].define(convert(grids,IntVect::TheDimensionVector(idim)), dmap, NCONS, NGHOST,MFInfo(),Factory());
       // convert() function converts the Vnumflxmf to edge based type (node)
       // Defining like this necessary for compatibility with flux register, otherwise boxArray.ixType() =/= numflxmf boxArray.ixType() error appears.
 
-      Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
-      Vnumflxmf[level][idim].setVal(0.0);
-      Vpntvflxmf[level][idim].setVal(0.0);
+      // Vpntvflxmf[level][idim].define(grids, dmap, NCONS, NGHOST,MFInfo(),Factory());
+      // Vnumflxmf[level][idim].setVal(0.0);
+      // Vpntvflxmf[level][idim].setVal(0.0);
     }
 
-    if constexpr (PROB::do_pde==1) {NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory());}
+    // if constexpr (PROB::do_euler==-1) {NLDE::post_regrid(level,grids,dmap,MFInfo(),Factory());}
 }
 
 void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
@@ -607,8 +603,8 @@ void CNS::variableCleanUp ()
     VdSdt.clear();
     VSborder.clear();
     Vprimsmf.clear();
-    Vnumflxmf.clear();
-    Vpntvflxmf.clear();
+    // Vnumflxmf.clear();
+    // Vpntvflxmf.clear();
 }
 
 // Plotting

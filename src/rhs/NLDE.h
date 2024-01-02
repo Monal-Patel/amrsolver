@@ -26,21 +26,13 @@ namespace NLDE {
 
 
   // convert primitive variables to conserved variables
-  inline void cons2prim(const int& lev, const MultiFab& statemf, MultiFab& primsmf ,const PROB::ProbClosures& cls) {
+  inline void cons2prim (const Box& bxg, const Array4<const Real>& u, const Array4<Real>& q, const PROB::ProbClosures& cls) {
 
-  MultiFab& basemf = Vbaseflow[lev];
-
-   for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi) {
-      auto const& statefab = statemf.array(mfi);
-      auto const& primsfab = primsmf.array(mfi);
-      auto const& basefab  = basemf.array(mfi);
-      const Box& bxg       = mfi.growntilebox(NGHOST);
-      amrex::ParallelFor(bxg,
-      [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-      { 
-        Abort("NLDE cons2prim implement");
-      });
-    }
+    amrex::ParallelFor(bxg,
+    [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+    { 
+      Abort("NLDE cons2prim to implement");
+    });
   }
 
 
@@ -89,55 +81,23 @@ namespace NLDE {
   //   lambda(i,j,k,2) = std::abs(max(uz+cs,uz-cs,uz)); 
   }
 
-
   // euler flux computation function
-  AMREX_FORCE_INLINE void eflux(const int& lev, const MultiFab& statemf, const MultiFab& primsmf, Array<MultiFab,AMREX_SPACEDIM>& numflxmf) {
+  AMREX_FORCE_INLINE void eflux( const Box& bxg, const Array4<const Real>& consfab, const Array4<Real>& primfab, const Array4<Real>& pflx, const Array4<Real>&nflx, const PROB::ProbClosures& cls) {
 
+  // loop over all fabs
+  // if statement for linear disturance flux calculation (dist_linear)
+  // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+  //     eflux_linear(i, j, k, basefab, statefab, pflx, lambda, lcls);
+  // });
 
-    MultiFab& basemf = Vbaseflow[lev];
+  // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+  //     cons2char(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lclosures);
+  // });
 
-    // make multifab for variables
-    Array<MultiFab,AMREX_SPACEDIM> pntflxmf;
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-      pntflxmf[idim].define( statemf.boxArray(), statemf.DistributionMap(), NCONS, NGHOST);
-      }
+  // ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+  //       numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); 
+  // });
 
-    //store eigenvalues max(u+c,u,u-c) in all directions
-    MultiFab lambdamf;
-    lambdamf.define( statemf.boxArray(), statemf.DistributionMap(), AMREX_SPACEDIM, NGHOST);
-
-    // loop over all fabs
-    PROB::ProbClosures& lclosures = *CNS::d_prob_closures;
-      for (MFIter mfi(statemf, false); mfi.isValid(); ++mfi)
-      {
-        const Box& bxg     = mfi.growntilebox(NGHOST);
-        const Box& bxnodal = mfi.nodaltilebox(); // extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
-
-        auto const& statefab = statemf.array(mfi);
-        AMREX_D_TERM(auto const& nfabfx = numflxmf[0].array(mfi);,
-                     auto const& nfabfy = numflxmf[1].array(mfi);,
-                     auto const& nfabfz = numflxmf[2].array(mfi););
-
-        AMREX_D_TERM(auto const& pfabfx = pntflxmf[0].array(mfi);,
-                     auto const& pfabfy = pntflxmf[1].array(mfi);,
-                     auto const& pfabfz = pntflxmf[2].array(mfi););
-
-        auto const& lambda = lambdamf.array(mfi);
-        auto const& basefab = basemf.array(mfi);
-
-        // if statement for linear disturance flux calculation (dist_linear)
-        ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            eflux_linear(i, j, k, basefab, statefab, pfabfx, pfabfy, pfabfz, lambda ,lclosures);
-        });
-
-        // ParallelFor(bxg,[=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-        //     cons2char(i, j, k, statefab, pfabfx, pfabfy, pfabfz, lclosures);
-        // });
-
-        // ParallelFor(bxnodal, int(NCONS) , [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
-        //       numericalflux_globallaxsplit(i, j, k, n, statefab ,pfabfx, pfabfy, pfabfz, lambda ,nfabfx, nfabfy, nfabfz); 
-        // });
-    }
   }
 
 

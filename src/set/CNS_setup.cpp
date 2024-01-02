@@ -162,17 +162,17 @@ void CNS::variableSetUp ()
 
     // Velocities
     derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervel, the_same_box);
-    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Density,1);
-    derive_lst.addComponent("x_velocity",desc_lst,State_Type,Xmom,1);
+    derive_lst.addComponent("x_velocity",desc_lst,State_Type,URHO,1);
+    derive_lst.addComponent("x_velocity",desc_lst,State_Type,UMX,1);
 
     derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, dervel, the_same_box);
-    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Density,1);
-    derive_lst.addComponent("y_velocity",desc_lst,State_Type,Ymom,1);
+    derive_lst.addComponent("y_velocity",desc_lst,State_Type,URHO,1);
+    derive_lst.addComponent("y_velocity",desc_lst,State_Type,UMY,1);
 
 #if (AMREX_SPACEDIM == 3)
     derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervel, the_same_box);
-    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Density,1);
-    derive_lst.addComponent("z_velocity",desc_lst,State_Type,Zmom,1);
+    derive_lst.addComponent("z_velocity",desc_lst,State_Type,URHO,1);
+    derive_lst.addComponent("z_velocity",desc_lst,State_Type,UMZ,1);
 #endif
 
 }

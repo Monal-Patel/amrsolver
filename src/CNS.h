@@ -103,9 +103,9 @@ public:
     // init
     CNS& getLevel (int lev) { return dynamic_cast<CNS&>(parent->getLevel(lev)); }
 
-    enum StateVariable {
-        Density = 0, Xmom, Ymom, Zmom, Etot
-    };
+    // enum StateVariable {
+    //     Density = 0, Xmom, Ymom, Zmom, Etot
+    // };
 
     enum StateDataType {
         State_Type = 0,
@@ -141,12 +141,12 @@ public:
     static amrex::Real dt_constant;
     static bool dt_dynamic;
     static int nstep_screen_output;
-    static int flux_euler;
+    // static int flux_euler;
     static int dist_linear;
     static int art_diss;
     static int order_rk;
     static int stages_rk;
-    static bool rhs_euler;
+    // static bool rhs_euler;
     static bool rhs_visc;
     static bool rhs_source;
     static bool ib_move;
@@ -158,6 +158,7 @@ public:
     static Vector<Array<MultiFab,AMREX_SPACEDIM>> Vnumflxmf,Vpntvflxmf; 
 
 public:
+    static inline PROB::ProbRHS prob_rhs;
     static PROB::ProbClosures* h_prob_closures;
     static PROB::ProbClosures* d_prob_closures;
     static PROB::ProbParm* h_prob_parm;
