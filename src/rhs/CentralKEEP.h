@@ -3,6 +3,27 @@
 
 #include <prob.h>
 
+
+/// 
+/// \brief Template class for Central Kinetic Energy and Entropy Preserving scheme
+/// 
+/// \param isAD  Artificial dissipation True or False
+/// \param isIB  Immersed boundary fluxes
+/// \param order Order of accuracy, 2, 4 or 6
+///
+/// ```
+/// {rst}
+/// Method implemented from High-order accurate kinetic-energy and entropy preserving (KEEP) schemes on curvilinear grids (10.1016/j.jcp.2021.110482).
+/// Divergence split:
+/// :math:`\frac{\partial f}{\partial x}\bigg|_i= \frac{\partial}{}`
+///
+/// Quadratic split:
+/// :math:`\frac{\partial fg}{\partial x}\bigg|_i= \frac{\partial}{}`
+/// 
+/// Cubic split:
+/// :math:`\frac{\partial fgh}{\partial x}\bigg|_i= \frac{\partial}{}`
+/// ```
+///
 template <bool isAD, bool isIB, int order, typename closures>
 class keep_euler_t
 {
@@ -127,7 +148,7 @@ class keep_euler_t
   Real fDiv(Real f,Real fl) const {
     return 0.5_rt*(f + fl);}
 
-  // divergence split
+  //Divergence split
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE 
   Real fgDiv(Real f,Real fl, Real g, Real gl) const {
     return 0.5_rt*(f*gl + fl*g);}

@@ -17,7 +17,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'amrsolver'
+project = 'Solver'
 copyright = '2023, Monal Patel'
 author = 'Monal Patel'
 
@@ -59,7 +59,7 @@ html_static_path = ['./']
 
 #doxygen_root = "docs/doxygen" # this is just a convenience variable
 doxylink = {
-    "amrsolver": (  # "demo" is the role name that you can later use in sphinx to reference this doxygen documentation (see below)
+    "Solver": (  # "demo" is the role name that you can later use in sphinx to reference this doxygen documentation (see below)
         f"./build_doxygen/html/tagfile.xml", # the first parameter of this tuple is the tagfile
         f"./build_doxygen/html", # the second parameter of this tuple is a relative path pointing from
                                      # sphinx output directory to the doxygen output folder inside the output

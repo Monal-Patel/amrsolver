@@ -208,8 +208,7 @@ void CNS::compute_rhs (MultiFab& consmf, MultiFab& rhsmf, Real dt,
     auto const& prims = primsmf.array(mfi);
     auto const& rhs   = rhsmf.array(mfi);
 
-    const Box& bxgnodal  = mfi.grownnodaltilebox(-1,0);// extent is 0,N_cell+1 in all directions -- -1 means for all directions. amrex::surroundingNodes(bx) does the same
-
+    const Box& bxgnodal  = mfi.grownnodaltilebox(-1,0);// extent is 0,N_cell+1
     FArrayBox tempf(bxgnodal, NCONS, The_Async_Arena());
     Array4<Real> const& temp = tempf.array();
 
@@ -221,8 +220,6 @@ void CNS::compute_rhs (MultiFab& consmf, MultiFab& rhsmf, Real dt,
     prob_rhs.dflux(); //(prims,cons,nflx)
 
     // Source terms, including update mask (e.g inside IB)
-    // prob_rhs.fder();// (nflx,dudt)
-
     // prob_rhs.src(prims,cons,nflx,rhs)
   }
 
