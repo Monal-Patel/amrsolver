@@ -1,4 +1,7 @@
-#include <AMReX.H>
+#ifndef CLOSURES_H_
+#define CLOSURES_H_
+
+#include <AMReX_MFIter.H>
 
 using namespace amrex;
 
@@ -23,18 +26,18 @@ using namespace amrex;
 #define NGHOST 3  // TODO: make this an automatic parameter?
 
 ////////////////////////////////THERMODYNAMICS/////////////////////////////////
-class EosBase {
- private:
-  EosBase(/* args */);
-  ~EosBase();
+// class EosBase {
+//  private:
+//   EosBase(/* args */);
+//   ~EosBase();
 
-  /* data */
- public:
-  Real virtual pressure() { return 0.0; }
+//   /* data */
+//  public:
+//   Real virtual pressure() { return 0.0; }
 
-  Real virtual density() { return 0.0; }
-  Real virtual energy() { return 0.0; }
-};
+//   Real virtual density() { return 0.0; }
+//   Real virtual energy() { return 0.0; }
+// };
 
 // class stiffgas_t : public EosBase
 // {
@@ -230,3 +233,5 @@ class closures_dt : public Cond, public Visc, public Thermo, public others... {
 //     ~Multiphase();
 //   public:
 // };
+
+#endif

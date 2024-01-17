@@ -138,7 +138,7 @@ class CNS : public amrex::AmrLevel {
   static Vector<MultiFab> VdSdt;
   static Vector<MultiFab> VSborder;
   static Vector<MultiFab> Vprimsmf;
-  static Vector<Array<MultiFab, AMREX_SPACEDIM>> Vnumflxmf, Vpntvflxmf;
+  // static Vector<Array<MultiFab, AMREX_SPACEDIM>> Vnumflxmf, Vpntvflxmf;
 
  public:
   static inline PROB::ProbRHS prob_rhs;

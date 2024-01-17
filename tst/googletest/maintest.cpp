@@ -4,6 +4,11 @@
 
 #include <iostream>
 #include <gtest/gtest.h>
+
+#include <AMReX.H>
+#include <MMS.h>
+
+
 int main(int argc, char** argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
@@ -11,8 +16,8 @@ int main(int argc, char** argv)
   // utest_env = new amr_wind_tests::AmrexTestEnv(argc, argv);
   // ::testing::AddGlobalTestEnvironment(utest_env);
 
+  // initialise amrex
+  Initialize(argc, argv, true, MPI_COMM_WORLD);
 
-
-    std::cout << "hello" << std::endl;
   return RUN_ALL_TESTS();
 }

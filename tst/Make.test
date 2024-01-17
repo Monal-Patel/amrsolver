@@ -1,0 +1,3 @@
+include $(AMR_SOLVER)/tst/rhs/Make.package
+INCLUDE_LOCATIONS += $(AMR_SOLVER)/tst/rhs
+VPATH_LOCATIONS   += $(AMR_SOLVER)/tst/rhs

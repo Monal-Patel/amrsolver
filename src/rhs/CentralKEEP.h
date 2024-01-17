@@ -1,8 +1,6 @@
 #ifndef CentralKEEP_H_
 #define CentralKEEP_H_
 
-#include <prob.h>
-
 ///
 /// \brief Template class for Central Kinetic Energy and Entropy Preserving
 /// scheme
@@ -42,6 +40,8 @@ class keep_euler_t {
     coeffs(2, 2) = 2.0 / 60;
   }
 
+  int order_keep=order;
+
   // TODO: add copy and move constructors
   // AMREX_GPU_HOST_DEVICE
   // keep_euler_t(const keep_euler_t& other) {}
@@ -60,6 +60,7 @@ class keep_euler_t {
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
 
+    int halfsten = order / 2;
     Array1D<Real, 0, 2> order_coeffs{
         coeffs(halfsten - 1, 0), coeffs(halfsten - 1, 1),
         coeffs(halfsten - 1, 2)};  // get coefficients array for current scheme
@@ -88,13 +89,7 @@ class keep_euler_t {
       art_dissipation_flux();
     }
   }
-
- private:
-  const int halfsten = order / 2;
-  // 2 * standard finite difference coeffs-- need coefficients for all orders
-  typedef Array2D<Real, 0, 2, 0, 2> arrCoeff_t;
-  arrCoeff_t coeffs;
-
+  // flux_dir needs to be public only because we need test it. Can improve this.
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
       int i, int j, int k, int dir, const Array1D<Real, 0, 2>& coefs,
       const Array4<Real>& prims, const Array4<Real>& flx,
@@ -110,7 +105,7 @@ class keep_euler_t {
     Real massflx, ke;
 
     // flux at i/j/k-1/2
-    for (int l = 1; l <= halfsten; l++) {
+    for (int l = 1; l <= order / 2; l++) {
       for (int m = 0; m <= l - 1; m++) {
         i1 = i + m * vdir[0];
         j1 = j + m * vdir[1];
@@ -160,6 +155,11 @@ class keep_euler_t {
     amrex::Print() << "AD eflux" << std::endl;
   }
 
+  // 2 * standard finite difference coeffs-- need coefficients for all orders
+  typedef Array2D<Real, 0, 2, 0, 2> arrCoeff_t;
+  arrCoeff_t coeffs;
+
+ private:
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE Real fDiv(Real f, Real fl) const {
     return 0.5_rt * (f + fl);
   }

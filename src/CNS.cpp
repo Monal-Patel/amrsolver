@@ -32,7 +32,7 @@ Real CNS::refine_dengrad = 1.0e10;
 Vector<MultiFab> CNS::VdSdt;
 Vector<MultiFab> CNS::VSborder;
 Vector<MultiFab> CNS::Vprimsmf;
-Vector<Array<MultiFab, AMREX_SPACEDIM>> CNS::Vnumflxmf, CNS::Vpntvflxmf;
+// Vector<Array<MultiFab, AMREX_SPACEDIM>> CNS::Vnumflxmf, CNS::Vpntvflxmf;
 
 PROB::ProbClosures *CNS::h_prob_closures = nullptr;
 PROB::ProbClosures *CNS::d_prob_closures = nullptr;
@@ -58,10 +58,6 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
   VdSdt.resize(nlevs);
   VSborder.resize(nlevs);
   Vprimsmf.resize(nlevs);
-  Vnumflxmf.resize(nlevs);
-  Vpntvflxmf.resize(nlevs);
-
-  // if constexpr (PROB::do_euler==-1) {NLDE::allocVMF(nlevs);}
 
 #ifdef AMREX_USE_GPIBM
   IBM::ib.buildMFs(grids, dmap, level);
