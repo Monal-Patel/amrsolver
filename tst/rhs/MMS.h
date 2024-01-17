@@ -48,11 +48,13 @@ public:
                               scheme.coeffs(idx, 2)};
 
     // fill prims
-    Array1D<Real, 0, 2> dx = {0.222, 0.222, 0.222};
+    Array1D<Real, 0, 2> dx = {0.111, 0.111, 0.111};
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       Real x = (i + 0.5_rt) * dx(0);
       Real y = (j + 0.5_rt) * dx(1);
       Real z = (k + 0.5_rt) * dx(2);
+      // std::cout << i << " " << j << " " << k << std::endl;
+      // std::cout << x << " " << y << " " << z << std::endl;
 
       Real P = fp(x, y, z);
       Real T = ft(x, y, z);
@@ -64,72 +66,71 @@ public:
       prims(i, j, k, 5) = P;
     });
 
-    int i = 0; int j=0; int k=0;
+    int i = 0;
+    int j = 0;
+    int k = 0;
+
     // numerical flux derivatives (rhs)
-    scheme.flux_dir(i  , j, k, 0, coefs, prims, flx1, cls);
-    scheme.flux_dir(i-1, j, k, 0, coefs, prims, flx1, cls);
+    scheme.flux_dir(i + 1, j, k, 0, coefs, prims, flx1, cls);
+    scheme.flux_dir(i, j, k, 0, coefs, prims, flx1, cls);
 
-    scheme.flux_dir(i, j  , k, 1, coefs, prims, flx2, cls);
-    scheme.flux_dir(i, j-1, k, 1, coefs, prims, flx2, cls);
+    scheme.flux_dir(i, j + 1, k, 1, coefs, prims, flx2, cls);
+    scheme.flux_dir(i, j    , k, 1, coefs, prims, flx2, cls);
 
-    scheme.flux_dir(i, j, k  , 2, coefs, prims, flx3, cls);
-    scheme.flux_dir(i, j, k-1, 2, coefs, prims, flx3, cls);
+    scheme.flux_dir(i, j, k + 1, 2, coefs, prims, flx3, cls);
+    scheme.flux_dir(i, j, k, 2, coefs, prims, flx3, cls);
 
     for (int nn = 0; nn < 5; nn++) {
-      rhs(i, j, k, nn) = (flx1(i-1, j, k, nn) - flx1(i, j, k, nn)) / dx(0);
-      +(flx2(i, j-1, k, nn) - flx2(i, j, k, nn)) / dx(1);
-      +(flx3(i, j, k-1, nn) - flx3(i, j, k, nn)) / dx(2);
-      std::cout << "   rhs , nn = " << nn << " " << rhs(0, 0, 0, nn)
-                << std::endl;
+      rhs(i, j, k, nn) = (flx1(i, j, k, nn) - flx1(i + 1, j, k, nn)) / dx(0)   + (flx2(i, j, k, nn) - flx2(i, j + 1, k, nn)) / dx(1)  
+      + (flx3(i, j, k, nn) - flx3(i, j, k + 1, nn)) / dx(2);
+
+      // if (nn==2) {
+      //   std::cout << "nn, flxl, flxr, df, dx, rhs = " << nn << " " << flx2(i, j, k, nn) << " " << flx2(i, j + 1, k, nn) << " " << (flx2(i, j, k, nn) - flx2(i, j + 1, k, nn)) << " "<< dx(1) << " "<< rhs(i, j, k, nn)
+      //           << std::endl;
+      // }
+        std::cout << "nn, rhs = " << nn << " " << rhs(i, j, k, nn) << std::endl ;
     }
 
     // error rhs
     const Real x = (i + 0.5_rt) * dx(0);
     const Real y = (j + 0.5_rt) * dx(1);
     const Real z = (k + 0.5_rt) * dx(2);
-    Real rho = fp(x,y,z) / (cls.Rspec*ft(x,y,z));
+    Real rho = fp(x, y, z) / (cls.Rspec * ft(x, y, z));
 
-    // rho (duu/dx + duv/dy + duw/dz) assuming rho=constant
     Real error = rhs(i, j, k, URHO) +
                  rho * (dudx(x, y, z) + dvdy(x, y, z) + dwdz(x, y, z));
     rhs(i, j, k, URHO) = error;
 
-    // d (rho u ht) = d(rho u (et + p/rho)) = d(rho u et + Pu) = rho d(u et +
-    // Pu/rho) = rho [ d(u et) + 1/rho d(Pu) ] = rho [ et d(u) + u d(et) +
-    // (1/rho) ( u d(P) + P d(u) )]
+    // rho (duu/dx + duv/dy + duw/dz) assuming rho=constant
     error = rhs(i, j, k, UMX) +
             rho * (2 * fu(x, y, z) * dudx(x, y, z) +
-                   fv(x, y, z) * dudy(x, y, z) + fu(x, y, z) * dvdy(x, y, z)
-                   + fw(x, y, z) * dudz(x, y, z) + fu(x, y, z) * dwdz(x, y,
-                   z)) +
+                   fv(x, y, z) * dudy(x, y, z) + fu(x, y, z) * dvdy(x, y, z) +
+                   fw(x, y, z) * dudz(x, y, z) + fu(x, y, z) * dwdz(x, y, z)) +
             dpdx(x, y, z);
     rhs(i, j, k, UMX) = error;
 
-    error = rhs(i, j, k, UMY) +
-            rho * (fu(x, y, z) * dvdx(x, y, z) + fv(x, y, z) * dudx(x, y, z)
-            +
-                   2 * fv(x, y, z) * dvdy(x, y, z) +
-                   fw(x, y, z) * dvdz(x, y, z) + fv(x, y, z) * dwdz(x, y, z))
-                   +
-            dpdy(x, y, z);
+    error = rhs(i, j, k, UMY) + rho * (fu(x, y, z) * dvdx(x, y, z) + fv(x, y, z) * dudx(x, y, z) + 2 * fv(x, y, z) * dvdy(x, y, z) + fw(x, y, z) * dvdz(x, y, z) + fv(x, y, z) * dwdz(x, y, z)) +  dpdy(x, y, z);
     rhs(i, j, k, UMY) = error;
 
     error = rhs(i, j, k, UMZ) +
-            rho * (fu(x, y, z) * dwdx(x, y, z) + fw(x, y, z) * dudx(x, y, z)
-            +
-                   fv(x, y, z) * dwdy(x, y, z) + fw(x, y, z) * dvdy(x, y, z)
-                   + 2 * fw(x, y, z) * dwdz(x, y, z)) +
+            rho * (fu(x, y, z) * dwdx(x, y, z) + fw(x, y, z) * dudx(x, y, z) +
+                   fv(x, y, z) * dwdy(x, y, z) + fw(x, y, z) * dvdy(x, y, z) +
+                   2 * fw(x, y, z) * dwdz(x, y, z)) +
             dpdz(x, y, z);
     rhs(i, j, k, UMZ) = error;
 
+    // d (rho u ht) = d(rho u (et + p/rho)) = d(rho u et + Pu) = rho d(u et +
+    // Pu/rho) = rho [ d(u et) + 1/rho d(Pu) ] = rho [ et d(u) + u d(et) +
+    // (1/rho) ( u d(P) + P d(u) )]
+
     // et = e + 1/2 (u^2 + v^2 + w^2) = cv T + 1/2 (u^2 + v^2 + w^2)
     Real et = cls.cv * ft(x, y, z) +
-              0.5_rt * (fu(x, y, z) * fu(x, y, z) + fv(x, y, z) * fv(x, y, z)
-              +
+              0.5_rt * (fu(x, y, z) * fu(x, y, z) + fv(x, y, z) * fv(x, y, z) +
                         fw(x, y, z) * fw(x, y, z));
 
     // x-direction: rho [ et d(u)/dx + u d(et)/dx + (1/rho) ( u d(P)dx + P
     // d(u)dx )] d(et)/dx = cv dT/dx + 2*0.5(udu/dx + vdv/dx + wdw/dx)
+
     Real det = cls.cv * dTdx(x, y, z) +
                (fu(x, y, z) * dudx(x, y, z) + fv(x, y, z) * dvdx(x, y, z) +
                 fw(x, y, z) * dwdx(x, y, z));
@@ -142,7 +143,6 @@ public:
     det = cls.cv * dTdy(x, y, z) +
           (fu(x, y, z) * dudy(x, y, z) + fv(x, y, z) * dvdy(x, y, z) +
            fw(x, y, z) * dwdy(x, y, z));
-
     error += rho * (et * dvdy(x, y, z) + fv(x, y, z) * det +
                     (1 / rho) * (fv(x, y, z) * dpdy(x, y, z) +
                                  fp(x, y, z) * dvdy(x, y, z)));
@@ -156,14 +156,11 @@ public:
                     (1 / rho) * (fw(x, y, z) * dpdz(x, y, z) +
                                  fp(x, y, z) * dwdz(x, y, z)));
 
-
     error = error + rhs(i, j, k, UET);
     rhs(i, j, k, UET) = error;
 
-    // Print() << x << " " << y << " " << z << " " << rhs(i,j,k,UET)/2 << " "
-
     for (int nn = 0; nn < 5; nn++) {
-      std::cout << "   rhs error , nn = " << nn << " " << rhs(i, j, k, nn)
+      std::cout << "rhs error , nn = " << nn << " " << rhs(i, j, k, nn)
                 << std::endl;
     }
 
@@ -176,8 +173,8 @@ protected:
 
   MMS() {
     // You can do set-up work for each test here.
-    bx.setSmall(IntVect{-4, -4, -4});
-    bx.setBig(IntVect{3, 3, 3});
+    bx.setSmall(IntVect{-3, -3, -3});
+    bx.setBig(IntVect{4, 4, 4});
     primsF.resize(bx, numcomps + 1);
     flx1F.resize(bx, numcomps);
     flx2F.resize(bx, numcomps);
@@ -206,7 +203,6 @@ protected:
 
   // void error(int i, int j, int k, const Array4<Real> &rhs, cls_t const &cls,
   //            const Array1D<Real, 0, 2> &dx) {
-
 
   // }
 
@@ -332,7 +328,7 @@ TEST_F(MMS, keep) {
   typedef closures_dt<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t>
       cls_t;
   cls_t cls;
-  typedef keep_euler_t<false, false, 6, cls_t> keep2_t;
+  typedef keep_euler_t<false, false, 4, cls_t> keep2_t;
   keep2_t keep2;
 
   int result = test_keep_scheme<keep2_t, cls_t>(keep2, cls);
