@@ -40,7 +40,7 @@ class keep_euler_t {
     coeffs(2, 2) = 2.0 / 60;
   }
 
-  int order_keep=order;
+  int order_keep = order;
 
   // TODO: add copy and move constructors
   // AMREX_GPU_HOST_DEVICE
@@ -67,18 +67,17 @@ class keep_euler_t {
 
     // compute interface fluxes at i-1/2, j-1/2, k-1/2
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
-      amrex::ParallelFor(
-          bxgnodal, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            this->flux_dir(i, j, k, dir, order_coeffs, prims, flx, cls);
-          });
+      ParallelFor(bxgnodal,
+                  [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                    this->flux_dir(i, j, k, dir, order_coeffs, prims, flx, cls);
+                  });
 
       // add flux derivative to rhs = -(fi+1 - fi)/dx
-      amrex::ParallelFor(
-          bxg, NCONS,
-          [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-            rhs(i, j, k, n) +=
-                dxinv[dir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
-          });
+      ParallelFor(bxg, NCONS,
+                  [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+                    rhs(i, j, k, n) +=
+                        dxinv[dir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
+                  });
     }
 
     if constexpr (isIB) {
@@ -129,17 +128,18 @@ class keep_euler_t {
         ie2 = cls.cv * prims(i2, j2, k2, QT);
         p2 = prims(i2, j2, k2, QPRES);
 
-
         massflx = fgQuad(rho1, rho2, uu1, uu2);
         ke = 0.5_rt * (ux1 * ux2 + uy1 * uy2 + uz1 * uz2);
         flx(i, j, k, URHO) += coefs(l - 1) * massflx;
         flx(i, j, k, UMX) +=
-            coefs(l - 1) * (fghCubic(rho1, rho2, uu1, uu2, ux1, ux2) + vdir[0]*fDiv(p1, p2));
+            coefs(l - 1) *
+            (fghCubic(rho1, rho2, uu1, uu2, ux1, ux2) + vdir[0] * fDiv(p1, p2));
         flx(i, j, k, UMY) +=
             coefs(l - 1) *
-            (fghCubic(rho1, rho2, uu1, uu2, uy1, uy2) + vdir[1]*fDiv(p1, p2));
+            (fghCubic(rho1, rho2, uu1, uu2, uy1, uy2) + vdir[1] * fDiv(p1, p2));
         flx(i, j, k, UMZ) +=
-            coefs(l - 1) * (fghCubic(rho1, rho2, uu1, uu2, uz1, uz2) + vdir[2]*fDiv(p1, p2));
+            coefs(l - 1) *
+            (fghCubic(rho1, rho2, uu1, uu2, uz1, uz2) + vdir[2] * fDiv(p1, p2));
         flx(i, j, k, UET) +=
             coefs(l - 1) *
             (massflx * ke + fghCubic(rho1, rho2, uu1, uu2, ie1, ie2) +

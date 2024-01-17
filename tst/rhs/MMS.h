@@ -24,7 +24,7 @@ public:
   Box bx;
 
   template <class scheme_t, class cls_t>
-  int test_keep_scheme(scheme_t scheme, cls_t cls) {
+  Real test_keep_scheme(const scheme_t scheme, const cls_t cls, const Array1D<Real, 0, 2>& dx) {
 
     // pepare arrays
     const Array4<Real> &prims = primsF.array();
@@ -48,13 +48,10 @@ public:
                               scheme.coeffs(idx, 2)};
 
     // fill prims
-    Array1D<Real, 0, 2> dx = {0.111, 0.111, 0.111};
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
       Real x = (i + 0.5_rt) * dx(0);
       Real y = (j + 0.5_rt) * dx(1);
       Real z = (k + 0.5_rt) * dx(2);
-      // std::cout << i << " " << j << " " << k << std::endl;
-      // std::cout << x << " " << y << " " << z << std::endl;
 
       Real P = fp(x, y, z);
       Real T = ft(x, y, z);
@@ -75,20 +72,16 @@ public:
     scheme.flux_dir(i, j, k, 0, coefs, prims, flx1, cls);
 
     scheme.flux_dir(i, j + 1, k, 1, coefs, prims, flx2, cls);
-    scheme.flux_dir(i, j    , k, 1, coefs, prims, flx2, cls);
+    scheme.flux_dir(i, j, k, 1, coefs, prims, flx2, cls);
 
     scheme.flux_dir(i, j, k + 1, 2, coefs, prims, flx3, cls);
     scheme.flux_dir(i, j, k, 2, coefs, prims, flx3, cls);
 
     for (int nn = 0; nn < 5; nn++) {
-      rhs(i, j, k, nn) = (flx1(i, j, k, nn) - flx1(i + 1, j, k, nn)) / dx(0)   + (flx2(i, j, k, nn) - flx2(i, j + 1, k, nn)) / dx(1)  
-      + (flx3(i, j, k, nn) - flx3(i, j, k + 1, nn)) / dx(2);
-
-      // if (nn==2) {
-      //   std::cout << "nn, flxl, flxr, df, dx, rhs = " << nn << " " << flx2(i, j, k, nn) << " " << flx2(i, j + 1, k, nn) << " " << (flx2(i, j, k, nn) - flx2(i, j + 1, k, nn)) << " "<< dx(1) << " "<< rhs(i, j, k, nn)
-      //           << std::endl;
-      // }
-        std::cout << "nn, rhs = " << nn << " " << rhs(i, j, k, nn) << std::endl ;
+      rhs(i, j, k, nn) = (flx1(i, j, k, nn) - flx1(i + 1, j, k, nn)) / dx(0) +
+                         (flx2(i, j, k, nn) - flx2(i, j + 1, k, nn)) / dx(1) +
+                         (flx3(i, j, k, nn) - flx3(i, j, k + 1, nn)) / dx(2);
+      // std::cout << "nn, rhs = " << nn << " " << rhs(i, j, k, nn) << std::endl;
     }
 
     // error rhs
@@ -109,7 +102,11 @@ public:
             dpdx(x, y, z);
     rhs(i, j, k, UMX) = error;
 
-    error = rhs(i, j, k, UMY) + rho * (fu(x, y, z) * dvdx(x, y, z) + fv(x, y, z) * dudx(x, y, z) + 2 * fv(x, y, z) * dvdy(x, y, z) + fw(x, y, z) * dvdz(x, y, z) + fv(x, y, z) * dwdz(x, y, z)) +  dpdy(x, y, z);
+    error = rhs(i, j, k, UMY) +
+            rho * (fu(x, y, z) * dvdx(x, y, z) + fv(x, y, z) * dudx(x, y, z) +
+                   2 * fv(x, y, z) * dvdy(x, y, z) +
+                   fw(x, y, z) * dvdz(x, y, z) + fv(x, y, z) * dwdz(x, y, z)) +
+            dpdy(x, y, z);
     rhs(i, j, k, UMY) = error;
 
     error = rhs(i, j, k, UMZ) +
@@ -130,7 +127,6 @@ public:
 
     // x-direction: rho [ et d(u)/dx + u d(et)/dx + (1/rho) ( u d(P)dx + P
     // d(u)dx )] d(et)/dx = cv dT/dx + 2*0.5(udu/dx + vdv/dx + wdw/dx)
-
     Real det = cls.cv * dTdx(x, y, z) +
                (fu(x, y, z) * dudx(x, y, z) + fv(x, y, z) * dvdx(x, y, z) +
                 fw(x, y, z) * dwdx(x, y, z));
@@ -159,12 +155,13 @@ public:
     error = error + rhs(i, j, k, UET);
     rhs(i, j, k, UET) = error;
 
+    error = 0.0;
     for (int nn = 0; nn < 5; nn++) {
-      std::cout << "rhs error , nn = " << nn << " " << rhs(i, j, k, nn)
-                << std::endl;
+      // printf("error(%i)=%f \n",nn,rhs(i, j, k, nn));
+      error = max(rhs(i, j, k, nn),error);
     }
 
-    return 0;
+    return error;
   }
 
 protected:
@@ -324,19 +321,54 @@ private:
 };
 
 TEST_F(MMS, keep) {
-
   typedef closures_dt<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t>
       cls_t;
   cls_t cls;
-  typedef keep_euler_t<false, false, 4, cls_t> keep2_t;
-  keep2_t keep2;
 
-  int result = test_keep_scheme<keep2_t, cls_t>(keep2, cls);
+  typedef keep_euler_t<false, false, 2, cls_t> keep2_t;
+  typedef keep_euler_t<false, false, 4, cls_t> keep4_t;
+  typedef keep_euler_t<false, false, 6, cls_t> keep6_t;
+
+  keep2_t keep2;
+  keep4_t keep4;
+  keep6_t keep6;
+
+  Array1D<Real, 0, 2> dx= {0.151, 0.151, 0.151};
+  Array1D<Real, 0, 2> error2,error4,error6;
+
+  for (int i=0; i<3; i++){
+    error2(i) = test_keep_scheme<keep2_t, cls_t>(keep2, cls, dx);
+    error4(i) = test_keep_scheme<keep4_t, cls_t>(keep4, cls, dx);
+    error6(i) = test_keep_scheme<keep6_t, cls_t>(keep6, cls, dx);
+    dx(0) = dx(0)/2;
+    dx(1) = dx(1)/2;
+    dx(2) = dx(2)/2;
+  }
+
+  printf("                 dx : %f  %f  %f \n",dx(0)*2*2, dx(0)*2, dx(0));
+  printf("Max error 2nd order KEEP: %f  %f  %f \n",error2(0),error2(1),error2(2));
+  printf("Max error 4th order KEEP: %f  %f  %f \n",error4(0),error4(1),error4(2));
+  printf("Max error 6th order KEEP: %f  %f  %f \n\n",error6(0),error6(1),error6(2));
+
+  printf("Linf error 2nd order KEEP: %f  %f \n",log2(error2(0)/error2(1)),log2(error2(1)/error2(2)));
+  printf("Linf error 4th order KEEP: %f  %f \n",log2(error4(0)/error4(1)),log2(error4(1)/error4(2)));
+  printf("Linf error 6th order KEEP: %f  %f \n",log2(error6(0)/error6(1)),log2(error6(1)/error6(2)));
+
+  Real order2 = (log2(error2(0)/error2(1)) + log2(error2(1)/error2(2)))/2;
+  Real order4 = (log2(error4(0)/error4(1)) + log2(error4(1)/error4(2)))/2;
+  Real order6 = (log2(error6(0)/error6(1)) + log2(error6(1)/error6(2)))/2;
+  
+  EXPECT_GE(order2,2.0);
+  EXPECT_GE(order4,4.0);
+  EXPECT_GE(order6,6.0);
 }
 
-TEST_F(MMS, scheme2) {}
+TEST_F(MMS, scheme2) {
 
-TEST_F(MMS, scheme3) {}
+
+}
+
+// TEST_F(MMS, scheme3) {}
 
 // TODO: test the public function eflux directly. However, this requires setup
 // an amr grid. Like NALU wind. However, here the first aim is to have simplest
