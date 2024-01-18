@@ -16,9 +16,6 @@
 [submodule "lib/autodiff"]
 	path = lib/autodiff
 	url = https://github.com/autodiff/autodiff
-[submodule "lib/Catch2"]
-	path = lib/Catch2
-	url = https://github.com/catchorg/Catch2.git
 [submodule "docs/website"]
 	path = docs/website
 	url = https://github.com/Monal-Patel/amrsolver_docs
