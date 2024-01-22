@@ -7,7 +7,8 @@
                 "/home/monal/Documents/code/amrsolver/lib/amrex/Src/**",
                 "/usr/lib/x86_64-linux-gnu/openmpi/include",
                 "/home/monal/Documents/code/amrsolver/lib/install/cgal/include",
-                "/home/monal/Documents/code/amrsolver/lib/install/googletest/include"
+                "/home/monal/Documents/code/amrsolver/lib/install/googletest/include",
+                "/home/monal/Documents/code/amrsolver/lib/autodiff"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

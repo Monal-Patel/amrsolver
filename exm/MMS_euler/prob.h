@@ -7,6 +7,7 @@
 #include <AMReX_REAL.H>
 #include <AMReX_GpuMemory.H>
 #include <Closures.h>
+#include <RHS.h>
 
 using namespace amrex;
 
@@ -119,7 +120,10 @@ struct ProbParm
 
 constexpr int do_pde=0;
 ///////////////////////////////CLOSURES/////////////////////////////////////////
-typedef closures_derived_base_t<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
+typedef closures_dt<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t> ProbClosures;
+
+typedef rhs_dt<keep_euler_t<false, false, 6, ProbClosures>, no_diffusive_t,
+               no_source_t>  ProbRHS;
 // user can also define their own closure class and use it here by naming it ProbClosures
 // template <typename Visc, typename Cond, typename Thermo>
 // class closures_derived_user_t : public Cond, public Visc, public Thermo
