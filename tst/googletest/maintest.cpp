@@ -17,7 +17,7 @@ int main(int argc, char** argv)
   // ::testing::AddGlobalTestEnvironment(utest_env);
 
   // initialise amrex
-  Initialize(argc, argv, true, MPI_COMM_WORLD);
+  amrex::Initialize(argc, argv, true, MPI_COMM_WORLD);
 
   return RUN_ALL_TESTS();
 }

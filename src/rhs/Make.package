@@ -1,1 +1,1 @@
-CEXE_headers += RHS.h CentralKEEP.h
+CEXE_headers += RHS.h CentralKEEP.h Weno.h

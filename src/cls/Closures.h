@@ -21,52 +21,28 @@ using namespace amrex;
 #define QT 4
 #define QPRES 5
 #define NPRIM 6
-
-//
 #define NGHOST 3  // TODO: make this an automatic parameter?
 
 ////////////////////////////////THERMODYNAMICS/////////////////////////////////
-// class EosBase {
-//  private:
-//   EosBase(/* args */);
-//   ~EosBase();
+class calorifically_perfect_gas_nasg_liquid_t
+{
+private:
+  /* data */
+  // gamma_a =;
+  // gamma_l =;
 
-//   /* data */
-//  public:
-//   Real virtual pressure() { return 0.0; }
+public:
+// state
 
-//   Real virtual density() { return 0.0; }
-//   Real virtual energy() { return 0.0; }
-// };
+Real inline energy (Real p, Real rho) {
+  Real eint=0;
+return eint;
+}
 
-// class stiffgas_t : public EosBase
-// {
-// private:
-//   /* data */
-//   gamma_a =;
-//   gamma_l =;
+// pressure (eint,rho)
 
-// public:
-// // state
+};
 
-// Real energy (Real p, Real rho) {
-
-// return eint
-// }
-
-// // pressure (eint,rho)
-
-// }
-
-//
-// class ThermodynamicsBase
-// {
-// private:
-//   /* data */
-// public:
-//   ThermodynamicsBase(/* args */);
-//   ~ThermodynamicsBase();
-// };
 
 class calorifically_perfect_gas_t {
  public:
@@ -78,19 +54,39 @@ class calorifically_perfect_gas_t {
   Real cp = gamma * Ru / (mw * (gamma - Real(1.0)));
   Real Rspec = Ru / mw;
 
-  // operates
-  void prims2cons(){
+  Real sos(Real& T){return std::sqrt(this->gamma * this->Rspec * T);}
 
-  };
+  // void prims2cons(i,j,k,){};
 
-  void cons2prims(){
+  void prims2char(){};
 
+
+  // void prims2flux(int& i, int& j, int& k, const GpuArray<Real,NPRIM>& prims, GpuArray<Real,NCONS>& fluxes, const GpuArray<int, 3>& vdir) {
+  AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+  void prims2fluxes(int& i, int& j, int& k, const Array4<Real>& prims, Array4<Real>& fluxes, const GpuArray<int, 3>& vdir) {
+
+    Real rho = prims(i,j,k,QRHO);
+    Real ux  = prims(i,j,k,QU);
+    Real uy  = prims(i,j,k,QV);
+    Real uz  = prims(i,j,k,QW);
+    Real P   = prims(i,j,k,QPRES);
+    Real udir = ux*vdir[0] + uy*vdir[1] + uz*vdir[2];
+
+    Real ekin  = Real(0.5) *(ux*ux + uy*uy + uz*uz);
+    Real rhoet = rho*(this->cp*prims(i,j,k,QT) + ekin) ;
+
+    fluxes(i,j,k,URHO) = rho*udir;
+    fluxes(i,j,k,UMX)  = rho*ux*udir + P*vdir[0];
+    fluxes(i,j,k,UMY)  = rho*uy*udir + P*vdir[1];
+    fluxes(i,j,k,UMZ)  = rho*uz*udir + P*vdir[2];
+    fluxes(i,j,k,UET)  = (rhoet + P) * udir;
   };
 
   // can move this to closures derived tyoe (closures_dt)
   // prims to cons
   // - We want to call it from thermodynamics class
   // - cls is stored on cpu and gpu
+  // TODO: remove ParallelFor from here. Keep closures local
   void inline cons2prims(const MFIter& mfi, const Array4<Real>& cons,
                          const Array4<Real>& prims) const {
     const Box& bxg = mfi.growntilebox(NGHOST);
@@ -117,22 +113,9 @@ class calorifically_perfect_gas_t {
   }
 };
 
+
 ////////////////////////////////TRANSPORT/////////////////////////////////
-
-// class TransportBase
-// {
-// private:
-//   /* data */
-// public:
-//   TransportBase(/* args */);
-//   ~TransportBase();
-
-// };
-
 ////// Viscosity
-// enum ViscOptionsEnum {visc_cons_e, visc_suth_e, visc_other_e};
-// constexpr static ViscOptionsEnum ViscSelectUser = visc_suth_e;
-
 class visc_const_t {
  private:
  public:
@@ -154,13 +137,6 @@ class visc_suth_t {
     return visc_ref * T * sqrt(T) / (Tvisc_ref + T);
   }
 };
-
-// auto select_viscosity_law()
-// {
-//   if constexpr (ViscSelectUser == visc_cons_e) return visc_const_t();
-//   else if constexpr (ViscSelectUser == visc_suth_e) return visc_suth_t();
-//   else return 0 ;
-// }
 
 ////// Conductivity
 class cond_const_t {
@@ -215,23 +191,4 @@ class closures_dt : public Cond, public Visc, public Thermo, public others... {
   Real Cshock = 1.0;
   Real Cdamp = 0.01;
 };
-
-// Class MultispeciesIdealGas : public BaseEOS, public ThermodynamicsBase,
-// public TransportBase
-// {
-//   private:
-//     MultispeciesIdealGas(/* args */);
-//     ~MultispeciesIdealGas();
-//   public:
-// };
-
-// class Multiphase : public BaseEOS, public ThermodynamicsBase, public
-// TransportBase
-// {
-//   private:
-//     Multiphase(/* args */);
-//     ~Multiphase();
-//   public:
-// };
-
 #endif

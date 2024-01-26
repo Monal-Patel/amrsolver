@@ -24,7 +24,7 @@ public:
   Box bx;
 
   template <class scheme_t, class cls_t>
-  Real test_keep_scheme(const scheme_t scheme, const cls_t cls, const Array1D<Real, 0, 2>& dx) {
+  Real test_keep(const scheme_t scheme, const cls_t cls, const Array1D<Real, 0, 2>& dx) {
 
     // pepare arrays
     const Array4<Real> &prims = primsF.array();
@@ -48,20 +48,7 @@ public:
                               scheme.coeffs(idx, 2)};
 
     // fill prims
-    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-      Real x = (i + 0.5_rt) * dx(0);
-      Real y = (j + 0.5_rt) * dx(1);
-      Real z = (k + 0.5_rt) * dx(2);
-
-      Real P = fp(x, y, z);
-      Real T = ft(x, y, z);
-      prims(i, j, k, 0) = P / (cls.Rspec * T);
-      prims(i, j, k, 1) = fu(x, y, z);
-      prims(i, j, k, 2) = fv(x, y, z);
-      prims(i, j, k, 3) = fw(x, y, z);
-      prims(i, j, k, 4) = T;
-      prims(i, j, k, 5) = P;
-    });
+    fill_prims<cls_t>(bx,prims,dx,cls);
 
     int i = 0;
     int j = 0;
@@ -84,6 +71,68 @@ public:
       // std::cout << "nn, rhs = " << nn << " " << rhs(i, j, k, nn) << std::endl;
     }
 
+    Real error = compute_error<cls_t>(i,j,k,rhs,dx,cls);
+    return error;
+  }
+
+  template <class scheme_t, class cls_t>
+  Real test_weno(const scheme_t scheme, const cls_t cls, const Array1D<Real, 0, 2>& dx) {
+    // pepare arrays
+    const Array4<Real> &prims = primsF.array();
+    const Array4<Real> &flx1 = flx1F.array();
+    const Array4<Real> &flx2 = flx2F.array();
+    const Array4<Real> &flx3 = flx3F.array();
+    const Array4<Real> &rhs = rhsF.array();
+
+    // fill prims
+    fill_prims<cls_t>(bx,prims,dx,cls);
+    int i = 0;
+    int j = 0;
+    int k = 0;
+
+    // numerical flux derivatives (rhs)
+    // scheme.flux_dir(i + 1, j, k, 0, coefs, prims, flx1, cls);
+    // scheme.flux_dir(i, j, k, 0, coefs, prims, flx1, cls);
+
+    // scheme.flux_dir(i, j + 1, k, 1, coefs, prims, flx2, cls);
+    // scheme.flux_dir(i, j, k, 1, coefs, prims, flx2, cls);
+
+    // scheme.flux_dir(i, j, k + 1, 2, coefs, prims, flx3, cls);
+    // scheme.flux_dir(i, j, k, 2, coefs, prims, flx3, cls);
+
+    for (int nn = 0; nn < 5; nn++) {
+      rhs(i, j, k, nn) = (flx1(i, j, k, nn) - flx1(i + 1, j, k, nn)) / dx(0) +
+                         (flx2(i, j, k, nn) - flx2(i, j + 1, k, nn)) / dx(1) +
+                         (flx3(i, j, k, nn) - flx3(i, j, k + 1, nn)) / dx(2);
+      // std::cout << "nn, rhs = " << nn << " " << rhs(i, j, k, nn) << std::endl;
+    }
+
+
+    Real error;
+    return error;
+
+  }
+
+  template <class cls_t>
+  void fill_prims(Box& bx, const Array4<Real>& prims, const Array1D<Real,0,2>& dx, cls_t cls) {
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+      Real x = (i + 0.5_rt) * dx(0);
+      Real y = (j + 0.5_rt) * dx(1);
+      Real z = (k + 0.5_rt) * dx(2);
+
+      Real P = fp(x, y, z);
+      Real T = ft(x, y, z);
+      prims(i, j, k, 0) = P / (cls.Rspec * T);
+      prims(i, j, k, 1) = fu(x, y, z);
+      prims(i, j, k, 2) = fv(x, y, z);
+      prims(i, j, k, 3) = fw(x, y, z);
+      prims(i, j, k, 4) = T;
+      prims(i, j, k, 5) = P;
+    });
+  }
+
+  template <class cls_t>
+  Real compute_error(int& i, int& j, int& k, const Array4<Real>& rhs ,const Array1D<Real, 0, 2>& dx, cls_t cls) {
     // error rhs
     const Real x = (i + 0.5_rt) * dx(0);
     const Real y = (j + 0.5_rt) * dx(1);
@@ -337,9 +386,9 @@ TEST_F(MMS, keep) {
   Array1D<Real, 0, 2> error2,error4,error6;
 
   for (int i=0; i<3; i++){
-    error2(i) = test_keep_scheme<keep2_t, cls_t>(keep2, cls, dx);
-    error4(i) = test_keep_scheme<keep4_t, cls_t>(keep4, cls, dx);
-    error6(i) = test_keep_scheme<keep6_t, cls_t>(keep6, cls, dx);
+    error2(i) = test_keep<keep2_t, cls_t>(keep2, cls, dx);
+    error4(i) = test_keep<keep4_t, cls_t>(keep4, cls, dx);
+    error6(i) = test_keep<keep6_t, cls_t>(keep6, cls, dx);
     dx(0) = dx(0)/2;
     dx(1) = dx(1)/2;
     dx(2) = dx(2)/2;
@@ -364,7 +413,22 @@ TEST_F(MMS, keep) {
 }
 
 TEST_F(MMS, scheme2) {
+  typedef closures_dt<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t>
+      cls_t;
+  cls_t cls;
 
+  typedef weno_t<0, false, cls_t> wenojs_t;
+  wenojs_t wenojs;
+
+  Array1D<Real, 0, 2> dx= {0.151, 0.151, 0.151};
+  Array1D<Real, 0, 2> error;
+
+  for (int i=0; i<3; i++){
+    error(i) = test_weno<wenojs_t, cls_t>(wenojs, cls, dx);
+    dx(0) = dx(0)/2;
+    dx(1) = dx(1)/2;
+    dx(2) = dx(2)/2;
+  }
 
 }
 
