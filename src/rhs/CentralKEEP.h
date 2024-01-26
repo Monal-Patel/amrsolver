@@ -51,11 +51,12 @@ class keep_euler_t {
   ~keep_euler_t() {}
 
   void inline eflux(const Geometry& geom, const MFIter& mfi,
-                    const Array4<Real>& prims, const Array4<Real>& cons,
-                    const Array4<Real>& flx, const Array4<Real>& rhs,
+                    const Array4<Real>& prims, const Array4<Real>& flx,
+                    const Array4<Real>& rhs,
                     const closures& cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
-    const Box& bxg = mfi.growntilebox(0);
+    const Box& bx  = mfi.growntilebox(0);
+    const Box& bxg = mfi.growntilebox(NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
@@ -66,14 +67,16 @@ class keep_euler_t {
         coeffs(halfsten - 1, 2)};  // get coefficients array for current scheme
 
     // compute interface fluxes at i-1/2, j-1/2, k-1/2
+    ParallelFor(bxg, NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {rhs(i, j, k, n)=0.0;});
+
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
       ParallelFor(bxgnodal,
                   [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
                     this->flux_dir(i, j, k, dir, order_coeffs, prims, flx, cls);
                   });
 
-      // add flux derivative to rhs = -(fi+1 - fi)/dx
-      ParallelFor(bxg, NCONS,
+      // add flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
+      ParallelFor(bx, NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     rhs(i, j, k, n) +=
                         dxinv[dir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));

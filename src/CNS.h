@@ -43,7 +43,7 @@ class CNS : public amrex::AmrLevel {
   // -------------------------------------------------------------------------
 
   // Time-stepping -----------------------------------------------------------
-  void compute_rhs(amrex::MultiFab& S, amrex::MultiFab& dSdt, amrex::Real dt,
+  void compute_rhs(amrex::MultiFab& S, amrex::Real dt,
                    amrex::FluxRegister* fr_as_crse,
                    amrex::FluxRegister* fr_as_fine);
 
@@ -135,9 +135,9 @@ class CNS : public amrex::AmrLevel {
   static bool ib_move;
   static bool plot_surf;
 
-  static Vector<MultiFab> VdSdt;
-  static Vector<MultiFab> VSborder;
-  static Vector<MultiFab> Vprimsmf;
+  // static Vector<MultiFab> VdSdt;
+  // static Vector<MultiFab> VSborder;
+  // static Vector<MultiFab> Vprimsmf;
   // static Vector<Array<MultiFab, AMREX_SPACEDIM>> Vnumflxmf, Vpntvflxmf;
 
  public:
