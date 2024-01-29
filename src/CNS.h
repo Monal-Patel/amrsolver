@@ -1,6 +1,7 @@
 #ifndef CNS_H_
 #define CNS_H_
 
+#include <Index.h>
 #include <AMReX_AmrLevel.H>
 #include <AMReX_FluxRegister.H>
 #include <prob.h>

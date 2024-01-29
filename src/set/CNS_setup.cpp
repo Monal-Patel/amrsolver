@@ -151,28 +151,28 @@ void CNS::variableSetUp() {
   // Pressure
   derive_lst.add("pressure", IndexType::TheCellType(), 1, derpres,
                  the_same_box);
-  derive_lst.addComponent("pressure", desc_lst, State_Type, URHO, NCONS);
+  derive_lst.addComponent("pressure", desc_lst, State_Type, h_prob_closures->URHO, NCONS);
 
   // Temperature
   derive_lst.add("temperature", IndexType::TheCellType(), 1, dertemp,
                  the_same_box);
-  derive_lst.addComponent("temperature", desc_lst, State_Type, URHO, NCONS);
+  derive_lst.addComponent("temperature", desc_lst, State_Type, h_prob_closures->URHO, NCONS);
 
   // Velocities
   derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervel,
                  the_same_box);
-  derive_lst.addComponent("x_velocity", desc_lst, State_Type, URHO, 1);
-  derive_lst.addComponent("x_velocity", desc_lst, State_Type, UMX, 1);
+  derive_lst.addComponent("x_velocity", desc_lst, State_Type, h_prob_closures->URHO, 1);
+  derive_lst.addComponent("x_velocity", desc_lst, State_Type, h_prob_closures->UMX, 1);
 
   derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, dervel,
                  the_same_box);
-  derive_lst.addComponent("y_velocity", desc_lst, State_Type, URHO, 1);
-  derive_lst.addComponent("y_velocity", desc_lst, State_Type, UMY, 1);
+  derive_lst.addComponent("y_velocity", desc_lst, State_Type, h_prob_closures->URHO, 1);
+  derive_lst.addComponent("y_velocity", desc_lst, State_Type, h_prob_closures->UMY, 1);
 
 #if (AMREX_SPACEDIM == 3)
   derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervel,
                  the_same_box);
-  derive_lst.addComponent("z_velocity", desc_lst, State_Type, URHO, 1);
-  derive_lst.addComponent("z_velocity", desc_lst, State_Type, UMZ, 1);
+  derive_lst.addComponent("z_velocity", desc_lst, State_Type, h_prob_closures->URHO, 1);
+  derive_lst.addComponent("z_velocity", desc_lst, State_Type, h_prob_closures->UMZ, 1);
 #endif
 }

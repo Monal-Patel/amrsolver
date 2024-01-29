@@ -1,6 +1,7 @@
 #ifndef RHS_H_
 #define RHS_H_
 
+#include <Index.h>
 #include <Weno.h>
 #include <CentralKEEP.h>
 

@@ -1,6 +1,8 @@
 #ifndef CentralKEEP_H_
 #define CentralKEEP_H_
 
+#include <Index.h>
+
 ///
 /// \brief Template class for Central Kinetic Energy and Entropy Preserving
 /// scheme
@@ -23,7 +25,7 @@
 /// :math:`\frac{\partial fgh}{\partial x}\bigg|_i= \frac{\partial}{}`
 /// ```
 ///
-template <bool isAD, bool isIB, int order, typename closures>
+template <bool isAD, bool isIB, int order, typename cls_t>
 class keep_euler_t {
  public:
   AMREX_GPU_HOST_DEVICE
@@ -45,7 +47,7 @@ class keep_euler_t {
   // TODO: add copy and move constructors
   // AMREX_GPU_HOST_DEVICE
   // keep_euler_t(const keep_euler_t& other) {}
-  // keep_euler_t (keep_euler_t<isAD,isIB,order,closures>&& rhs) noexcept {};
+  // keep_euler_t (keep_euler_t<isAD,isIB,order,cls_t>&& rhs) noexcept {};
 
   AMREX_GPU_HOST_DEVICE
   ~keep_euler_t() {}
@@ -53,7 +55,7 @@ class keep_euler_t {
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
                     const Array4<Real>& rhs,
-                    const closures& cls) {
+                    const cls_t& cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(NGHOST);
@@ -95,7 +97,7 @@ class keep_euler_t {
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(
       int i, int j, int k, int dir, const Array1D<Real, 0, 2>& coefs,
       const Array4<Real>& prims, const Array4<Real>& flx,
-      const closures& cls) const {
+      const cls_t& cls) const {
     for (int n = 0; n < NCONS; n++) {
       flx(i, j, k, n) = 0.0;
     };
@@ -112,38 +114,38 @@ class keep_euler_t {
         i1 = i + m * vdir[0];
         j1 = j + m * vdir[1];
         k1 = k + m * vdir[2];
-        rho1 = prims(i1, j1, k1, QRHO);
-        ux1 = prims(i1, j1, k1, QU);
-        uy1 = prims(i1, j1, k1, QV);
-        uz1 = prims(i1, j1, k1, QW);
-        uu1 = prims(i1, j1, k1, QU + dir);
-        ie1 = cls.cv * prims(i1, j1, k1, QT);
-        p1 = prims(i1, j1, k1, QPRES);
+        rho1 = prims(i1, j1, k1, cls.QRHO);
+        ux1 = prims(i1, j1, k1, cls.QU);
+        uy1 = prims(i1, j1, k1, cls.QV);
+        uz1 = prims(i1, j1, k1, cls.QW);
+        uu1 = prims(i1, j1, k1, cls.QU + dir);
+        ie1 = cls.cv * prims(i1, j1, k1, cls.QT);
+        p1 = prims(i1, j1, k1, cls.QPRES);
 
         i2 = i + (m - l) * vdir[0];
         j2 = j + (m - l) * vdir[1];
         k2 = k + (m - l) * vdir[2];
-        rho2 = prims(i2, j2, k2, QRHO);
-        ux2 = prims(i2, j2, k2, QU);
-        uy2 = prims(i2, j2, k2, QV);
-        uz2 = prims(i2, j2, k2, QW);
-        uu2 = prims(i2, j2, k2, QU + dir);
-        ie2 = cls.cv * prims(i2, j2, k2, QT);
-        p2 = prims(i2, j2, k2, QPRES);
+        rho2 = prims(i2, j2, k2, cls.QRHO);
+        ux2 = prims(i2, j2, k2, cls.QU);
+        uy2 = prims(i2, j2, k2, cls.QV);
+        uz2 = prims(i2, j2, k2, cls.QW);
+        uu2 = prims(i2, j2, k2, cls.QU + dir);
+        ie2 = cls.cv * prims(i2, j2, k2, cls.QT);
+        p2 = prims(i2, j2, k2, cls.QPRES);
 
         massflx = fgQuad(rho1, rho2, uu1, uu2);
         ke = 0.5_rt * (ux1 * ux2 + uy1 * uy2 + uz1 * uz2);
-        flx(i, j, k, URHO) += coefs(l - 1) * massflx;
-        flx(i, j, k, UMX) +=
+        flx(i, j, k, cls.URHO) += coefs(l - 1) * massflx;
+        flx(i, j, k, cls.UMX) +=
             coefs(l - 1) *
             (fghCubic(rho1, rho2, uu1, uu2, ux1, ux2) + vdir[0] * fDiv(p1, p2));
-        flx(i, j, k, UMY) +=
+        flx(i, j, k, cls.UMY) +=
             coefs(l - 1) *
             (fghCubic(rho1, rho2, uu1, uu2, uy1, uy2) + vdir[1] * fDiv(p1, p2));
-        flx(i, j, k, UMZ) +=
+        flx(i, j, k, cls.UMZ) +=
             coefs(l - 1) *
             (fghCubic(rho1, rho2, uu1, uu2, uz1, uz2) + vdir[2] * fDiv(p1, p2));
-        flx(i, j, k, UET) +=
+        flx(i, j, k, cls.UET) +=
             coefs(l - 1) *
             (massflx * ke + fghCubic(rho1, rho2, uu1, uu2, ie1, ie2) +
              fgDiv(p1, p2, uu1, uu2));

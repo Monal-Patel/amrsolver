@@ -2,6 +2,7 @@
 #define Weno_H
 
 #include <AMReX_FArrayBox.H>
+// #include <Index.h>
 
 ///
 /// \brief Template class for Riemann solvers
@@ -15,22 +16,21 @@
 /// :math:`f_{i+1/2}= `
 /// ```
 ///
-
-template <int iSplit, bool isChar, typename closures>
+template <int iSplit, bool isChar, typename cls_t>
 class weno_t {
   public: 
   AMREX_GPU_HOST_DEVICE
   weno_t() {}
   ~weno_t() {}
 
-/// \brief Template class for Riemann solvers
-///
-/// \param ivars interpolation vars
-///
+  /// \brief Template class for Riemann solvers
+  ///
+  /// \param ivars interpolation vars
+  ///
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& ivars,
                     const Array4<Real>& rhs,
-                    const closures& cls) {
+                    const cls_t& cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(NGHOST);
@@ -56,8 +56,8 @@ class weno_t {
       // compute eigenvalues
       ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
         cls.prims2fluxes(i, j, k, prims, ivars, vdir);
-        Real cs = cls.sos(prims(i,j,k,QT));
-        Real udir = QU * vdir[0] + QV * vdir[1] + QW * vdir[2];
+        Real cs = cls.sos(prims(i,j,k,cls.QT));
+        Real udir = prims(i,j,k,cls.QU) * vdir[0] + prims(i,j,k,cls.QV) * vdir[1] + prims(i,j,k,cls.QW) * vdir[2];
         lambda(i, j, k, 0) = std::abs(max(udir + cs, udir - cs, udir));
       });
 
@@ -72,7 +72,7 @@ class weno_t {
         Array2D<Real,0,NCONS-1,0,NCONS-1> jac;
         ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           // R = 
-          ivars(i,j,k,) = R*var;
+          // ivars(i,j,k,) = R*var;
         });
       }
 
@@ -102,34 +102,34 @@ class weno_t {
   }
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void flux_dir(int& i, int& j, int& k, int& n, const Array4<Real>& prims, const Array4<Real>& vars, const Array4<Real>& lambda, Array4<Real>& temp) {
-    Real maxeigen = max(lambda(i - 3, j, k, 0), lambda(i - 2, j, k, 0),
-                        lambda(i - 1, j, k, 0), lambda(i, j, k, 0),
-                        lambda(i + 1, j, k, 0), lambda(i + 2, j, k, 0));
+    // Real maxeigen = max(lambda(i - 3, j, k, 0), lambda(i - 2, j, k, 0),
+    //                     lambda(i - 1, j, k, 0), lambda(i, j, k, 0),
+    //                     lambda(i + 1, j, k, 0), lambda(i + 2, j, k, 0));
 
-    df[0] = maxeigen * cons(i - 3, j, k, n);
-    df[1] = maxeigen * cons(i - 2, j, k, n);
-    df[2] = maxeigen * cons(i - 1, j, k, n);
-    df[3] = maxeigen * cons(i, j, k, n);
-    df[4] = maxeigen * cons(i + 1, j, k, n);
-    df[5] = maxeigen * cons(i + 2, j, k, n);
+    // df[0] = maxeigen * cons(i - 3, j, k, n);
+    // df[1] = maxeigen * cons(i - 2, j, k, n);
+    // df[2] = maxeigen * cons(i - 1, j, k, n);
+    // df[3] = maxeigen * cons(i, j, k, n);
+    // df[4] = maxeigen * cons(i + 1, j, k, n);
+    // df[5] = maxeigen * cons(i + 2, j, k, n);
 
-    // f(i-1/2)^+
-    sten[0] = Real(0.5) * (pfx(i - 3, j, k, n) + df[0]);
-    sten[1] = Real(0.5) * (pfx(i - 2, j, k, n) + df[1]);
-    sten[2] = Real(0.5) * (pfx(i - 1, j, k, n) + df[2]);
-    sten[3] = Real(0.5) * (pfx(i, j, k, n) + df[3]);
-    sten[4] = Real(0.5) * (pfx(i + 1, j, k, n) + df[4]);
-    Real ivar = weno5js(sten);
+    // // f(i-1/2)^+
+    // sten[0] = Real(0.5) * (pfx(i - 3, j, k, n) + df[0]);
+    // sten[1] = Real(0.5) * (pfx(i - 2, j, k, n) + df[1]);
+    // sten[2] = Real(0.5) * (pfx(i - 1, j, k, n) + df[2]);
+    // sten[3] = Real(0.5) * (pfx(i, j, k, n) + df[3]);
+    // sten[4] = Real(0.5) * (pfx(i + 1, j, k, n) + df[4]);
+    // Real ivar = weno5js(sten);
 
-    // f(i-1/2)^- (note, we are flipping the stencil)
-    sten[4] = Real(0.5) * (pfx(i - 2, j, k, n) - df[1]);
-    sten[3] = Real(0.5) * (pfx(i - 1, j, k, n) - df[2]);
-    sten[2] = Real(0.5) * (pfx(i, j, k, n) - df[3]);
-    sten[1] = Real(0.5) * (pfx(i + 1, j, k, n) - df[4]);
-    sten[0] = Real(0.5) * (pfx(i + 2, j, k, n) - df[5]);
-    ivar += weno5js(sten);
+    // // f(i-1/2)^- (note, we are flipping the stencil)
+    // sten[4] = Real(0.5) * (pfx(i - 2, j, k, n) - df[1]);
+    // sten[3] = Real(0.5) * (pfx(i - 1, j, k, n) - df[2]);
+    // sten[2] = Real(0.5) * (pfx(i, j, k, n) - df[3]);
+    // sten[1] = Real(0.5) * (pfx(i + 1, j, k, n) - df[4]);
+    // sten[0] = Real(0.5) * (pfx(i + 2, j, k, n) - df[5]);
+    // ivar += weno5js(sten);
 
-    temp(i, j, k, n) = flx;
+    // temp(i, j, k, n) = flx;
   }
 
 

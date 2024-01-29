@@ -22,7 +22,7 @@ constexpr int do_wm = 0; // 0=false, 1=true
 ////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////DISCRETISATION////////////////////////////////////
-typedef closures_dt<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t>
+typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t, calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
 typedef rhs_dt<keep_euler_t<false, false, 6, ProbClosures>, no_diffusive_t,
                no_source_t>
@@ -113,11 +113,11 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
   Real eint = cls.cv * pparm.T0;
 
   // Set the state
-  state(i, j, k, URHO) = rho;
-  state(i, j, k, UMX) = rho * u[0];
-  state(i, j, k, UMY) = rho * u[1];
-  state(i, j, k, UMZ) = rho * u[2];
-  state(i, j, k, UET) =
+  state(i, j, k, cls.URHO) = rho;
+  state(i, j, k, cls.UMX) = rho * u[0];
+  state(i, j, k, cls.UMY) = rho * u[1];
+  state(i, j, k, cls.UMZ) = rho * u[2];
+  state(i, j, k, cls.UET) =
       rho * (eint + Real(0.5) * (u[0] * u[0] + u[1] * u[1] + u[2] * u[2]));
 }
 

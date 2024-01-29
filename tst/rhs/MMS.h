@@ -26,7 +26,6 @@ public:
   template <class scheme_t, class cls_t>
   Real test_keep(const scheme_t scheme, const cls_t cls, const Array1D<Real, 0, 2>& dx) {
 
-    // pepare arrays
     const Array4<Real> &prims = primsF.array();
     const Array4<Real> &flx1 = flx1F.array();
     const Array4<Real> &flx2 = flx2F.array();
@@ -113,6 +112,40 @@ public:
 
   }
 
+  template <class scheme_t, class cls_t>
+  Real test_riemann(const scheme_t scheme, const cls_t cls,
+                    const Array1D<Real, 0, 2> &dx) {
+
+    // pepare arrays
+    const Array4<Real> &prims = primsF.array();
+    const Array4<Real> &flx1 = flx1F.array();
+    const Array4<Real> &flx2 = flx2F.array();
+    const Array4<Real> &flx3 = flx3F.array();
+    const Array4<Real> &rhs = rhsF.array();
+    fill_prims<cls_t>(bx, prims, dx, cls);
+
+    int i = 0;
+    int j = 0;
+    int k = 0;
+
+    //
+
+    // cns_slope_x(i, j, k, slope, prims, cls);
+    // cns_riemann_x(i, j, k, nfabfx, slope, prims, cls);
+
+    //
+
+    for (int nn = 0; nn < 5; nn++) {
+      rhs(i, j, k, nn) = (flx1(i, j, k, nn) - flx1(i + 1, j, k, nn)) / dx(0) +
+                         (flx2(i, j, k, nn) - flx2(i, j + 1, k, nn)) / dx(1) +
+                         (flx3(i, j, k, nn) - flx3(i, j, k + 1, nn)) / dx(2);
+      // std::cout << "nn, rhs = " << nn << " " << rhs(i, j, k, nn) <<
+      // std::endl;
+    }
+
+    return compute_error<cls_t>(i, j, k, rhs, dx, cls);
+  }
+
   template <class cls_t>
   void fill_prims(Box& bx, const Array4<Real>& prims, const Array1D<Real,0,2>& dx, cls_t cls) {
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -139,31 +172,31 @@ public:
     const Real z = (k + 0.5_rt) * dx(2);
     Real rho = fp(x, y, z) / (cls.Rspec * ft(x, y, z));
 
-    Real error = rhs(i, j, k, URHO) +
+    Real error = rhs(i, j, k, cls.URHO) +
                  rho * (dudx(x, y, z) + dvdy(x, y, z) + dwdz(x, y, z));
-    rhs(i, j, k, URHO) = error;
+    rhs(i, j, k, cls.URHO) = error;
 
     // rho (duu/dx + duv/dy + duw/dz) assuming rho=constant
-    error = rhs(i, j, k, UMX) +
+    error = rhs(i, j, k, cls.UMX) +
             rho * (2 * fu(x, y, z) * dudx(x, y, z) +
                    fv(x, y, z) * dudy(x, y, z) + fu(x, y, z) * dvdy(x, y, z) +
                    fw(x, y, z) * dudz(x, y, z) + fu(x, y, z) * dwdz(x, y, z)) +
             dpdx(x, y, z);
-    rhs(i, j, k, UMX) = error;
+    rhs(i, j, k, cls.UMX) = error;
 
-    error = rhs(i, j, k, UMY) +
+    error = rhs(i, j, k, cls.UMY) +
             rho * (fu(x, y, z) * dvdx(x, y, z) + fv(x, y, z) * dudx(x, y, z) +
                    2 * fv(x, y, z) * dvdy(x, y, z) +
                    fw(x, y, z) * dvdz(x, y, z) + fv(x, y, z) * dwdz(x, y, z)) +
             dpdy(x, y, z);
-    rhs(i, j, k, UMY) = error;
+    rhs(i, j, k, cls.UMY) = error;
 
-    error = rhs(i, j, k, UMZ) +
+    error = rhs(i, j, k, cls.UMZ) +
             rho * (fu(x, y, z) * dwdx(x, y, z) + fw(x, y, z) * dudx(x, y, z) +
                    fv(x, y, z) * dwdy(x, y, z) + fw(x, y, z) * dvdy(x, y, z) +
                    2 * fw(x, y, z) * dwdz(x, y, z)) +
             dpdz(x, y, z);
-    rhs(i, j, k, UMZ) = error;
+    rhs(i, j, k, cls.UMZ) = error;
 
     // d (rho u ht) = d(rho u (et + p/rho)) = d(rho u et + Pu) = rho d(u et +
     // Pu/rho) = rho [ d(u et) + 1/rho d(Pu) ] = rho [ et d(u) + u d(et) +
@@ -201,8 +234,8 @@ public:
                     (1 / rho) * (fw(x, y, z) * dpdz(x, y, z) +
                                  fp(x, y, z) * dwdz(x, y, z)));
 
-    error = error + rhs(i, j, k, UET);
-    rhs(i, j, k, UET) = error;
+    error = error + rhs(i, j, k, cls.UET);
+    rhs(i, j, k, cls.UET) = error;
 
     error = 0.0;
     for (int nn = 0; nn < 5; nn++) {
@@ -370,7 +403,7 @@ private:
 };
 
 TEST_F(MMS, keep) {
-  typedef closures_dt<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t>
+  typedef closures_dt<indicies_t,visc_suth_t, cond_suth_t, calorifically_perfect_gas_t<indicies_t>>
       cls_t;
   cls_t cls;
 
@@ -413,7 +446,7 @@ TEST_F(MMS, keep) {
 }
 
 TEST_F(MMS, scheme2) {
-  typedef closures_dt<visc_suth_t, cond_suth_t, calorifically_perfect_gas_t>
+  typedef closures_dt<indicies_t,visc_suth_t, cond_suth_t, calorifically_perfect_gas_t<indicies_t>>
       cls_t;
   cls_t cls;
 
