@@ -12,5 +12,7 @@ USE_GPIBM=FALSE
 
 AMREX_NO_PROBINIT=TRUE
 
+CUDA_ARCH=8.0
+
 include ./Make.package
 include $(AMR_SOLVER)/src/Make.CNS
