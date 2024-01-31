@@ -50,7 +50,7 @@ CNS::CNS(Amr &papa, int lev, const Geometry &level_geom, const BoxArray &bl,
          const DistributionMapping &dm, Real time)
     : AmrLevel(papa, lev, level_geom, bl, dm, time) {
   if (do_reflux && level > 0) {
-    flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level, NCONS));
+    flux_reg.reset(new FluxRegister(grids, dmap, crse_ratio, level,PROB::ProbClosures::NCONS));
   }
 
   // resize MultiFab vectors based on the number of levels
@@ -156,7 +156,7 @@ void CNS::init(AmrLevel &old) {
   setTimeLevel(cur_time, dt_old, dt_new);
 
   MultiFab &S_new = get_new_data(State_Type);
-  FillPatch(old, S_new, 0, cur_time, State_Type, 0, NCONS);
+  FillPatch(old, S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 }
 
 void CNS::init() {
@@ -168,7 +168,7 @@ void CNS::init() {
   setTimeLevel(cur_time, dt_old, dt);
 
   MultiFab &S_new = get_new_data(State_Type);
-  FillCoarsePatch(S_new, 0, cur_time, State_Type, 0, NCONS);
+  FillCoarsePatch(S_new, 0, cur_time, State_Type, 0,PROB::ProbClosures::NCONS);
 };
 
 void CNS::initData() {
@@ -357,7 +357,7 @@ void CNS::post_timestep(int /* iteration*/) {
   if (do_reflux && level < parent->finestLevel()) {
     MultiFab &S = get_new_data(State_Type);
     CNS &fine_level = getLevel(level + 1);
-    fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, NCONS, geom);
+    fine_level.flux_reg->Reflux(S, Real(1.0), 0, 0, PROB::ProbClosures::NCONS, geom);
   }
 
   if (level < parent->finestLevel()) {
@@ -430,12 +430,12 @@ void CNS::errorEst(TagBoxArray &tags, int /*clearval*/, int /*tagval*/,
                    Real time, int /*n_error_buf*/, int /*ngrow*/) {
   // MF without ghost points filled (why?)
   MultiFab sdata(get_new_data(State_Type).boxArray(),
-                 get_new_data(State_Type).DistributionMap(), NCONS, NGHOST,
+                 get_new_data(State_Type).DistributionMap(), PROB::ProbClosures::NCONS, PROB::ProbClosures::NGHOST,
                  MFInfo(), Factory());
 
   // filling ghost points (copied from PeleC)
   const Real cur_time = state[State_Type].curTime();
-  FillPatch(*this, sdata, NGHOST, cur_time, State_Type, 0, NCONS);
+  FillPatch(*this, sdata, PROB::ProbClosures::NGHOST, cur_time, State_Type, 0, PROB::ProbClosures::NCONS);
   const auto geomdata = geom.data();
 
 #ifdef AMREX_USE_GPIBM

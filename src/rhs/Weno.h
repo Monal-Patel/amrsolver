@@ -33,19 +33,19 @@ class weno_t {
                     const cls_t& cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(NGHOST);
+    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Box& bxn = mfi.grownnodaltilebox(-1, 0);  // 0,N+1 all directions
 
-    FArrayBox varsf(bxg, NCONS, The_Async_Arena());
+    FArrayBox varsf(bxg, cls_t::NCONS, The_Async_Arena());
     FArrayBox lambdaf(bxg, 1, The_Async_Arena());
-    FArrayBox tempf(bxg, NCONS, The_Async_Arena());
+    FArrayBox tempf(bxg, cls_t::NCONS, The_Async_Arena());
 
     Array4<Real> const& vars= varsf.array();
     Array4<Real> const& lambda= lambdaf.array();
     Array4<Real> const& temp= tempf.array();
 
     // zero rhs
-    ParallelFor(bxg, NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int
+    ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int
     n) noexcept {rhs(i, j, k, n)=0.0;});
 
     // for each direction
@@ -69,7 +69,7 @@ class weno_t {
 
       // compute interpolation vars
       if constexpr (isChar) {
-        Array2D<Real,0,NCONS-1,0,NCONS-1> jac;
+        Array2D<Real,0,cls_t::NCONS-1,0,cls_t::NCONS-1> jac;
         ParallelFor(bxg, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
           // R = 
           // ivars(i,j,k,) = R*var;
@@ -77,7 +77,7 @@ class weno_t {
       }
 
       // interpolate split-flux at i-1/2, j-1/2, k-1/2
-      ParallelFor(bxn, NCONS,
+      ParallelFor(bxn, cls_t::NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     // flux_dir(i, j, k, n, prims, ivars, lambda, temp);
 

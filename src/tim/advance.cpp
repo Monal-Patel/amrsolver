@@ -28,8 +28,10 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   MultiFab& S1 = get_old_data(State_Type);
   MultiFab& S2 = get_new_data(State_Type);
 
-  // MultiFab dSdt(grids,dmap,NCONS,0,MFInfo(),Factory());
-  MultiFab Stemp(grids,dmap,NCONS,NGHOST,MFInfo(),Factory());
+  int ncons = d_prob_closures->NCONS;
+  int nghost= d_prob_closures->NGHOST;
+  // MultiFab dSdt(grids,dmap,ncons,0,MFInfo(),Factory());
+  MultiFab Stemp(grids,dmap,ncons,nghost,MFInfo(),Factory());
 
   FluxRegister* fr_as_crse = nullptr;
   if (do_reflux && level < parent->finestLevel()) {
@@ -49,31 +51,31 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   if (order_rk == -2) {
     // Original time integration ///////////////////////////////////////////////
     // RK2 stage 1
-    FillPatch(*this, Stemp, NGHOST, time, State_Type, 0, NCONS);
+    FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
     // U^* = U^n + dt*dUdt^n
-    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, NCONS, 0);
+    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
 
     // RK2 stage 2
     // After fillpatch Sborder = U^n+dt*dUdt^n
     state[0].setNewTimeLevel(time + dt);
-    FillPatch(*this, Stemp, NGHOST, time + dt, State_Type, 0, NCONS);
+    FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
     compute_rhs(Stemp, Real(0.5) * dt, fr_as_crse, fr_as_fine);
     // S_new = 0.5*(Sborder+S_old) = U^n + 0.5*dt*dUdt^n
-    MultiFab::LinComb(S2, Real(0.5), S1, 0, Real(0.5), S1, 0, 0, NCONS, 0);
+    MultiFab::LinComb(S2, Real(0.5), S1, 0, Real(0.5), S1, 0, 0, ncons, 0);
     // S_new += 0.5*dt*dSdt
-    MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, NCONS, 0);
+    MultiFab::Saxpy(S2, Real(0.5) * dt, Stemp, 0, 0, ncons, 0);
     // We now have S_new = U^{n+1} = (U^n+0.5*dt*dUdt^n) + 0.5*dt*dUdt^*
     ////////////////////////////////////////////////////////////////////////////
   } else if (order_rk == 0) {  // returns rhs
-    FillPatch(*this, Stemp, NGHOST, time, State_Type, 0, NCONS);
+    FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
-    MultiFab::Copy(S2, Stemp, 0, 0, NCONS, 0);
+    MultiFab::Copy(S2, Stemp, 0, 0, ncons, 0);
   } else if (order_rk == 1) {
-    FillPatch(*this, Stemp, NGHOST, time, State_Type, 0,
-              NCONS);  // filled at t_n to evalulate f(t_n,y_n).
+    FillPatch(*this, Stemp, nghost, time, State_Type, 0,
+              ncons);  // filled at t_n to evalulate f(t_n,y_n).
     compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
-    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, NCONS, 0);
+    MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
   } else if (order_rk == 2) {
     // Low storage SSPRKm2 with m stages (C = m-1, Ceff=1-1/m). Where C is the
     // SSPRK coefficient, it also represents the max CFL over the whole
@@ -81,7 +83,7 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     // Preserving Runge–kutta And Multistep Time Discretizations
     int m = stages_rk;
     // Copy to S2 from S1
-    MultiFab::Copy(S2, S1, 0, 0, NCONS, 0);
+    MultiFab::Copy(S2, S1, 0, 0, ncons, 0);
     state[0].setOldTimeLevel(time);
     state[0].setNewTimeLevel(time);
     // first to m-1 stages
@@ -91,20 +93,20 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
     // state[0].printTimeInterval(std::cout);
     // Print() << "---------------------------------" << std::endl;
     for (int i = 1; i <= m - 1; i++) {
-      FillPatch(*this, Stemp, NGHOST, time + dt * Real(i - 1) / (m - 1),
-                State_Type, 0, NCONS);
+      FillPatch(*this, Stemp, nghost, time + dt * Real(i - 1) / (m - 1),
+                State_Type, 0, ncons);
       compute_rhs(Stemp, dt / Real(m - 1), fr_as_crse, fr_as_fine);
-      MultiFab::Saxpy(S2, dt / Real(m - 1), Stemp, 0, 0, NCONS, 0);
+      MultiFab::Saxpy(S2, dt / Real(m - 1), Stemp, 0, 0, ncons, 0);
       state[State_Type].setNewTimeLevel(
           time + dt * Real(i) /
                      (m - 1));  // important to do this for correct fillpatch
                                 // interpolations for the proceeding stages
     }
     // final stage
-    FillPatch(*this, Stemp, NGHOST, time + dt, State_Type, 0, NCONS);
+    FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
     compute_rhs(Stemp, dt / Real(m - 1), fr_as_crse, fr_as_fine);
-    MultiFab::LinComb(S2, Real(m - 1), S2, 0, dt, Stemp, 0, 0, NCONS, 0);
-    MultiFab::LinComb(S2, Real(1.0) / m, S1, 0, Real(1.0) / m, S2, 0, 0, NCONS,
+    MultiFab::LinComb(S2, Real(m - 1), S2, 0, dt, Stemp, 0, 0, ncons, 0);
+    MultiFab::LinComb(S2, Real(1.0) / m, S1, 0, Real(1.0) / m, S2, 0, 0, ncons,
                       0);
 
     state[State_Type].setNewTimeLevel(
@@ -123,28 +125,28 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       state[0].setOldTimeLevel(time);
       // http://ketch.github.io/numipedia/methods/SSPRK33.html
       // state[0].setOldTimeLevel (time);
-      FillPatch(*this, Stemp, NGHOST, time, State_Type, 0,
-                NCONS);  // filled at t_n to evalulate f(t_n,y_n).
+      FillPatch(*this, Stemp, nghost, time, State_Type, 0,
+                ncons);  // filled at t_n to evalulate f(t_n,y_n).
       compute_rhs(Stemp, dt, fr_as_crse, fr_as_fine);
-      MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, NCONS, 0);
+      MultiFab::LinComb(S2, Real(1.0), S1, 0, dt, Stemp, 0, 0, ncons, 0);
 
       state[0].setNewTimeLevel(
           time + dt);  // same time as upcoming FillPatch ensures we copy S2 to
                        // Sborder, without time interpolation
-      FillPatch(*this, Stemp, NGHOST, time + dt, State_Type, 0, NCONS);
+      FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
       compute_rhs(Stemp, dt / 4, fr_as_crse, fr_as_fine);
-      MultiFab::Xpay(Stemp, dt, S2, 0, 0, NCONS, 0);
+      MultiFab::Xpay(Stemp, dt, S2, 0, 0, ncons, 0);
       MultiFab::LinComb(S2, Real(3.0) / 4, S1, 0, Real(1.0) / 4, Stemp, 0, 0,
-                        NCONS, 0);
+                        ncons, 0);
 
       state[0].setNewTimeLevel(
           time + dt / 2);  // same time as upcoming FillPatch ensures we copy S2
                            // to Sborder, without time interpolation
-      FillPatch(*this, Stemp, NGHOST, time + dt / 2, State_Type, 0, NCONS);
+      FillPatch(*this, Stemp, nghost, time + dt / 2, State_Type, 0, ncons);
       compute_rhs(Stemp, dt * Real(2.0) / 3, fr_as_crse, fr_as_fine);
-      MultiFab::Xpay(Stemp, dt, S2, 0, 0, NCONS, 0);
+      MultiFab::Xpay(Stemp, dt, S2, 0, 0, ncons, 0);
       MultiFab::LinComb(S2, Real(1.0) / 3, S1, 0, Real(2.0) / 3, Stemp, 0, 0,
-                        NCONS, 0);
+                        ncons, 0);
 
       state[State_Type].setNewTimeLevel(
           time + dt);  // important to do this for correct fillpatch
@@ -157,32 +159,32 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
       // Discretizations
 
       state[0].setOldTimeLevel(time);
-      FillPatch(*this, Stemp, NGHOST, time, State_Type, 0, NCONS);
+      FillPatch(*this, Stemp, nghost, time, State_Type, 0, ncons);
       compute_rhs(Stemp, dt / 2, fr_as_crse, fr_as_fine);
-      MultiFab::LinComb(S2, Real(1.0), S1, 0, dt / 2, Stemp, 0, 0, NCONS, 0);
+      MultiFab::LinComb(S2, Real(1.0), S1, 0, dt / 2, Stemp, 0, 0, ncons, 0);
 
       state[0].setNewTimeLevel(
           time + dt / 2);  // same time as upcoming FillPatch ensures we copy S2
                            // to Sborder, without time interpolation
-      FillPatch(*this, Stemp, NGHOST, time + dt / 2, State_Type, 0, NCONS);
+      FillPatch(*this, Stemp, nghost, time + dt / 2, State_Type, 0, ncons);
       compute_rhs(Stemp, dt / 2, fr_as_crse, fr_as_fine);
-      MultiFab::Saxpy(S2, dt / 2, Stemp, 0, 0, NCONS, 0);
+      MultiFab::Saxpy(S2, dt / 2, Stemp, 0, 0, ncons, 0);
 
       state[0].setNewTimeLevel(
           time + dt);  // same time as upcoming FillPatch ensures we copy S2 to
                        // Sborder, without time interpolation
-      FillPatch(*this, Stemp, NGHOST, time + dt, State_Type, 0, NCONS);
+      FillPatch(*this, Stemp, nghost, time + dt, State_Type, 0, ncons);
       compute_rhs(Stemp, dt / 6, fr_as_crse, fr_as_fine);
       MultiFab::LinComb(S2, Real(2.0) / 3, S1, 0, Real(1.0) / 3, S2, 0, 0,
-                        NCONS, 0);
-      MultiFab::Saxpy(S2, dt / 6, Stemp, 0, 0, NCONS, 0);
+                        ncons, 0);
+      MultiFab::Saxpy(S2, dt / 6, Stemp, 0, 0, ncons, 0);
 
       state[0].setNewTimeLevel(
           time + dt / 2);  // same time as upcoming FillPatch ensures we copy S2
                            // to Sborder, without time interpolation
-      FillPatch(*this, Stemp, NGHOST, time + dt / 2, State_Type, 0, NCONS);
+      FillPatch(*this, Stemp, nghost, time + dt / 2, State_Type, 0, ncons);
       compute_rhs(Stemp, dt / 2, fr_as_crse, fr_as_fine);
-      MultiFab::Saxpy(S2, dt / 2, Stemp, 0, 0, NCONS, 0);
+      MultiFab::Saxpy(S2, dt / 2, Stemp, 0, 0, ncons, 0);
 
       state[State_Type].setNewTimeLevel(
           time + dt);  // important to do this for correct fillpatch
@@ -213,15 +215,12 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
 // computation and data transfer, is not useful then. Therefore, we can have all
 // grid point computations, per fab, in a single MFIter loop (single stream).
 
-// However, computation and temporary space allocation could be done
-// concurrently?
-
 void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, FluxRegister* fr_as_fine) {
   BL_PROFILE("CNS::compute_rhs()");
 
   // Variables
   // TODO: introduce a struct for these variables?
-  // const PROB::ProbClosures& cls_d = *CNS::d_prob_closures;
+  const PROB::ProbClosures& cls_d = *CNS::d_prob_closures;
   const PROB::ProbClosures& cls_h = *CNS::h_prob_closures;
   const PROB::ProbParm& parms = *d_prob_parm;
 
@@ -229,10 +228,10 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
     Array4<Real> const& state = statemf.array(mfi);
 
     const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0);  // extent is 0,N_cell+1
-    const Box& bxg = mfi.growntilebox(NGHOST);
+    const Box& bxg = mfi.growntilebox(cls_d.NGHOST);
 
-    FArrayBox primf(bxg, NPRIM, The_Async_Arena());
-    FArrayBox tempf(bxgnodal, NCONS, The_Async_Arena());
+    FArrayBox primf(bxg, cls_d.NPRIM , The_Async_Arena());
+    FArrayBox tempf(bxgnodal, cls_d.NCONS, The_Async_Arena());
     Array4<Real> const& temp = tempf.array();
     Array4<Real> const& prims= primf.array();
 
@@ -314,7 +313,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 //           ComputeSensorLambda(i,j,k,primsfab,lambda,sensor,cls);
 //         });
 
-//         amrex::ParallelFor(bxnodal, NCONS,
+//         amrex::ParallelFor(bxnodal, ncons,
 //         [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
 //         {
 //           JSTflux(i,j,k,n,lambda,sensor,statefab,nfabfx,nfabfy,nfabfz,cls);
@@ -416,7 +415,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 //       const Box& bxnodal  = mfi.grownnodaltilebox(-1,0); // extent is 0,N+1
 //       in all directions -- -1 means for all directions.
 //       amrex::surroundingNodes(bx) does the same amrex::ParallelFor(bxnodal,
-//       NCONS,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
+//       ncons,[=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept {
 //         ViscousNumericalFluxes(i, j, k, n, pfabfx, pfabfy, pfabfz, nfabfx,
 //         nfabfy, nfabfz);
 //       });
@@ -429,7 +428,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ?
 //         dx[0]*dx[2] : dx[0]*dx[1]); const Real scale = -dt*dA;
-//         fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, NCONS, scale,
+//         fr_as_crse->CrseInit(numflxmf[idim], idim, 0, 0, ncons, scale,
 //         FluxRegister::ADD);
 //     }
 // }
@@ -437,7 +436,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 //     for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 //         const Real dA = (idim == 0) ? dx[1]*dx[2] : ((idim == 1) ?
 //         dx[0]*dx[2] : dx[0]*dx[1]); const Real scale = dt*dA;
-//         fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, NCONS, scale);
+//         fr_as_fine->FineAdd(numflxmf[idim], idim, 0, 0, ncons, scale);
 //     }
 // }
 // }
@@ -467,7 +466,7 @@ void CNS::compute_rhs(MultiFab& statemf, Real dt, FluxRegister* fr_as_crse, Flux
 //     auto const& dsdtfab = dSdt.array(mfi);
 //     IBM::IBFab &fab = mfab.get(mfi);
 //     Array4<bool> ibMarkers = fab.array();
-//     amrex::ParallelFor(bx, NCONS,
+//     amrex::ParallelFor(bx, ncons,
 //     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) noexcept
 //     {
 //     dsdtfab(i,j,k,n) = dsdtfab(i,j,k,n)*(1 - int(ibMarkers(i,j,k,0)));

@@ -52,7 +52,7 @@ class calorifically_perfect_gas_t {
   // TODO: remove ParallelFor from here. Keep closures local
   void inline cons2prims(const MFIter& mfi, const Array4<Real>& cons,
                          const Array4<Real>& prims) const {
-    const Box& bxg = mfi.growntilebox(NGHOST);
+    const Box& bxg = mfi.growntilebox(idx_t::NGHOST);
 
     amrex::ParallelFor(bxg, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) {
       Real rho = cons(i, j, k, idx.URHO);

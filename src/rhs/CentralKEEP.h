@@ -58,7 +58,7 @@ class keep_euler_t {
                     const cls_t& cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
-    const Box& bxg = mfi.growntilebox(NGHOST);
+    const Box& bxg = mfi.growntilebox(cls.NGHOST);
     const Box& bxgnodal = mfi.grownnodaltilebox(
         -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
                  // directions. amrex::surroundingNodes(bx) does the same
@@ -69,7 +69,7 @@ class keep_euler_t {
         coeffs(halfsten - 1, 2)};  // get coefficients array for current scheme
 
     // compute interface fluxes at i-1/2, j-1/2, k-1/2
-    ParallelFor(bxg, NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {rhs(i, j, k, n)=0.0;});
+    ParallelFor(bxg, cls_t::NCONS, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {rhs(i, j, k, n)=0.0;});
 
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
       ParallelFor(bxgnodal,
@@ -78,7 +78,7 @@ class keep_euler_t {
                   });
 
       // add flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-      ParallelFor(bx, NCONS,
+      ParallelFor(bx, cls_t::NCONS,
                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                     rhs(i, j, k, n) +=
                         dxinv[dir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
@@ -98,7 +98,7 @@ class keep_euler_t {
       int i, int j, int k, int dir, const Array1D<Real, 0, 2>& coefs,
       const Array4<Real>& prims, const Array4<Real>& flx,
       const cls_t& cls) const {
-    for (int n = 0; n < NCONS; n++) {
+    for (int n = 0; n < cls_t::NCONS; n++) {
       flx(i, j, k, n) = 0.0;
     };
     GpuArray<int, 3> vdir = {int(dir == 0), int(dir == 1), int(dir == 2)};

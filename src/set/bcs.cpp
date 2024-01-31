@@ -31,9 +31,9 @@ struct CnsFillExtDir {
                      prob_lo[1] + static_cast<Real>(iv[1] + 0.5) * dx[1],
                      prob_lo[2] + static_cast<Real>(iv[2] + 0.5) * dx[2])};
 
-    Real s_int[NCONS] = {0.0};
-    Real s_refl[NCONS] = {0.0};
-    Real s_ext[NCONS] = {0.0};
+    Real s_int[PROB::ProbClosures::NCONS] = {0.0};
+    Real s_refl[PROB::ProbClosures::NCONS] = {0.0};
+    Real s_ext[PROB::ProbClosures::NCONS] = {0.0};
 
     for (int idir = 0; idir < AMREX_SPACEDIM; ++idir) {
       if ((bc.lo(idir) == BCType::ext_dir) && (iv[idir] < domlo[idir])) {

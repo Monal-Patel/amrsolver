@@ -15,7 +15,7 @@
 /// :math:`f_{i+1/2}= `
 /// ```
 ///
-template <bool iOption, typename closures>
+template <bool iOption, typename cls_t>
 class riemann_t {
  public:
   AMREX_GPU_HOST_DEVICE
@@ -26,20 +26,20 @@ class riemann_t {
 
   void inline eflux(const Geometry& geom, const MFIter& mfi,
                     const Array4<Real>& prims, const Array4<Real>& flx,
-                    const Array4<Real>& rhs, const closures& cls) {
+                    const Array4<Real>& rhs, const cls_t& cls) {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx = mfi.tilebox();
-    const Box& bxg = mfi.growntilebox(NGHOST);
+    const Box& bxg = mfi.growntilebox(cls_t::NGHOST);
     const Box& bxn = mfi.grownnodaltilebox(-1, 0);  // 0,N+1 all directions
 
     // zero rhs
-    ParallelFor(bxg, NCONS,
+    ParallelFor(bxg, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                   rhs(i, j, k, n) = 0.0;
                 });
 
     const Box& bxg1 = amrex::grow(bx, 1);
-    FArrayBox slopef(bxg1, NCONS, The_Async_Arena());
+    FArrayBox slopef(bxg1, cls_t::NCONS, The_Async_Arena());
     const Array4<Real>& slope = slopef.array();
 
     // x-direction
@@ -55,7 +55,7 @@ class riemann_t {
           this->cns_riemann_x(i, j, k, flx, slope, prims, cls);
         });
     // add x flux derivative to rhs = -(fi+1 - fi)/dx = (fi - fi+1)/dx
-    ParallelFor(bx, NCONS,
+    ParallelFor(bx, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                   rhs(i, j, k, n) +=
                       dxinv[cdir] * (flx(i, j, k, n) - flx(i + 1, j, k, n));
@@ -71,13 +71,13 @@ class riemann_t {
     const Box& yflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         yflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int n = 0; n < NCONS; n++) {
+          for (int n = 0; n < cls_t::NCONS; n++) {
             flx(i, j, k, n) = 0.0;
           };
           this->cns_riemann_y(i, j, k, flx, slope, prims, cls);
         });
     // add y flux derivative to rhs = -(fi+1 - fi)/dy = (fi - fi+1)/dy
-    ParallelFor(bx, NCONS,
+    ParallelFor(bx, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                   rhs(i, j, k, n) +=
                       dxinv[cdir] * (flx(i, j, k, n) - flx(i, j + 1, k, n));
@@ -93,13 +93,13 @@ class riemann_t {
     const Box& zflxbx = amrex::surroundingNodes(bx, cdir);
     amrex::ParallelFor(
         zflxbx, [=, *this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-          for (int n = 0; n < NCONS; n++) {
+          for (int n = 0; n < cls_t::NCONS; n++) {
             flx(i, j, k, n) = 0.0;
           };
           this->cns_riemann_z(i, j, k, flx, slope, prims, cls);
         });
     // add z flux derivative to rhs = -(fi+1 - fi)/dz = (fi - fi+1)/dz
-    ParallelFor(bx, NCONS,
+    ParallelFor(bx, cls_t::NCONS,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
                   rhs(i, j, k, n) +=
                       dxinv[cdir] * (flx(i, j, k, n) - flx(i, j, k + 1, n));
@@ -243,7 +243,7 @@ class riemann_t {
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_x(
       int i, int j, int k, const Array4<Real>& dq, const Array4<Real>& q,
-      const closures& cls) const {
+      const cls_t& cls) const {
     Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 2.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i - 1, j, k, cls.QPRES)) /
@@ -291,7 +291,7 @@ class riemann_t {
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_y(
       int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
-      closures const& cls) const {
+      cls_t const& cls) const {
     Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j - 1, k, cls.QPRES)) /
@@ -339,7 +339,7 @@ class riemann_t {
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_slope_z(
       int i, int j, int k, Array4<Real> const& dq, Array4<Real const> const& q,
-      closures const& cls) const {
+      cls_t const& cls) const {
     Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k, cls.QT)) + 1.e-40;
     Real dlft = Real(0.5) *
                     (q(i, j, k, cls.QPRES) - q(i, j, k - 1, cls.QPRES)) /
@@ -387,7 +387,7 @@ class riemann_t {
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_x(
       int i, int j, int k, Array4<Real> const& fx, Array4<Real> const& dq,
-      Array4<Real> const& q, closures const& cls) const {
+      Array4<Real> const& q, cls_t const& cls) const {
     Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i - 1, j, k, cls.QT)) + 1.e-40;
     Real rl = q(i - 1, j, k, cls.QRHO) +
               Real(0.5) * ((dq(i - 1, j, k, 0) + dq(i - 1, j, k, 2)) / cspeed +
@@ -424,7 +424,7 @@ class riemann_t {
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_y(
       int i, int j, int k, Array4<Real> const& fy, Array4<Real const> const& dq,
-      Array4<Real const> const& q, closures const& cls) const {
+      Array4<Real const> const& q, cls_t const& cls) const {
     Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j - 1, k, cls.QT)) + 1.e-40;
     Real rl = q(i, j - 1, k, cls.QRHO) +
               Real(0.5) * ((dq(i, j - 1, k, 0) + dq(i, j - 1, k, 2)) / cspeed +
@@ -461,7 +461,7 @@ class riemann_t {
 
   AMREX_GPU_DEVICE AMREX_FORCE_INLINE void cns_riemann_z(
       int i, int j, int k, Array4<Real> const& fz, Array4<Real const> const& dq,
-      Array4<Real const> const& q, closures const& cls) const {
+      Array4<Real const> const& q, cls_t const& cls) const {
     Real cspeed = sqrt(cls.gamma * cls.Rspec * q(i, j, k + 1, cls.QT)) + 1.e-40;
     Real rl = q(i, j, k - 1, cls.QRHO) +
               Real(0.5) * ((dq(i, j, k - 1, 0) + dq(i, j, k - 1, 2)) / cspeed +
