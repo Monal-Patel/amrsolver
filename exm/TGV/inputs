@@ -2,7 +2,7 @@ amrex.fpe_trap_invalid=1
 # amrex.use_gpu_aware_mpi = 1
 
 # start time is assumed to be 0, unless re-starting
-max_step  = 10
+max_step  = 100
 #stop_time = 0.094959268
 # One flow time @ M=0.1 = 0.04747963405s
 # One flow time @ M=1.0 = 4.74796e-3s

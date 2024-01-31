@@ -11,10 +11,10 @@ using namespace amrex;
 
 namespace PROB {
 
-// constexpr int do_wm = 0; // 0=false, 1=true
-////////////////////////////////////////////////////////////////////////////////
-
 //////////////////////////////DISCRETISATION////////////////////////////////////
+inline Vector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
+inline Vector<int> cons_vars_type={0,1,2,3,0};
+
 typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
                     calorifically_perfect_gas_t<indicies_t>>
     ProbClosures;
@@ -35,26 +35,10 @@ void inline inputs() {
   pp.addarr("cns.hi_bc", std::vector<int>{1, 1, 1});
   pp.add("cns.order_rk", 3);  // -2, 1, 2 or 3"
   pp.add("cns.stages_rk", 4); // 1, 2 or 3
-  // pp.add   ("cns.rhs_euler", 1); // 0=false, 1=true
-  // pp.add   ("cns.rhs_visc", 1); // 0=false, 1=true
-  pp.add("cns.rhs_source", 0); // 0=false, 1=true
-  // pp.add   ("cns.flux_euler", 1); // 0=riemann solver, 1=KEEP/AD, 2=WENO5
-  pp.add("cns.order_keep", 4);         // Order of accuracy=2, 4 or 6"
-  pp.add("cns.art_diss", 0);           // 0=none, 1=artificial dissipation
   pp.add("cns.screen_output", 100000); //
   pp.add("cns.verbose", 0);            // 0=quiet, 1=verbose
 }
 ////////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////////CLOSURES/////////////////////////////////////////
-// user can also define their own closure class and use it here by naming it
-// ProbClosures template <typename Visc, typename Cond, typename Thermo> class
-// cls_derived_user_t : public Cond, public Visc, public Thermo
-// {
-// private:
-//
-// public:
-// };
 
 // problem parameters
 struct ProbParm {
@@ -117,8 +101,8 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
 
 // boundary conditions
 AMREX_GPU_DEVICE AMREX_FORCE_INLINE void
-bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[NCONS],
-         const Real s_refl[NCONS], Real s_ext[NCONS], const int idir,
+bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[ProbClosures::NCONS],
+         const Real s_refl[ProbClosures::NCONS], Real s_ext[ProbClosures::NCONS], const int idir,
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &cls, ProbParm const &pparm) {
   Abort("bcnormal not set");
