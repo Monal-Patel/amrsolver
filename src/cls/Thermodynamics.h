@@ -74,14 +74,38 @@ class calorifically_perfect_gas_t {
       prims(i, j, k, idx.QT) = p / (rho * (this->Rspec));
     });
   }
+
+
+  inline void derpres(const Box& bx, FArrayBox& derfab, int dcomp, int /*ncomp*/,
+                    const FArrayBox& datafab, const Geometry& /*geomdata*/,
+                    Real /*time*/, const int* /*bcrec*/, int /*level*/) const {
+  auto const dat = datafab.array();
+  auto pfab = derfab.array(dcomp);
+
+  amrex::ParallelFor(bx, [=,*this] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+    // cons2P
+    Real rhoinv = 1.0_rt / dat(i, j, k, idx.URHO);
+    Real mx = dat(i, j, k, idx.UMX);
+    Real my = dat(i, j, k, idx.UMY);
+    Real mz = dat(i, j, k, idx.UMZ);
+    Real rhoeint =
+        dat(i, j, k, idx.UET) - Real(0.5) * rhoinv * (mx * mx + my * my + mz * mz);
+    pfab(i, j, k) = (this->gamma - Real(1.0)) * rhoeint;
+  });
+}
+
 };
 
+template <typename idx_t>
 class calorifically_perfect_gas_nasg_liquid_t
 {
 private:
   /* data */
   // gamma_a =;
   // gamma_l =;
+
+protected:
+ idx_t idx;
 
 public:
 // state
@@ -91,11 +115,12 @@ Real inline energy (Real p, Real rho) {
 return eint;
 }
 
-// pressure (eint,rho)
+void inline cons2prims(const MFIter& mfi, const Array4<Real>& cons,
+                         const Array4<Real>& prims) const {
+
+
+amrex::Print() << "cons2prims multiphase \n";
+                         }
 
 };
-
-
-
-
 #endif

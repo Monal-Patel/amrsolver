@@ -1,6 +1,5 @@
 #include <AMReX_FluxRegister.H>
 #include <CNS.h>
-#include <CNS_hydro_K.h>
 #include <prob.h>
 // #include <CentralKEEP.h>
 // #include <Riemann.h>
@@ -28,8 +27,9 @@ Real CNS::advance(Real time, Real dt, int /*iteration*/, int /*ncycle*/) {
   MultiFab& S1 = get_old_data(State_Type);
   MultiFab& S2 = get_new_data(State_Type);
 
-  int ncons = d_prob_closures->NCONS;
-  int nghost= d_prob_closures->NGHOST;
+  int ncons = h_prob_closures->NCONS;
+  int nghost= h_prob_closures->NGHOST;
+
   // MultiFab dSdt(grids,dmap,ncons,0,MFInfo(),Factory());
   MultiFab Stemp(grids,dmap,ncons,nghost,MFInfo(),Factory());
 

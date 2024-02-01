@@ -48,7 +48,7 @@ class CNS : public amrex::AmrLevel {
                    amrex::FluxRegister* fr_as_crse,
                    amrex::FluxRegister* fr_as_fine);
 
-  void computeTemp(amrex::MultiFab& State, int ng);
+  // void computeTemp(amrex::MultiFab& State, int ng);
 
   amrex::Real estTimeStep();
 
@@ -156,4 +156,45 @@ void cns_bcfill(amrex::Box const& bx, amrex::FArrayBox& data, const int dcomp,
                 const amrex::Real time, const amrex::Vector<amrex::BCRec>& bcr,
                 const int bcomp, const int scomp);
 
+// TODO: Pass primsmf here to avoid computing primitive variables again.
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE Real
+cns_estdt(Box const& bx, Array4<Real const> const& state,
+          GpuArray<Real, AMREX_SPACEDIM> const& dx,
+          const PROB::ProbClosures& cls) {
+  const auto lo = lbound(bx);
+  const auto hi = ubound(bx);
+#if !defined(__CUDACC__) || (__CUDACC_VER_MAJOR__ != 9) || \
+    (__CUDACC_VER_MINOR__ != 2)
+  Real dt = std::numeric_limits<Real>::max();
+#else
+  Real dt = Real(1.e37);
+#endif
+
+  // exit(0);
+
+  for (int k = lo.z; k <= hi.z; ++k) {
+    for (int j = lo.y; j <= hi.y; ++j) {
+      for (int i = lo.x; i <= hi.x; ++i) {
+        // Real rho = state(i, j, k, cls.URHO);
+        // Real mx = state(i, j, k, cls.UMX);
+        // Real my = state(i, j, k, cls.UMY);
+        // Real mz = state(i, j, k, cls.UMY);
+        // Real rhoinv = Real(1.0) / max(rho, 1.0e-40);
+        // Real vx = mx * rhoinv;
+        // Real vy = my * rhoinv;
+        // Real vz = mz * rhoinv;
+        // Real ke = Real(0.5) * rho * (vx * vx + vy * vy + vz * vz);
+        // Real rhoei = (state(i, j, k, cls.UET) - ke);
+        // Real p = (cls.gamma - Real(1.0)) * rhoei;
+        // Real cs = std::sqrt(cls.gamma * p * rhoinv);
+        // Real dtx = dx[0] / (Math::abs(vx) + cs);
+        // Real dty = dx[1] / (Math::abs(vy) + cs);
+        // Real dtz = dx[2] / (Math::abs(vz) + cs);
+        // dt = min(dt, min(dtx, min(dty, dtz)));
+      }
+    }
+  }
+
+  return dt;
+}
 #endif

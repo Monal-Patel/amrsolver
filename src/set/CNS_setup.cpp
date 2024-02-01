@@ -112,17 +112,22 @@ void CNS::variableSetUp() {
 
   // Physical boundary conditions ////////////////////////////////////////////
 
+  // TODO assert Ncons = cons_vars_type.length and cons_vars_names_length 
   for (int cnt=0;cnt<h_prob_closures->NCONS;cnt++) {
     if (PROB::cons_vars_type[cnt]==0) {
+      // Print() << cnt << " " << PROB::cons_vars_names[cnt] << std::endl;
       set_scalar_bc(bcs[cnt], h_phys_bc);
     }
     else if (PROB::cons_vars_type[cnt]==1) {
+      // Print() << cnt << " " << PROB::cons_vars_names[cnt] << std::endl;
       set_x_vel_bc(bcs[cnt], h_phys_bc);
     }
     else if (PROB::cons_vars_type[cnt]==2) {
+      // Print() << cnt << " " << PROB::cons_vars_names[cnt] << std::endl;
       set_y_vel_bc(bcs[cnt], h_phys_bc);
     }
     else if (PROB::cons_vars_type[cnt]==3) {
+      // Print() << cnt << " " << PROB::cons_vars_names[cnt] << std::endl;
       set_z_vel_bc(bcs[cnt], h_phys_bc);
     }
   }
@@ -134,36 +139,31 @@ void CNS::variableSetUp() {
   desc_lst.setComponent(State_Type, 0, PROB::cons_vars_names, bcs, bndryfunc);
 
   num_state_data_types = desc_lst.size();
-  // printf("num_state_data_types %d \n",num_state_data_types);
-  // exit(0);
   ////////////////////////////////////////////////////////////////////////////
 
   // Define derived quantities ///////////////////////////////////////////////
+
+  // Can have derpres, dertemp, derprimvar defined in prob.h
+  // Can we avoid this by modifying write plot file routine? --> AMReX not designed for this, not trivial.
+  // 
+
+  // PROB::
   // Pressure
-  derive_lst.add("pressure", IndexType::TheCellType(), 1, derpres,
-                 the_same_box);
-  derive_lst.addComponent("pressure", desc_lst, State_Type, h_prob_closures->URHO, h_prob_closures->NCONS);
+  // derive_lst.add("Pressure", IndexType::TheCellType(), 1,derpres,
+                //  the_same_box);
+  // printf("address:%p \n",&PROB::ProbClosures::derpres);
+  // std::cout << typeid(derpres).name() << std::endl;
+  // std::cout << typeid(&PROB::ProbClosures::derpres).name() << std::endl;
 
-  // Temperature
-  derive_lst.add("temperature", IndexType::TheCellType(), 1, dertemp,
-                 the_same_box);
-  derive_lst.addComponent("temperature", desc_lst, State_Type, h_prob_closures->URHO, h_prob_closures->NCONS);
+  // Vector<std::string> derived_vars_names={"Pressure","Temperature"};
 
-//   // Velocities
-//   derive_lst.add("x_velocity", amrex::IndexType::TheCellType(), 1, dervel,
-//                  the_same_box);
-//   derive_lst.addComponent("x_velocity", desc_lst, State_Type, h_prob_closures->URHO, 1);
-//   derive_lst.addComponent("x_velocity", desc_lst, State_Type, h_prob_closures->UMX, 1);
+  // derive_lst.add("Pressure", IndexType::TheCellType(), 1, derpres, the_same_box);
 
-//   derive_lst.add("y_velocity", amrex::IndexType::TheCellType(), 1, dervel,
-//                  the_same_box);
-//   derive_lst.addComponent("y_velocity", desc_lst, State_Type, h_prob_closures->URHO, 1);
-//   derive_lst.addComponent("y_velocity", desc_lst, State_Type, h_prob_closures->UMY, 1);
+  // derive_lst.addComponent("Pressure", desc_lst, State_Type, h_prob_closures->URHO, h_prob_closures->NCONS);
 
-// #if (AMREX_SPACEDIM == 3)
-//   derive_lst.add("z_velocity", amrex::IndexType::TheCellType(), 1, dervel,
-//                  the_same_box);
-//   derive_lst.addComponent("z_velocity", desc_lst, State_Type, h_prob_closures->URHO, 1);
-//   derive_lst.addComponent("z_velocity", desc_lst, State_Type, h_prob_closures->UMZ, 1);
-// #endif
+  // // Temperature
+  // derive_lst.add("Temperature", IndexType::TheCellType(), 1, dertemp,
+  //                the_same_box);
+  // derive_lst.addComponent("Temperature", desc_lst, State_Type, h_prob_closures->URHO, h_prob_closures->NCONS);
+
 }

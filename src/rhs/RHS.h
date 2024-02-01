@@ -5,6 +5,7 @@
 #include <Weno.h>
 #include <CentralKEEP.h>
 #include <Riemann.h>
+#include <HLLCMP.h>
 
 // _dt stands for derived type
 // later on change this from rhs_dt to cns_dt.

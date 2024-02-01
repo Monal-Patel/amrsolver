@@ -21,13 +21,22 @@ struct ProbParm {
   Real u_r = 0.0;
 };
 
-inline Vector<std::string> cons_vars_names={"Density","Xmom","Ymom","Zmom","Energy"};
-inline Vector<int> cons_vars_type={0,1,2,3,0};
+// static constexpr int UR1=0;
+// static constexpr int UR2=1;
+// static constexpr int UMX=2;
+// static constexpr int UMY=3;
+// static constexpr int UMZ=4;
+// static constexpr int UET=5;
+// static constexpr int UA1=6;
+// static constexpr int NCONS=7;
 
-typedef closures_dt<indicies_t, visc_suth_t, cond_suth_t,
-                    calorifically_perfect_gas_t<indicies_t>>
+inline Vector<std::string> cons_vars_names={"DensityL","DensityG","Xmom","Ymom","Zmom","Energy", "VolFrac"};
+inline Vector<int> cons_vars_type={0,0,1,2,3,0,0};
+
+typedef closures_dt<indicies_multiphase_t, visc_const_t, cond_const_t,
+                    calorifically_perfect_gas_nasg_liquid_t<indicies_multiphase_t>>
     ProbClosures;
-typedef rhs_dt<riemann_t<false, ProbClosures>, no_diffusive_t, no_source_t>
+typedef rhs_dt<hllc_mp_t<false, ProbClosures>, no_diffusive_t, no_source_t>
     ProbRHS;
 
 // This function will be removed
@@ -68,12 +77,12 @@ prob_initdata(int i, int j, int k, Array4<Real> const &state,
     rhot = prob_parm.rho_r;
     uxt = prob_parm.u_r;
   }
-  state(i, j, k, cls.URHO) = rhot;
-  state(i, j, k, cls.UMX) = rhot * uxt;
-  state(i, j, k, cls.UMY) = Real(0.0);
-  state(i, j, k, cls.UMZ) = Real(0.0);
-  Real et = Pt / (cls.gamma - Real(1.0));
-  state(i, j, k, cls.UET) = et + Real(0.5) * rhot * uxt * uxt;
+  // state(i, j, k, cls.URHO) = rhot;
+  // state(i, j, k, cls.UMX) = rhot * uxt;
+  // state(i, j, k, cls.UMY) = Real(0.0);
+  // state(i, j, k, cls.UMZ) = Real(0.0);
+  // Real et = Pt / (cls.gamma - Real(1.0));
+  // state(i, j, k, cls.UET) = et + Real(0.5) * rhot * uxt * uxt;
 }
 
 // boundary conditions
@@ -98,6 +107,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[5],
          const Real s_refl[ProbClosures::NCONS], Real s_ext[5], const int idir,
          const int sgn, const Real time, GeometryData const & /*geomdata*/,
          ProbClosures const &closures, ProbParm const &prob_parm) {
+  if (idir == 1) { // ylo or yhi
 
     Abort("bcnormal not coded");
 
@@ -127,6 +137,7 @@ bcnormal(const Real x[AMREX_SPACEDIM], Real dratio, const Real s_int[5],
     // q_ext[QW]*q_ext[QW]); Real eint_ext =
     // q_ext[QPRES]/(q_ext[QRHO]*(parm.eos_gamma - 1.0)); s_ext[UET] =
     // q_ext[QRHO]*(eint_ext + ekin_ext);
+  }
 }
 
 // source term

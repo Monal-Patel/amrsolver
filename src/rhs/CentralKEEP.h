@@ -59,10 +59,7 @@ class keep_euler_t {
     const GpuArray<Real, AMREX_SPACEDIM> dxinv = geom.InvCellSizeArray();
     const Box& bx  = mfi.growntilebox(0);
     const Box& bxg = mfi.growntilebox(cls.NGHOST);
-    const Box& bxgnodal = mfi.grownnodaltilebox(
-        -1, 0);  // extent is 0,N_cell+1 in all directions -- -1 means for all
-                 // directions. amrex::surroundingNodes(bx) does the same
-
+    const Box& bxgnodal = mfi.grownnodaltilebox(-1, 0); // [0,N+1]
     int halfsten = order / 2;
     Array1D<Real, 0, 2> order_coeffs{
         coeffs(halfsten - 1, 0), coeffs(halfsten - 1, 1),
